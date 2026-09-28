@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kaoyan.study.progress.mapper.ProgressMapper">
+
+    <resultMap id="unitProgressMap" type="com.kaoyan.study.progress.dto.UnitProgressView">
+        <constructor>
+            <idArg column="subject_id" name="subjectId" javaType="java.lang.Long"/>
+            <arg column="subject_name" name="subjectName" javaType="java.lang.String"/>
+            <arg column="unit_id" name="unitId" javaType="java.lang.Long"/>
+            <arg column="unit_name" name="unitName" javaType="java.lang.String"/>
+            <arg column="planned_amount" name="plannedAmount" javaType="java.math.BigDecimal"/>
+            <arg column="completed_amount" name="completedAmount" javaType="java.math.BigDecimal"/>
+            <arg column="study_minutes" name="studyMinutes" javaType="java.lang.Integer"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="dailyMinutesMap" type="com.kaoyan.study.progress.mapper.ProgressMapper$DailyMinutesRow">
+        <constructor>
+            <idArg column="record_date" name="date" javaType="java.time.LocalDate"/>
+            <arg column="study_minutes" name="studyMinutes" javaType="java.lang.Integer"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="dailyUnitAmountMap" type="com.kaoyan.study.progress.mapper.ProgressMapper$DailyUnitAmountRow">
+        <constructor>
+            <idArg column="record_date" name="date" javaType="java.time.LocalDate"/>
+            <arg column="unit_id" name="unitId" javaType="java.lang.Long"/>
+            <arg column="unit_name" name="unitName" javaType="java.lang.String"/>
+            <arg column="amount" name="amount" javaType="java.math.BigDecimal"/>
+        </constructor>
+    </resultMap>
+
+    <!--
+      计划量聚合 task.planned_amount（允许为空：全部为空时 SUM 为 NULL，表示未设置计划量）；
+      完成量与时长聚合未删除的学习记录。分组键包含单位，避免跨单位相加。
+    -->
+    <select id="findUnitProgress" resultMap="unitProgressMap">
+        SELECT p.subject_id,
+               s.name AS subject_name,
+               p.unit_id,
+               u.name AS unit_name,
+               SUM(p.planned_amount) AS planned_amount,
+               COALESCE(SUM(p.completed_amount), 0) AS completed_amount,
+               CAST(COALESCE(SUM(p.study_minutes), 0) AS SIGNED) AS study_minutes
+        FROM (SELECT t.subject_id,
+                     t.unit_id,
+                     t.planned_amount,
+                     0 AS completed_amount,
+                     0 AS study_minutes
+              FROM task t
+              WHERE t.status &lt;&gt; 'ARCHIVED'
+              UNION ALL
+              SELECT r.subject_id,
+                     r.unit_id,
+                     0 AS planned_amount,
+                     r.amount AS completed_amount,
+                     COALESCE(r.duration_minutes, 0) AS study_minutes
+              FROM study_record r
+              WHERE r.deleted_at IS NULL
+                <!-- 只记时长、没有单位的记录无法归入任何单位，因此不参与按单位的完成量聚合；
+                     它们的用时仍然计入 /api/progress/trend 的时长趋势。 -->
+                AND r.unit_id IS NOT NULL
+                AND r.subject_id IS NOT NULL
+                <if test="from != null">AND r.record_date &gt;= #{from}</if>
+                <if test="to != null">AND r.record_date &lt;= #{to}</if>) p
+                 JOIN subject s ON s.id = p.subject_id
+                 JOIN study_unit u ON u.id = p.unit_id
+        GROUP BY p.subject_id, s.name, p.unit_id, u.name
+        ORDER BY s.sort_order, s.id, u.sort_order, u.id
+    </select>
+
+    <select id="findDailyMinutes" resultMap="dailyMinutesMap">
+        SELECT r.record_date AS record_date,
+               CAST(COALESCE(SUM(r.duration_minutes), 0) AS SIGNED) AS study_minutes
+        FROM study_record r
+        WHERE r.deleted_at IS NULL
+          <if test="from != null">AND r.record_date &gt;= #{from}</if>
+          <if test="to != null">AND r.record_date &lt;= #{to}</if>
+        GROUP BY r.record_date
+        ORDER BY r.record_date
+    </select>
+
+    <select id="findDailyUnitAmounts" resultMap="dailyUnitAmountMap">
+        SELECT r.record_date AS record_date,
+               r.unit_id AS unit_id,
+               u.name AS unit_name,
+               SUM(r.amount) AS amount
+        FROM study_record r
+                 JOIN study_unit u ON u.id = r.unit_id
+        WHERE r.deleted_at IS NULL
+          <if test="from != null">AND r.record_date &gt;= #{from}</if>
+          <if test="to != null">AND r.record_date &lt;= #{to}</if>
+        GROUP BY r.record_date, r.unit_id, u.name
+        ORDER BY r.record_date, u.sort_order
+    </select>
+
+</mapper>

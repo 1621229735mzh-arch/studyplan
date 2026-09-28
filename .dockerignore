@@ -1,0 +1,17 @@
+# 构建上下文是仓库根目录，这里排除不需要进入镜像的内容。
+.git/
+.m2repo/
+.github/
+docs/
+deploy/backups/
+deploy/data/
+deploy/logs/
+**/target/
+**/node_modules/
+**/dist/
+**/.env
+**/.env.*
+!**/.env.example
+*.log
+.idea/
+.vscode/

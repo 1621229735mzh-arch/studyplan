@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kaoyan.study.settings.mapper.SubjectMapper">
+
+    <resultMap id="subjectResultMap" type="com.kaoyan.study.settings.entity.Subject">
+        <id property="id" column="id"/>
+        <result property="name" column="name"/>
+        <result property="category" column="category"/>
+        <result property="color" column="color"/>
+        <result property="sortOrder" column="sort_order"/>
+        <result property="enabled" column="enabled"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <select id="findAll" resultMap="subjectResultMap">
+        SELECT id, name, category, color, sort_order, enabled, created_at, updated_at
+        FROM subject
+        <where>
+            <if test="enabledOnly">enabled = 1</if>
+        </where>
+        ORDER BY sort_order, id
+    </select>
+
+    <select id="findById" resultMap="subjectResultMap">
+        SELECT id, name, category, color, sort_order, enabled, created_at, updated_at
+        FROM subject WHERE id = #{id}
+    </select>
+
+    <select id="findByName" resultMap="subjectResultMap">
+        SELECT id, name, category, color, sort_order, enabled, created_at, updated_at
+        FROM subject WHERE name = #{name}
+    </select>
+
+    <insert id="insert" parameterType="com.kaoyan.study.settings.entity.Subject"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO subject (name, category, color, sort_order, enabled)
+        VALUES (#{name}, #{category}, #{color}, #{sortOrder}, #{enabled})
+    </insert>
+
+    <update id="update" parameterType="com.kaoyan.study.settings.entity.Subject">
+        UPDATE subject
+        SET name = #{name},
+            category = #{category},
+            color = #{color},
+            sort_order = #{sortOrder},
+            enabled = #{enabled}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM subject WHERE id = #{id}
+    </delete>
+
+    <select id="countUsages" resultType="long">
+        SELECT (SELECT COUNT(*) FROM task WHERE subject_id = #{subjectId})
+             + (SELECT COUNT(*) FROM stage_goal WHERE subject_id = #{subjectId})
+             + (SELECT COUNT(*) FROM study_record WHERE subject_id = #{subjectId})
+             + (SELECT COUNT(*) FROM review_item WHERE subject_id = #{subjectId})
+             + (SELECT COUNT(*) FROM memo WHERE subject_id = #{subjectId})
+    </select>
+
+</mapper>

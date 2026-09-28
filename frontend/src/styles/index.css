@@ -1,0 +1,134 @@
+@import './variables.css';
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--kaoyan-bg);
+  color: var(--kaoyan-text);
+  font-family:
+    'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: #2f6feb;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* 页面通用骨架 */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.page__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.page__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.page__subtitle {
+  margin: 4px 0 0;
+  color: var(--kaoyan-text-secondary);
+  font-size: 13px;
+}
+
+.page__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.section-card {
+  background: #fff;
+  border: 1px solid var(--kaoyan-border);
+  border-radius: var(--kaoyan-card-radius);
+  padding: 16px;
+}
+
+.section-card__title {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.section-card__hint {
+  margin: 0 0 12px;
+  color: var(--kaoyan-text-secondary);
+  font-size: 13px;
+}
+
+/* 统计分组：学习时长 / 内容完成量 / 掌握情况，三块永远分开显示 */
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.metric-label {
+  color: var(--kaoyan-text-secondary);
+  font-size: 13px;
+}
+
+.metric-value {
+  margin-top: 4px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.unit-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.hint-text {
+  color: var(--kaoyan-text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.warning-text {
+  color: var(--el-color-warning);
+}
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.table-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}

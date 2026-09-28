@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kaoyan.study.memo.mapper.MemoMapper">
+
+    <resultMap id="memoResultMap" type="com.kaoyan.study.memo.entity.Memo">
+        <id property="id" column="id"/>
+        <result property="subjectId" column="subject_id"/>
+        <result property="content" column="content"/>
+        <result property="dueDate" column="due_date"/>
+        <result property="status" column="status"/>
+        <result property="convertedTaskId" column="converted_task_id"/>
+        <result property="reminderDismissed" column="reminder_dismissed"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="version" column="version"/>
+    </resultMap>
+
+    <sql id="memoColumns">
+        id, subject_id, content, due_date, status, converted_task_id, reminder_dismissed,
+        created_at, updated_at, version
+    </sql>
+
+    <!-- 有到期日的排在前面，同一到期日内新建的优先；无到期日的沉到最后。 -->
+    <select id="findAll" resultMap="memoResultMap">
+        SELECT <include refid="memoColumns"/>
+        FROM memo
+        <where>
+            <if test="status != null">AND status = #{status}</if>
+            <if test="subjectId != null">AND subject_id = #{subjectId}</if>
+            <if test="keyword != null">AND content LIKE CONCAT('%', #{keyword}, '%')</if>
+        </where>
+        ORDER BY (due_date IS NULL), due_date, created_at DESC, id DESC
+    </select>
+
+    <select id="findById" resultMap="memoResultMap">
+        SELECT <include refid="memoColumns"/>
+        FROM memo WHERE id = #{id}
+    </select>
+
+    <select id="findByIdForUpdate" resultMap="memoResultMap">
+        SELECT <include refid="memoColumns"/>
+        FROM memo WHERE id = #{id} FOR UPDATE
+    </select>
+
+    <!--
+      到期提醒：只取未完成的备忘录；已忽略的（reminder_dismissed = 1）不再返回，
+      否则“忽略提醒”按钮不会产生任何效果。
+    -->
+    <select id="findDue" resultMap="memoResultMap">
+        SELECT <include refid="memoColumns"/>
+        FROM memo
+        WHERE status = 'OPEN'
+          AND reminder_dismissed = 0
+          AND due_date &lt;= #{date}
+        ORDER BY due_date, id
+    </select>
+
+    <insert id="insert" parameterType="com.kaoyan.study.memo.entity.Memo"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO memo (subject_id, content, due_date, status, reminder_dismissed)
+        VALUES (#{subjectId}, #{content}, #{dueDate}, #{status}, #{reminderDismissed})
+    </insert>
+
+    <!--
+      只更新内容类字段：converted_task_id 与 reminder_dismissed 有各自的入口，
+      避免编辑内容时把转任务结果或已忽略状态一起覆盖掉。
+    -->
+    <update id="update" parameterType="com.kaoyan.study.memo.entity.Memo">
+        UPDATE memo
+        SET subject_id = #{subjectId},
+            content = #{content},
+            due_date = #{dueDate},
+            status = #{status},
+            version = version + 1
+        WHERE id = #{id} AND version = #{version}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM memo WHERE id = #{id}
+    </delete>
+
+    <update id="dismissReminder">
+        UPDATE memo SET reminder_dismissed = 1 WHERE id = #{id}
+    </update>
+
+    <update id="updateConvertedTask">
+        UPDATE memo SET converted_task_id = #{taskId}, version = version + 1 WHERE id = #{id}
+    </update>
+
+</mapper>

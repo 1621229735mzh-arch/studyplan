@@ -1,0 +1,92 @@
+name: CI
+
+# 提交与 PR 触发的自动检查：后端在真实 MySQL 上跑测试，前端做类型检查、单测与构建。
+# 生产发布不在这里，见 release.yml（手动触发）。
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: 后端构建与测试
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: kaoyan_study_test
+          MYSQL_USER: kaoyan
+          MYSQL_PASSWORD: ci-password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      # 集成测试始终连真实 MySQL：这里用服务容器，Testcontainers 作为本地替代方案。
+      - name: 后端 verify
+        working-directory: backend
+        env:
+          TEST_MYSQL_URL: jdbc:mysql://127.0.0.1:3306/kaoyan_study_test?useUnicode=true&characterEncoding=utf8&allowPublicKeyRetrieval=true&useSSL=false
+          TEST_MYSQL_USERNAME: kaoyan
+          TEST_MYSQL_PASSWORD: ci-password
+        run: ./mvnw -B verify
+
+      - name: 上传测试报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-surefire-reports
+          path: backend/target/surefire-reports/
+          if-no-files-found: ignore
+
+  frontend:
+    name: 前端检查与构建
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: 安装 Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: 安装依赖
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: 类型检查
+        working-directory: frontend
+        run: pnpm run typecheck
+
+      - name: 单元测试
+        working-directory: frontend
+        run: pnpm run test
+
+      - name: 构建
+        working-directory: frontend
+        run: pnpm run build

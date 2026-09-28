@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kaoyan.study.target.mapper.TargetMapper">
+
+    <resultMap id="targetResultMap" type="com.kaoyan.study.target.entity.TargetSchool">
+        <id property="id" column="id"/>
+        <result property="schoolName" column="school_name"/>
+        <result property="majorName" column="major_name"/>
+        <result property="note" column="note"/>
+        <result property="status" column="status"/>
+        <result property="sortOrder" column="sort_order"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="version" column="version"/>
+    </resultMap>
+
+    <resultMap id="targetLinkResultMap" type="com.kaoyan.study.target.entity.TargetLink">
+        <id property="id" column="id"/>
+        <result property="targetId" column="target_id"/>
+        <result property="url" column="url"/>
+        <result property="label" column="label"/>
+        <result property="sortOrder" column="sort_order"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <sql id="targetColumns">
+        id, school_name, major_name, note, status, sort_order, created_at, updated_at, version
+    </sql>
+
+    <sql id="targetLinkColumns">
+        id, target_id, url, label, sort_order, created_at
+    </sql>
+
+    <select id="findAll" resultMap="targetResultMap">
+        SELECT <include refid="targetColumns"/>
+        FROM target_school
+        <where>
+            <if test="status != null">AND status = #{status}</if>
+        </where>
+        ORDER BY sort_order, id
+    </select>
+
+    <select id="findById" resultMap="targetResultMap">
+        SELECT <include refid="targetColumns"/>
+        FROM target_school WHERE id = #{id}
+    </select>
+
+    <select id="findLinksByTargetId" resultMap="targetLinkResultMap">
+        SELECT <include refid="targetLinkColumns"/>
+        FROM target_link WHERE target_id = #{targetId}
+        ORDER BY sort_order, id
+    </select>
+
+    <insert id="insert" parameterType="com.kaoyan.study.target.entity.TargetSchool"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO target_school (school_name, major_name, note, status, sort_order)
+        VALUES (#{schoolName}, #{majorName}, #{note}, #{status}, #{sortOrder})
+    </insert>
+
+    <update id="update" parameterType="com.kaoyan.study.target.entity.TargetSchool">
+        UPDATE target_school
+        SET school_name = #{schoolName},
+            major_name = #{majorName},
+            note = #{note},
+            status = #{status},
+            sort_order = #{sortOrder},
+            version = version + 1
+        WHERE id = #{id} AND version = #{version}
+    </update>
+
+    <!-- 只改状态：与其他字段的编辑互不覆盖，版本检查保持一致。 -->
+    <update id="updateStatus">
+        UPDATE target_school
+        SET status = #{status},
+            version = version + 1
+        WHERE id = #{id} AND version = #{version}
+    </update>
+
+    <!-- target_link 有 ON DELETE CASCADE，删除目标即连带删除链接。 -->
+    <delete id="deleteById">
+        DELETE FROM target_school WHERE id = #{id}
+    </delete>
+
+    <delete id="deleteLinksByTargetId">
+        DELETE FROM target_link WHERE target_id = #{targetId}
+    </delete>
+
+    <insert id="insertLink" parameterType="com.kaoyan.study.target.entity.TargetLink"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO target_link (target_id, url, label, sort_order)
+        VALUES (#{targetId}, #{url}, #{label}, #{sortOrder})
+    </insert>
+
+</mapper>

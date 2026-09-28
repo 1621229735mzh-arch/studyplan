@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kaoyan.study.plan.mapper.StageGoalMapper">
+
+    <resultMap id="stageGoalResultMap" type="com.kaoyan.study.plan.entity.StageGoal">
+        <id property="id" column="id"/>
+        <result property="subjectId" column="subject_id"/>
+        <result property="title" column="title"/>
+        <result property="description" column="description"/>
+        <result property="startDate" column="start_date"/>
+        <result property="targetDate" column="target_date"/>
+        <result property="status" column="status"/>
+        <result property="version" column="version"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <sql id="stageGoalColumns">
+        g.id, g.subject_id, g.title, g.description, g.start_date, g.target_date,
+        g.status, g.version, g.created_at, g.updated_at
+    </sql>
+
+    <select id="findAll" resultMap="stageGoalResultMap">
+        SELECT <include refid="stageGoalColumns"/>
+        FROM stage_goal g
+        <where>
+            <if test="subjectId != null">AND g.subject_id = #{subjectId}</if>
+            <if test="status != null and status != ''">AND g.status = #{status}</if>
+        </where>
+        ORDER BY g.target_date IS NULL, g.target_date, g.id DESC
+    </select>
+
+    <select id="findById" resultMap="stageGoalResultMap">
+        SELECT <include refid="stageGoalColumns"/>
+        FROM stage_goal g WHERE g.id = #{id}
+    </select>
+
+    <insert id="insert" parameterType="com.kaoyan.study.plan.entity.StageGoal"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO stage_goal (subject_id, title, description, start_date, target_date, status, version)
+        VALUES (#{subjectId}, #{title}, #{description}, #{startDate}, #{targetDate}, #{status}, 0)
+    </insert>
+
+    <update id="update" parameterType="com.kaoyan.study.plan.entity.StageGoal">
+        UPDATE stage_goal
+        SET subject_id = #{subjectId},
+            title = #{title},
+            description = #{description},
+            start_date = #{startDate},
+            target_date = #{targetDate},
+            status = #{status},
+            version = version + 1
+        WHERE id = #{id} AND version = #{version}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM stage_goal WHERE id = #{id}
+    </delete>
+
+    <select id="countTasks" resultType="long">
+        SELECT COUNT(*) FROM task WHERE stage_goal_id = #{stageGoalId}
+    </select>
+
+</mapper>

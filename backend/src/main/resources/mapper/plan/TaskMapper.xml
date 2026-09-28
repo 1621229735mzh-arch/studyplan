@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kaoyan.study.plan.mapper.TaskMapper">
+
+    <resultMap id="taskResultMap" type="com.kaoyan.study.plan.entity.Task">
+        <id property="id" column="id"/>
+        <result property="subjectId" column="subject_id"/>
+        <result property="stageGoalId" column="stage_goal_id"/>
+        <result property="title" column="title"/>
+        <result property="unitId" column="unit_id"/>
+        <result property="plannedAmount" column="planned_amount"/>
+        <result property="status" column="status"/>
+        <result property="version" column="version"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <!-- 记录 DTO 没有 setter，用构造器映射（name 匹配 record 组件，依赖编译参数 -parameters） -->
+    <resultMap id="taskProgressViewMap" type="com.kaoyan.study.plan.dto.TaskProgressView">
+        <constructor>
+            <idArg column="task_id" name="taskId" javaType="java.lang.Long"/>
+            <arg column="title" name="title" javaType="java.lang.String"/>
+            <arg column="subject_id" name="subjectId" javaType="java.lang.Long"/>
+            <arg column="unit_id" name="unitId" javaType="java.lang.Long"/>
+            <arg column="unit_name" name="unitName" javaType="java.lang.String"/>
+            <arg column="planned_amount" name="plannedAmount" javaType="java.math.BigDecimal"/>
+            <arg column="completed_amount" name="completedAmount" javaType="java.math.BigDecimal"/>
+            <arg column="remaining_amount" name="remainingAmount" javaType="java.math.BigDecimal"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="taskColumns">
+        t.id, t.subject_id, t.stage_goal_id, t.title, t.unit_id, t.planned_amount,
+        t.status, t.version, t.created_at, t.updated_at
+    </sql>
+
+    <select id="findAll" resultMap="taskResultMap">
+        SELECT <include refid="taskColumns"/>
+        FROM task t
+        <where>
+            <if test="subjectId != null">AND t.subject_id = #{subjectId}</if>
+            <if test="stageGoalId != null">AND t.stage_goal_id = #{stageGoalId}</if>
+            <if test="status != null and status != ''">AND t.status = #{status}</if>
+        </where>
+        ORDER BY t.created_at DESC, t.id DESC
+    </select>
+
+    <select id="findById" resultMap="taskResultMap">
+        SELECT <include refid="taskColumns"/>
+        FROM task t WHERE t.id = #{id}
+    </select>
+
+    <select id="findByIdForUpdate" resultMap="taskResultMap">
+        SELECT <include refid="taskColumns"/>
+        FROM task t WHERE t.id = #{id} FOR UPDATE
+    </select>
+
+    <insert id="insert" parameterType="com.kaoyan.study.plan.entity.Task"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO task (subject_id, stage_goal_id, title, unit_id, planned_amount, status, version)
+        VALUES (#{subjectId}, #{stageGoalId}, #{title}, #{unitId}, #{plannedAmount}, #{status}, 0)
+    </insert>
+
+    <!-- 版本过期时受影响行数为 0，由服务层转换为冲突错误 -->
+    <update id="update" parameterType="com.kaoyan.study.plan.entity.Task">
+        UPDATE task
+        SET subject_id = #{subjectId},
+            stage_goal_id = #{stageGoalId},
+            title = #{title},
+            unit_id = #{unitId},
+            planned_amount = #{plannedAmount},
+            status = #{status},
+            version = version + 1
+        WHERE id = #{id} AND version = #{version}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM task WHERE id = #{id}
+    </delete>
+
+    <select id="countRecords" resultType="long">
+        SELECT COUNT(*) FROM study_record WHERE task_id = #{taskId}
+    </select>
+
+    <!-- 计划量来自 task，完成量来自 study_record（软删除记录不计入）。 -->
+    <select id="findProgress" resultMap="taskProgressViewMap">
+        SELECT t.id                AS task_id,
+               t.title             AS title,
+               t.subject_id        AS subject_id,
+               t.unit_id           AS unit_id,
+               u.name              AS unit_name,
+               t.planned_amount    AS planned_amount,
+               COALESCE(SUM(r.amount), 0) AS completed_amount,
+               GREATEST(t.planned_amount - COALESCE(SUM(r.amount), 0), 0) AS remaining_amount
+        FROM task t
+                 JOIN study_unit u ON u.id = t.unit_id
+                 LEFT JOIN study_record r ON r.task_id = t.id AND r.deleted_at IS NULL
+        WHERE t.id = #{taskId}
+        GROUP BY t.id, t.title, t.subject_id, t.unit_id, u.name, t.planned_amount
+    </select>
+
+</mapper>

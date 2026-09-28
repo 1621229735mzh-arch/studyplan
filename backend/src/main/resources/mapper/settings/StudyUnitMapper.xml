@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kaoyan.study.settings.mapper.StudyUnitMapper">
+
+    <resultMap id="unitResultMap" type="com.kaoyan.study.settings.entity.StudyUnit">
+        <id property="id" column="id"/>
+        <result property="name" column="name"/>
+        <result property="sortOrder" column="sort_order"/>
+        <result property="enabled" column="enabled"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <select id="findAll" resultMap="unitResultMap">
+        SELECT id, name, sort_order, enabled, created_at, updated_at
+        FROM study_unit
+        <where>
+            <if test="enabledOnly">enabled = 1</if>
+        </where>
+        ORDER BY sort_order, id
+    </select>
+
+    <select id="findById" resultMap="unitResultMap">
+        SELECT id, name, sort_order, enabled, created_at, updated_at
+        FROM study_unit WHERE id = #{id}
+    </select>
+
+    <select id="findByName" resultMap="unitResultMap">
+        SELECT id, name, sort_order, enabled, created_at, updated_at
+        FROM study_unit WHERE name = #{name}
+    </select>
+
+    <insert id="insert" parameterType="com.kaoyan.study.settings.entity.StudyUnit"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO study_unit (name, sort_order, enabled)
+        VALUES (#{name}, #{sortOrder}, #{enabled})
+    </insert>
+
+    <update id="update" parameterType="com.kaoyan.study.settings.entity.StudyUnit">
+        UPDATE study_unit
+        SET name = #{name},
+            sort_order = #{sortOrder},
+            enabled = #{enabled}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM study_unit WHERE id = #{id}
+    </delete>
+
+    <!-- 单位被任务或学习记录引用时不允许删除，避免历史数据失去单位语义 -->
+    <select id="countUsages" resultType="long">
+        SELECT (SELECT COUNT(*) FROM task WHERE unit_id = #{unitId})
+             + (SELECT COUNT(*) FROM study_record WHERE unit_id = #{unitId})
+    </select>
+
+</mapper>

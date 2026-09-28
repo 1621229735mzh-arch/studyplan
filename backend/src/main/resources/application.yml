@@ -1,0 +1,79 @@
+spring:
+  application:
+    name: study-backend
+
+  datasource:
+    url: jdbc:mysql://${DB_HOST:127.0.0.1}:${DB_PORT:3306}/${DB_NAME:kaoyan_study}?useUnicode=true&characterEncoding=utf8&connectionTimeZone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false&rewriteBatchedStatements=true
+    username: ${DB_USERNAME:kaoyan}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+      minimum-idle: ${DB_POOL_MIN_IDLE:2}
+      connection-timeout: 10000
+      pool-name: study-pool
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+    validate-on-migrate: true
+
+  # 会话保存在 MySQL；表结构由 Flyway 迁移负责，框架不自行建表。
+  session:
+    timeout: ${SESSION_TIMEOUT:7d}
+    jdbc:
+      initialize-schema: never
+      table-name: SPRING_SESSION
+
+  jackson:
+    time-zone: Asia/Shanghai
+    default-property-inclusion: non_null
+
+mybatis:
+  mapper-locations: classpath*:mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    default-statement-timeout: 30
+
+server:
+  port: ${SERVER_PORT:8080}
+  # 部署在 Nginx 之后，按转发头还原真实协议与主机
+  forward-headers-strategy: framework
+  servlet:
+    session:
+      cookie:
+        name: SESSION
+        http-only: true
+        same-site: lax
+        secure: ${SESSION_COOKIE_SECURE:false}
+  error:
+    include-message: never
+    include-stacktrace: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: false
+
+app:
+  preset-account:
+    username: ${PRESET_ACCOUNT_USERNAME:kaoyan}
+    # 仅首次初始化账号时使用，仓库中不保存真实口令
+    password: ${PRESET_ACCOUNT_PASSWORD:}
+
+logging:
+  level:
+    com.kaoyan.study: INFO

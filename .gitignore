@@ -1,0 +1,43 @@
+# Local credentials and environment files
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+secrets/
+
+# Java build output (keep Maven Wrapper files)
+/backend/target/
+.m2repo/
+*.class
+
+# Frontend dependencies and generated output (keep dependency lockfiles)
+node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
+*.tsbuildinfo
+
+# Local runtime state and backups (do not ignore SQL migration sources)
+deploy/data/
+deploy/backups/
+deploy/logs/
+*.log
+
+# Local IDE and OS state
+.idea/
+.vscode/
+.fleet/
+*.iml
+.classpath
+.project
+.settings/
+.DS_Store
+Thumbs.db
+Desktop.ini

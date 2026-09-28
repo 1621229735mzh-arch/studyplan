@@ -1,0 +1,13 @@
+# 本地开发配置：便于调试，不用于部署。
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+springdoc:
+  swagger-ui:
+    enabled: true
+
+logging:
+  level:
+    com.kaoyan.study: DEBUG

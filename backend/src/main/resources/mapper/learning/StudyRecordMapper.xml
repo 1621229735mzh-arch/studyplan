@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kaoyan.study.learning.mapper.StudyRecordMapper">
+
+    <resultMap id="studyRecordResultMap" type="com.kaoyan.study.learning.entity.StudyRecord">
+        <id property="id" column="id"/>
+        <result property="taskId" column="task_id"/>
+        <result property="subjectId" column="subject_id"/>
+        <result property="unitId" column="unit_id"/>
+        <result property="recordDate" column="record_date"/>
+        <result property="amount" column="amount"/>
+        <result property="durationMinutes" column="duration_minutes"/>
+        <result property="content" column="content"/>
+        <result property="note" column="note"/>
+        <result property="clientToken" column="client_token"/>
+        <result property="version" column="version"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="deletedAt" column="deleted_at"/>
+    </resultMap>
+
+    <resultMap id="studyRecordViewMap" type="com.kaoyan.study.learning.dto.StudyRecordView">
+        <constructor>
+            <idArg column="id" name="id" javaType="java.lang.Long"/>
+            <arg column="task_id" name="taskId" javaType="java.lang.Long"/>
+            <arg column="task_title" name="taskTitle" javaType="java.lang.String"/>
+            <arg column="subject_id" name="subjectId" javaType="java.lang.Long"/>
+            <arg column="subject_name" name="subjectName" javaType="java.lang.String"/>
+            <arg column="unit_id" name="unitId" javaType="java.lang.Long"/>
+            <arg column="unit_name" name="unitName" javaType="java.lang.String"/>
+            <arg column="record_date" name="recordDate" javaType="java.time.LocalDate"/>
+            <arg column="amount" name="amount" javaType="java.math.BigDecimal"/>
+            <arg column="duration_minutes" name="durationMinutes" javaType="java.lang.Integer"/>
+            <arg column="content" name="content" javaType="java.lang.String"/>
+            <arg column="note" name="note" javaType="java.lang.String"/>
+            <arg column="version" name="version" javaType="java.lang.Long"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="viewColumns">
+        r.id, r.task_id, t.title AS task_title, r.subject_id, s.name AS subject_name,
+        r.unit_id, u.name AS unit_name, r.record_date, r.amount, r.duration_minutes,
+        r.content, r.note, r.version
+    </sql>
+
+    <!-- 科目与单位在“只记时长”的记录上为空，因此用 LEFT JOIN 保证列表不会漏掉这些记录 -->
+    <sql id="viewJoins">
+        FROM study_record r
+                 LEFT JOIN subject s ON s.id = r.subject_id
+                 LEFT JOIN study_unit u ON u.id = r.unit_id
+                 LEFT JOIN task t ON t.id = r.task_id
+    </sql>
+
+    <select id="findAll" resultMap="studyRecordViewMap">
+        SELECT <include refid="viewColumns"/>
+        <include refid="viewJoins"/>
+        <where>
+            r.deleted_at IS NULL
+            <if test="from != null">AND r.record_date &gt;= #{from}</if>
+            <if test="to != null">AND r.record_date &lt;= #{to}</if>
+            <if test="taskId != null">AND r.task_id = #{taskId}</if>
+            <if test="subjectId != null">AND r.subject_id = #{subjectId}</if>
+        </where>
+        ORDER BY r.record_date DESC, r.id DESC
+    </select>
+
+    <select id="findView" resultMap="studyRecordViewMap">
+        SELECT <include refid="viewColumns"/>
+        <include refid="viewJoins"/>
+        WHERE r.id = #{id} AND r.deleted_at IS NULL
+    </select>
+
+    <select id="findById" resultMap="studyRecordResultMap">
+        SELECT id, task_id, subject_id, unit_id, record_date, amount, duration_minutes,
+               content, note, client_token, version, created_at, updated_at, deleted_at
+        FROM study_record
+        WHERE id = #{id} AND deleted_at IS NULL
+    </select>
+
+    <!-- 重复提交防重：同一 client_token 只保留一条记录 -->
+    <select id="findByClientToken" resultMap="studyRecordResultMap">
+        SELECT id, task_id, subject_id, unit_id, record_date, amount, duration_minutes,
+               content, note, client_token, version, created_at, updated_at, deleted_at
+        FROM study_record
+        WHERE client_token = #{clientToken} AND deleted_at IS NULL
+    </select>
+
+    <insert id="insert" parameterType="com.kaoyan.study.learning.entity.StudyRecord"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO study_record (task_id, subject_id, unit_id, record_date, amount, duration_minutes,
+                                  content, note, client_token, version)
+        VALUES (#{taskId}, #{subjectId}, #{unitId}, #{recordDate}, #{amount}, #{durationMinutes},
+                #{content}, #{note}, #{clientToken}, 0)
+    </insert>
+
+    <update id="update" parameterType="com.kaoyan.study.learning.entity.StudyRecord">
+        UPDATE study_record
+        SET task_id = #{taskId},
+            subject_id = #{subjectId},
+            unit_id = #{unitId},
+            record_date = #{recordDate},
+            amount = #{amount},
+            duration_minutes = #{durationMinutes},
+            content = #{content},
+            note = #{note},
+            version = version + 1
+        WHERE id = #{id} AND version = #{version} AND deleted_at IS NULL
+    </update>
+
+    <update id="softDelete">
+        UPDATE study_record
+        SET deleted_at = CURRENT_TIMESTAMP(3), version = version + 1
+        WHERE id = #{id} AND version = #{version} AND deleted_at IS NULL
+    </update>
+
+</mapper>

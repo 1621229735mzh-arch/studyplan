@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kaoyan.study.account.mapper.AccountMapper">
+
+    <resultMap id="accountResultMap" type="com.kaoyan.study.account.entity.Account">
+        <id property="id" column="id"/>
+        <result property="username" column="username"/>
+        <result property="passwordHash" column="password_hash"/>
+        <result property="enabled" column="enabled"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <sql id="accountColumns">
+        id, username, password_hash, enabled, created_at, updated_at
+    </sql>
+
+    <select id="findByUsername" resultMap="accountResultMap">
+        SELECT <include refid="accountColumns"/>
+        FROM account
+        WHERE username = #{username}
+    </select>
+
+    <select id="countAll" resultType="long">
+        SELECT COUNT(*) FROM account
+    </select>
+
+    <insert id="insert" parameterType="com.kaoyan.study.account.entity.Account"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO account (username, password_hash, enabled, created_at, updated_at)
+        VALUES (#{username}, #{passwordHash}, #{enabled}, CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3))
+    </insert>
+
+    <update id="updatePasswordHash">
+        UPDATE account
+        SET password_hash = #{passwordHash},
+            updated_at = CURRENT_TIMESTAMP(3)
+        WHERE id = #{id}
+    </update>
+
+</mapper>

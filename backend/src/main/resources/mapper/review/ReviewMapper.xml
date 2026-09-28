@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kaoyan.study.review.mapper.ReviewMapper">
+
+    <resultMap id="reviewItemResultMap" type="com.kaoyan.study.review.entity.ReviewItem">
+        <id property="id" column="id"/>
+        <result property="subjectId" column="subject_id"/>
+        <result property="taskId" column="task_id"/>
+        <result property="title" column="title"/>
+        <result property="sourceRecordId" column="source_record_id"/>
+        <result property="status" column="status"/>
+        <result property="nextReviewDate" column="next_review_date"/>
+        <result property="lastResult" column="last_result"/>
+        <result property="intervalDays" column="interval_days"/>
+        <result property="estimatedMinutes" column="estimated_minutes"/>
+        <result property="scheduledDate" column="scheduled_date"/>
+        <result property="addedAt" column="added_at"/>
+        <result property="version" column="version"/>
+    </resultMap>
+
+    <resultMap id="reviewRecordResultMap" type="com.kaoyan.study.review.entity.ReviewRecord">
+        <id property="id" column="id"/>
+        <result property="reviewItemId" column="review_item_id"/>
+        <result property="reviewDate" column="review_date"/>
+        <result property="result" column="result"/>
+        <result property="durationMinutes" column="duration_minutes"/>
+        <result property="note" column="note"/>
+        <result property="nextReviewDate" column="next_review_date"/>
+        <result property="intervalDays" column="interval_days"/>
+        <result property="clientToken" column="client_token"/>
+    </resultMap>
+
+    <sql id="itemColumns">
+        id, subject_id, task_id, title, source_record_id, status, next_review_date, last_result,
+        interval_days, estimated_minutes, scheduled_date, added_at, version
+    </sql>
+
+    <select id="findItems" resultMap="reviewItemResultMap">
+        SELECT <include refid="itemColumns"/>
+        FROM review_item
+        <where>
+            <if test="status != null and status != ''">AND status = #{status}</if>
+            <if test="subjectId != null">AND subject_id = #{subjectId}</if>
+        </where>
+        ORDER BY next_review_date IS NULL, next_review_date, id
+    </select>
+
+    <select id="findItemById" resultMap="reviewItemResultMap">
+        SELECT <include refid="itemColumns"/> FROM review_item WHERE id = #{id}
+    </select>
+
+    <select id="findItemByIdForUpdate" resultMap="reviewItemResultMap">
+        SELECT <include refid="itemColumns"/> FROM review_item WHERE id = #{id} FOR UPDATE
+    </select>
+
+    <select id="findItemByTaskId" resultMap="reviewItemResultMap">
+        SELECT <include refid="itemColumns"/> FROM review_item WHERE task_id = #{taskId}
+    </select>
+
+    <!-- 待安排且已到期的内容：到期信息一直保留，积压不会自动提高强度 -->
+    <select id="findDueItems" resultMap="reviewItemResultMap">
+        SELECT <include refid="itemColumns"/>
+        FROM review_item
+        WHERE status = 'PENDING'
+          AND next_review_date IS NOT NULL
+          AND next_review_date &lt;= #{date}
+        ORDER BY next_review_date, id
+    </select>
+
+    <select id="findScheduledItems" resultMap="reviewItemResultMap">
+        SELECT <include refid="itemColumns"/>
+        FROM review_item
+        WHERE status = 'SCHEDULED' AND scheduled_date = #{date}
+        ORDER BY id
+    </select>
+
+    <insert id="insertItem" parameterType="com.kaoyan.study.review.entity.ReviewItem"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO review_item (subject_id, task_id, title, source_record_id, status, next_review_date,
+                                 last_result, interval_days, estimated_minutes, scheduled_date, added_at, version)
+        VALUES (#{subjectId}, #{taskId}, #{title}, #{sourceRecordId}, #{status}, #{nextReviewDate},
+                #{lastResult}, #{intervalDays}, #{estimatedMinutes}, #{scheduledDate}, CURRENT_TIMESTAMP(3), 0)
+    </insert>
+
+    <select id="findScheduledItemsForUpdate" resultMap="reviewItemResultMap">
+        SELECT <include refid="itemColumns"/>
+        FROM review_item
+        WHERE status = 'SCHEDULED' AND scheduled_date = #{date}
+        ORDER BY id FOR UPDATE
+    </select>
+
+    <update id="updateItemAfterReview">
+        UPDATE review_item
+        SET last_result = #{result},
+            interval_days = #{intervalDays},
+            next_review_date = #{nextReviewDate},
+            status = 'PENDING',
+            scheduled_date = NULL,
+            version = version + 1
+        WHERE id = #{id} AND version = #{version}
+    </update>
+
+    <update id="updateItemSchedule">
+        UPDATE review_item
+        SET status = #{status},
+            scheduled_date = #{scheduledDate},
+            estimated_minutes = #{estimatedMinutes},
+            version = version + 1
+        WHERE id = #{id} AND version = #{version}
+    </update>
+
+    <update id="archiveItem">
+        UPDATE review_item
+        SET status = 'ARCHIVED', scheduled_date = NULL, version = version + 1
+        WHERE id = #{id} AND version = #{version}
+    </update>
+
+    <select id="findRecords" resultMap="reviewRecordResultMap">
+        SELECT id, review_item_id, review_date, result, duration_minutes, note,
+               next_review_date, interval_days, client_token
+        FROM review_record
+        WHERE review_item_id = #{reviewItemId}
+        ORDER BY review_date DESC, id DESC
+    </select>
+
+    <select id="findRecordByToken" resultMap="reviewRecordResultMap">
+        SELECT id, review_item_id, review_date, result, duration_minutes, note,
+               next_review_date, interval_days, client_token
+        FROM review_record
+        WHERE client_token = #{clientToken}
+    </select>
+
+    <insert id="insertRecord" parameterType="com.kaoyan.study.review.entity.ReviewRecord"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO review_record (review_item_id, review_date, result, duration_minutes, note,
+                                   next_review_date, interval_days, client_token)
+        VALUES (#{reviewItemId}, #{reviewDate}, #{result}, #{durationMinutes}, #{note},
+                #{nextReviewDate}, #{intervalDays}, #{clientToken})
+    </insert>
+
+    <select id="sumScheduledMinutes" resultType="java.lang.Integer">
+        SELECT COALESCE(SUM(estimated_minutes), 0)
+        FROM review_item
+        WHERE status = 'SCHEDULED' AND scheduled_date = #{date}
+    </select>
+
+</mapper>

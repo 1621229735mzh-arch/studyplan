@@ -1,0 +1,21 @@
+{
+  // 构建与测试配置文件的独立配置。
+  // 注意：tsconfig.json 已把 vite.config.ts / vitest.config.ts 一并纳入，
+  // 因此 `vue-tsc --noEmit` 只用一个配置即可；本文件供编辑器按 Node 环境单独检查。
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["vite.config.ts", "vitest.config.ts"]
+}

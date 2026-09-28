@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kaoyan.study.settings.mapper.StudySettingsMapper">
+
+    <resultMap id="settingsResultMap" type="com.kaoyan.study.settings.entity.StudySettings">
+        <id property="id" column="id"/>
+        <result property="examDate" column="exam_date"/>
+        <result property="dailyStudyMinutes" column="daily_study_minutes"/>
+        <result property="dailyReviewMinutes" column="daily_review_minutes"/>
+        <result property="reviewPhase" column="review_phase"/>
+        <result property="reviewIntervalForgotDays" column="review_interval_forgot_days"/>
+        <result property="reviewIntervalVagueDays" column="review_interval_vague_days"/>
+        <result property="reviewIntervalMasteredDays" column="review_interval_mastered_days"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="version" column="version"/>
+    </resultMap>
+
+    <sql id="settingsColumns">
+        id, exam_date, daily_study_minutes, daily_review_minutes, review_phase,
+        review_interval_forgot_days, review_interval_vague_days, review_interval_mastered_days,
+        updated_at, version
+    </sql>
+
+    <select id="find" resultMap="settingsResultMap">
+        SELECT <include refid="settingsColumns"/>
+        FROM study_settings WHERE id = 1
+    </select>
+
+    <select id="findForUpdate" resultMap="settingsResultMap">
+        SELECT <include refid="settingsColumns"/>
+        FROM study_settings WHERE id = 1 FOR UPDATE
+    </select>
+
+    <insert id="insertDefaultIfAbsent">
+        INSERT IGNORE INTO study_settings (id) VALUES (1)
+    </insert>
+
+    <update id="update" parameterType="com.kaoyan.study.settings.entity.StudySettings">
+        UPDATE study_settings
+        SET exam_date = #{examDate},
+            daily_study_minutes = #{dailyStudyMinutes},
+            daily_review_minutes = #{dailyReviewMinutes},
+            review_phase = #{reviewPhase},
+            review_interval_forgot_days = #{reviewIntervalForgotDays},
+            review_interval_vague_days = #{reviewIntervalVagueDays},
+            review_interval_mastered_days = #{reviewIntervalMasteredDays},
+            version = version + 1
+        WHERE id = 1 AND version = #{version}
+    </update>
+
+</mapper>
