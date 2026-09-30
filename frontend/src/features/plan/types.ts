@@ -98,6 +98,8 @@ export type PlanSource = 'MANUAL' | 'WEEKLY' | 'REVIEW'
  * 当天完成量是 `completedAmount`（不是 actualAmount）。后端不返回剩余量。
  */
 export interface DailyPlanItemView {
+  /** 外部计划给出的完整预计用时（分钟），缺失不是 0 */
+  estimatedMinutes?: number | null
   id: number
   taskId: number
   taskTitle: string
@@ -114,6 +116,8 @@ export interface DailyPlanItemView {
 
 /** 加入某一天的安排（后端 DailyItemCreateRequest）。 */
 export interface DailyItemCreateRequest {
+  /** 外部计划给出的完整预计用时（分钟），缺失不是 0 */
+  estimatedMinutes?: number | null
   taskId: number
   plannedAmount: number
   /** 为空时后端按 MANUAL 处理 */
@@ -122,6 +126,8 @@ export interface DailyItemCreateRequest {
 
 /** 手动调整某一天的安排量（后端 DailyItemAdjustRequest）；调整不会顺延未完成内容。 */
 export interface DailyItemAdjustRequest {
+  /** 外部计划给出的完整预计用时（分钟），缺失不是 0 */
+  estimatedMinutes?: number | null
   plannedAmount: number
   version: number
   reason?: string | null

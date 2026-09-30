@@ -1,9 +1,11 @@
 package com.kaoyan.study.review.mapper;
 
+import com.kaoyan.study.review.dto.DayReviewTaskView;
 import com.kaoyan.study.review.entity.MasteryResult;
 import com.kaoyan.study.review.entity.ReviewItem;
 import com.kaoyan.study.review.entity.ReviewRecord;
 import com.kaoyan.study.review.entity.ReviewStatus;
+
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -51,6 +53,8 @@ public interface ReviewMapper {
     ReviewRecord findRecordByToken(@Param("clientToken") String clientToken);
 
     int insertRecord(ReviewRecord record);
+    int touchItem(@Param("id") Long id, @Param("version") Long version);
+    List<DayReviewTaskView> findDayTasks(@Param("date") LocalDate date);
 
     /** 某天已确认安排的复习预计用时合计（分钟），用于额度校验。 */
     Integer sumScheduledMinutes(@Param("date") LocalDate date);

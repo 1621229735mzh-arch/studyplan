@@ -1,12 +1,11 @@
 package com.kaoyan.study.learning.controller;
 
+import com.kaoyan.study.learning.dto.DayProgressRequest;
 import com.kaoyan.study.learning.dto.StudyRecordCreateRequest;
 import com.kaoyan.study.learning.dto.StudyRecordUpdateRequest;
 import com.kaoyan.study.learning.dto.StudyRecordView;
 import com.kaoyan.study.learning.service.StudyRecordService;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
+
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -56,6 +55,12 @@ public class StudyRecordController {
     @Operation(summary = "提交学习记录（带 clientToken 时重复提交不会生成第二条）")
     public StudyRecordView create(@Valid @RequestBody StudyRecordCreateRequest request) {
         return studyRecordService.create(request);
+    }
+
+    @PostMapping("/day-progress")
+    @ResponseStatus(HttpStatus.CREATED)
+    public StudyRecordView dayProgress(@Valid @RequestBody DayProgressRequest request) {
+        return studyRecordService.recordDayProgress(request);
     }
 
     @PutMapping("/{id}")

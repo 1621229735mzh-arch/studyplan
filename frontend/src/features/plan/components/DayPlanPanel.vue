@@ -51,6 +51,7 @@ const selectedTaskId = ref<number | null>(null)
 const plannedAmount = ref<number | null>(null)
 /** 调整原因（可选）：后端会在调整记录里保存它 */
 const reason = ref('')
+const estimatedMinutes = ref<number | null>(null)
 
 /** 当天已安排的任务（用于把“再次提交”变成“调整”）。 */
 const existingItem = computed<DailyPlanItemView | null>(
@@ -83,6 +84,8 @@ function onDateChange(value: unknown): void {
 
 function onTaskChange(value: unknown): void {
   selectedTaskId.value = typeof value === 'number' ? value : null
+  plannedAmount.value = existingItem.value?.plannedAmount ?? null
+  estimatedMinutes.value = existingItem.value?.estimatedMinutes ?? null
 }
 
 function onAmountChange(value: unknown): void {
@@ -140,6 +143,7 @@ async function submitItem(): Promise<void> {
       () =>
         adjustDayPlanItem(date.value, existing.id, {
           plannedAmount: amount,
+          estimatedMinutes: estimatedMinutes.value,
           version: existing.version,
           reason: reason.value.trim() === '' ? null : reason.value.trim()
         }),
@@ -149,7 +153,7 @@ async function submitItem(): Promise<void> {
   }
 
   await applyWrite(
-    () => addDayPlanItem(date.value, { taskId, plannedAmount: amount }),
+    () => addDayPlanItem(date.value, { taskId, plannedAmount: amount, estimatedMinutes: estimatedMinutes.value }),
     '已加入当天安排'
   )
 }
@@ -220,6 +224,8 @@ onMounted(() => {
         placeholder="当天计划量"
         @update:model-value="onAmountChange"
       />
+      <ElInputNumber :model-value="estimatedMinutes ?? undefined" @update:model-value="estimatedMinutes = $event ?? null" :min="0" :precision="0"
+        controls-position="right" placeholder="预计分钟（可选）" aria-label="任务预计用时（分钟）" />
       <ElInput
         v-model="reason"
         class="day-plan__reason"
@@ -269,6 +275,9 @@ onMounted(() => {
         <template #default="{ row }">
           <AmountUnit :amount="row.completedAmount ?? null" :unit="row.unitName ?? null" />
         </template>
+      </ElTableColumn>
+      <ElTableColumn label="预计用时" width="130">
+        <template #default="{ row }">{{ row.estimatedMinutes == null ? '未填写' : `${row.estimatedMinutes} 分钟` }}</template>
       </ElTableColumn>
       <ElTableColumn label="操作" width="100" fixed="right">
         <template #default="{ row }">

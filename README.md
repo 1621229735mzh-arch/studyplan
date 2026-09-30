@@ -11,9 +11,10 @@
 已实现并验证：工程基础、核心闭环、信息反馈、复习机制。智能升级（Spring AI）按计划留到后续阶段，当前未安装相关依赖。
 
 - 后端：Spring Boot 4.1.1 模块化单体，8 个业务模块全部实现。
-- 数据库：Flyway 迁移 V1–V12，随应用启动执行；V12 会一次性导入 2027 考研数学一轮计划。
+- 数据库：Flyway 迁移 V1–V14，随应用启动执行；V12 会一次性导入 2027 考研数学一轮计划。
 - 登录：预设账号 + Spring Security + Spring Session JDBC（会话存 MySQL）+ CSRF 防护。
-- 测试：**后端 64 个测试在隔离的 MySQL 8.0.45 上通过**（含并发与端到端 HTTP 流程）；前端类型检查、31 个测试与生产构建通过。具体命令及验证限制见 [验收记录](docs/testing/acceptance.md)。
+- 测试：本次后端 72 项在隔离的本机 MySQL 9.7.0 上通过（含并发与 HTTP 流程）；前端类型检查、38 项测试与生产构建通过。本次未运行 MySQL 8.4 / Testcontainers，也未发布今日清单到生产。命令与限制见 [今日清单验证](docs/testing/today-checklist-20261001.md)；先前验证见 [验收记录](docs/testing/acceptance.md)。
+- 今日页：四科学习/复习清单、累计百分比与本次用时、后端时间合计；规则见 [今日清单](docs/business/today-checklist.md)。
 - 前端：Vue 3 + TypeScript + Vite + Element Plus + ECharts，含离线只读快照。
 - 部署：Docker Compose + Nginx，CI 自动检查、生产发布手动触发。
 
@@ -94,6 +95,8 @@ export TEST_MYSQL_PASSWORD=你的口令
 > 注意：在 Windows 上通过 `mvn.cmd` 传 `-Dtest.mysql.url=...` 时，JDBC 参数里的 `&` 会被 cmd 解析吞掉，因此推荐用上面的环境变量。
 
 ## 部署
+
+当前远程网站采用本地构建产物、上传到服务器的手动部署方式，服务器使用 `compose.bundle.yaml`；它与本仓库下述 `compose.yaml` 镜像发布流程不同。2026-09-30 的前端更新、验证及回退方法见 [发布记录](docs/operations/frontend-update-20260930.md)。
 
 ```bash
 cd deploy

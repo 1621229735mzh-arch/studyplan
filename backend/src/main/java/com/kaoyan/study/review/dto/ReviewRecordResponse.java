@@ -20,11 +20,11 @@ public record ReviewRecordResponse(
         String note,
         LocalDate nextReviewDate,
         Integer intervalDays,
-        boolean intervalConfigured) {
+        boolean intervalConfigured, java.math.BigDecimal progressDelta) {
 
     public static ReviewRecordResponse from(ReviewRecord record, boolean intervalConfigured) {
         return new ReviewRecordResponse(record.getId(), record.getReviewItemId(), record.getReviewDate(),
                 record.getResult(), record.getDurationMinutes(), record.getNote(),
-                record.getNextReviewDate(), record.getIntervalDays(), intervalConfigured);
+                record.getNextReviewDate(), record.getIntervalDays(), intervalConfigured, record.getProgressDelta());
     }
 }

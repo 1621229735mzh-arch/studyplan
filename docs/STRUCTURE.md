@@ -114,7 +114,7 @@ SQL XML 放在 `backend/src/main/resources/mapper/<module>/`，与对应 Mapper 
 | `backend/` | `pom.xml`、`mvnw`、`mvnw.cmd`、`.mvn/wrapper/maven-wrapper.properties`（Maven 3.9.16） |
 | `backend/src/main/java/com/kaoyan/study/` | `StudyApplication.java`（`@MapperScan` + `@ConfigurationPropertiesScan`） |
 | `backend/src/main/resources/` | `application.yml`、`application-dev.yml`、`application-prod.yml` |
-| `backend/src/main/resources/db/migration/` | `V1`–`V12`（账号、会话、设置、计划、学习、复习、备忘录、目标、只记时长记录与数学一轮计划导入） |
+| `backend/src/main/resources/db/migration/` | `V1`–`V14`（原有迁移、恢复线上 V13 会话大小写归一化、V14 今日用时与部分复习） |
 | `backend/src/main/java/com/kaoyan/study/config/` | 安全（Spring Security 7 + JDBC 会话 + CSRF）、OpenAPI、预设账号配置 |
 | `frontend/` | `package.json`、`pnpm-lock.yaml`、`index.html`、Vite/TypeScript/Vitest 配置 |
 | `frontend/src/` | `main.ts`、`App.vue` 及各功能页面 |
@@ -135,3 +135,5 @@ Docker 构建上下文取仓库根目录（`deploy/compose.yaml` 中 `context: .
 备忘录转任务先锁定备忘录，已有转换结果直接返回；任务仍由计划业务服务创建。
 
 `.gitkeep` 占位文件在对应目录已有真实文件后即失去作用，可按需删除，不影响构建。
+
+今日清单的完成量与并发校验归 `learning/service/StudyRecordService`，每日预计用时归计划模块，部分复习与完成反馈归 `review/service/ReviewService`。`today/service/TodayService` 只组合这些业务服务并汇总分区与时间，不写独立任务表。接口与规则见 [今日清单](business/today-checklist.md)。

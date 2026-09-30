@@ -18,6 +18,7 @@
         <result property="source" column="source"/>
         <result property="reviewItemId" column="review_item_id"/>
         <result property="version" column="version"/>
+        <result property="estimatedMinutes" column="estimated_minutes"/>
     </resultMap>
 
     <resultMap id="weeklyItemViewMap" type="com.kaoyan.study.plan.dto.WeeklyPlanItemView">
@@ -45,6 +46,7 @@
             <arg column="review_item_id" name="reviewItemId" javaType="java.lang.Long"/>
             <arg column="version" name="version" javaType="java.lang.Long"/>
             <arg column="completed_amount" name="completedAmount" javaType="java.math.BigDecimal"/>
+            <arg column="estimated_minutes" name="estimatedMinutes" javaType="java.lang.Integer"/>
         </constructor>
     </resultMap>
 
@@ -122,6 +124,7 @@
                d.source,
                d.review_item_id,
                d.version,
+               d.estimated_minutes,
                COALESCE((SELECT SUM(r.amount)
                          FROM study_record r
                          WHERE r.task_id = d.task_id
@@ -135,25 +138,25 @@
     </select>
 
     <select id="findDailyItemById" resultMap="dailyPlanItemResultMap">
-        SELECT id, plan_date, task_id, planned_amount, source, review_item_id, version
+        SELECT id, plan_date, task_id, planned_amount, source, review_item_id, version, estimated_minutes
         FROM daily_plan_item WHERE id = #{id}
     </select>
 
     <select id="findDailyItem" resultMap="dailyPlanItemResultMap">
-        SELECT id, plan_date, task_id, planned_amount, source, review_item_id, version
+        SELECT id, plan_date, task_id, planned_amount, source, review_item_id, version, estimated_minutes
         FROM daily_plan_item
         WHERE plan_date = #{planDate} AND task_id = #{taskId} AND source = #{source}
     </select>
 
     <insert id="insertDailyItem" parameterType="com.kaoyan.study.plan.entity.DailyPlanItem"
             useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO daily_plan_item (plan_date, task_id, planned_amount, source, review_item_id, version)
-        VALUES (#{planDate}, #{taskId}, #{plannedAmount}, #{source}, #{reviewItemId}, 0)
+        INSERT INTO daily_plan_item (plan_date, task_id, planned_amount, source, review_item_id, version, estimated_minutes)
+        VALUES (#{planDate}, #{taskId}, #{plannedAmount}, #{source}, #{reviewItemId}, 0, #{estimatedMinutes})
     </insert>
 
     <update id="updateDailyItemAmount" parameterType="com.kaoyan.study.plan.entity.DailyPlanItem">
         UPDATE daily_plan_item
-        SET planned_amount = #{plannedAmount}, version = version + 1
+        SET planned_amount = #{plannedAmount}, estimated_minutes = #{estimatedMinutes}, version = version + 1
         WHERE id = #{id} AND version = #{version}
     </update>
 

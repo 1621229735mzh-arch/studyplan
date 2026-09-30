@@ -5,6 +5,9 @@ import java.math.BigDecimal;
 /** 每日安排条目。 */
 public class DailyPlanItem {
 
+    private Integer estimatedMinutes;
+    public Integer getEstimatedMinutes() { return estimatedMinutes; }
+    public void setEstimatedMinutes(Integer value) { estimatedMinutes = value; }
     private Long id;
     private java.time.LocalDate planDate;
     private Long taskId;

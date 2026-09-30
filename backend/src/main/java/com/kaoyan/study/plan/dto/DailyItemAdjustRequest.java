@@ -20,5 +20,9 @@ public record DailyItemAdjustRequest(
         Long version,
 
         @Size(max = 500, message = "原因过长")
-        String reason) {
+        String reason,
+        @jakarta.validation.constraints.Min(0) Integer estimatedMinutes) {
+    public DailyItemAdjustRequest(BigDecimal plannedAmount, Long version, String reason) {
+        this(plannedAmount, version, reason, null);
+    }
 }

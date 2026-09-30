@@ -16,5 +16,6 @@ public record DailyPlanItemView(
         PlanSource source,
         Long reviewItemId,
         Long version,
-        BigDecimal completedAmount) {
+        BigDecimal completedAmount,
+        Integer estimatedMinutes) {
 }

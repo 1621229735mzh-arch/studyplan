@@ -63,10 +63,12 @@ export interface ReviewRecordCreateRequest {
  * 为空——这是“待定参数未确定”，不是建议为“无”。界面必须提示去补充间隔，不能编造日期。
  */
 export interface ReviewRecordResponse {
+  /** 本次新增的进度；result 为空时表示部分复习。 */
+  progressDelta: number
   id: number
   reviewItemId: number
   reviewDate: string
-  result: MasteryLevel
+  result?: MasteryLevel | null
   durationMinutes?: number | null
   note?: string | null
   nextReviewDate?: string | null

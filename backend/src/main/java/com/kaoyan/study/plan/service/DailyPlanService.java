@@ -8,7 +8,9 @@ import com.kaoyan.study.plan.dto.DailyPlanItemView;
 import com.kaoyan.study.plan.entity.DailyPlanItem;
 import com.kaoyan.study.plan.entity.PlanSource;
 import com.kaoyan.study.plan.mapper.PlanMapper;
+
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -37,9 +39,9 @@ public class DailyPlanService {
     }
 
     /** 加入当天安排；同一任务同一来源已存在时更新计划量。 */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public List<DailyPlanItemView> addItem(LocalDate date, DailyItemCreateRequest request) {
-        taskService.requireExisting(request.taskId());
+        taskService.requireExistingForUpdate(request.taskId());
         PlanSource source = request.sourceOrDefault();
         DailyPlanItem existing = planMapper.findDailyItem(date, request.taskId(), source.name());
         if (existing == null) {
@@ -47,10 +49,12 @@ public class DailyPlanService {
             item.setPlanDate(date);
             item.setTaskId(request.taskId());
             item.setPlannedAmount(request.plannedAmount());
+            item.setEstimatedMinutes(request.estimatedMinutes());
             item.setSource(source);
             planMapper.insertDailyItem(item);
         } else {
             existing.setPlannedAmount(request.plannedAmount());
+            existing.setEstimatedMinutes(request.estimatedMinutes());
             if (planMapper.updateDailyItemAmount(existing) == 0) {
                 throw new ConflictException("DAILY_ITEM_STALE", "当天安排已在其他设备上修改，请刷新后重试");
             }
@@ -59,17 +63,20 @@ public class DailyPlanService {
     }
 
     /** 手动调整当天安排量，并留下调整记录（含调整前/后数量与原因）。 */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public List<DailyPlanItemView> adjust(LocalDate date, Long itemId, DailyItemAdjustRequest request) {
         DailyPlanItem item = planMapper.findDailyItemById(itemId);
         if (item == null || !item.getPlanDate().equals(date)) {
             throw new NotFoundException("当天安排不存在");
         }
-        if (!item.getVersion().equals(request.version())) {
+        taskService.requireExistingForUpdate(item.getTaskId());
+        item = planMapper.findDailyItemById(itemId);
+        if (item == null || !item.getVersion().equals(request.version())) {
             throw new ConflictException("DAILY_ITEM_STALE", "当天安排已在其他设备上修改，请刷新后重试");
         }
         BigDecimal before = item.getPlannedAmount();
         item.setPlannedAmount(request.plannedAmount());
+        item.setEstimatedMinutes(request.estimatedMinutes());
         if (planMapper.updateDailyItemAmount(item) == 0) {
             throw new ConflictException("DAILY_ITEM_STALE", "当天安排已在其他设备上修改，请刷新后重试");
         }
@@ -78,12 +85,13 @@ public class DailyPlanService {
         return list(date);
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public List<DailyPlanItemView> removeItem(LocalDate date, Long itemId) {
         DailyPlanItem item = planMapper.findDailyItemById(itemId);
         if (item == null || !item.getPlanDate().equals(date)) {
             throw new NotFoundException("当天安排不存在");
         }
+        taskService.requireExistingForUpdate(item.getTaskId());
         planMapper.deleteDailyItem(itemId);
         return list(date);
     }

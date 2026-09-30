@@ -2,15 +2,14 @@ package com.kaoyan.study.review.controller;
 
 import com.kaoyan.study.review.dto.ReviewConfirmRequest;
 import com.kaoyan.study.review.dto.ReviewConfirmResponse;
+import com.kaoyan.study.review.dto.ReviewDayProgressRequest;
 import com.kaoyan.study.review.dto.ReviewItemCreateRequest;
 import com.kaoyan.study.review.dto.ReviewItemResponse;
 import com.kaoyan.study.review.dto.ReviewRecordCreateRequest;
 import com.kaoyan.study.review.dto.ReviewRecordResponse;
 import com.kaoyan.study.review.dto.ReviewSuggestionResponse;
 import com.kaoyan.study.review.service.ReviewService;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
+
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -81,6 +80,12 @@ public class ReviewController {
     @Operation(summary = "提交复习反馈（不会/模糊/掌握），据此建议下次日期")
     public ReviewRecordResponse record(@Valid @RequestBody ReviewRecordCreateRequest request) {
         return reviewService.recordReview(request);
+    }
+
+    @PostMapping("/records/day-progress")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ReviewRecordResponse dayProgress(@Valid @RequestBody ReviewDayProgressRequest request) {
+        return reviewService.recordDayProgress(request);
     }
 
     @GetMapping("/suggestions")

@@ -29,6 +29,8 @@
         <result property="nextReviewDate" column="next_review_date"/>
         <result property="intervalDays" column="interval_days"/>
         <result property="clientToken" column="client_token"/>
+        <result property="progressDelta" column="progress_delta"/>
+        <result property="estimatedMinutes" column="estimated_minutes"/>
     </resultMap>
 
     <sql id="itemColumns">
@@ -118,7 +120,7 @@
 
     <select id="findRecords" resultMap="reviewRecordResultMap">
         SELECT id, review_item_id, review_date, result, duration_minutes, note,
-               next_review_date, interval_days, client_token
+               next_review_date, interval_days, client_token, progress_delta, estimated_minutes
         FROM review_record
         WHERE review_item_id = #{reviewItemId}
         ORDER BY review_date DESC, id DESC
@@ -126,7 +128,7 @@
 
     <select id="findRecordByToken" resultMap="reviewRecordResultMap">
         SELECT id, review_item_id, review_date, result, duration_minutes, note,
-               next_review_date, interval_days, client_token
+               next_review_date, interval_days, client_token, progress_delta, estimated_minutes
         FROM review_record
         WHERE client_token = #{clientToken}
     </select>
@@ -134,9 +136,9 @@
     <insert id="insertRecord" parameterType="com.kaoyan.study.review.entity.ReviewRecord"
             useGeneratedKeys="true" keyProperty="id">
         INSERT INTO review_record (review_item_id, review_date, result, duration_minutes, note,
-                                   next_review_date, interval_days, client_token)
+                                   next_review_date, interval_days, client_token, progress_delta, estimated_minutes)
         VALUES (#{reviewItemId}, #{reviewDate}, #{result}, #{durationMinutes}, #{note},
-                #{nextReviewDate}, #{intervalDays}, #{clientToken})
+                #{nextReviewDate}, #{intervalDays}, #{clientToken}, #{progressDelta}, #{estimatedMinutes})
     </insert>
 
     <select id="sumScheduledMinutes" resultType="java.lang.Integer">
@@ -145,4 +147,21 @@
         WHERE status = 'SCHEDULED' AND scheduled_date = #{date}
     </select>
 
+    <update id="touchItem">
+        UPDATE review_item SET version = version + 1 WHERE id = #{id} AND version = #{version}
+    </update>
+    <select id="findDayTasks" resultType="com.kaoyan.study.review.dto.DayReviewTaskView">
+        SELECT i.id, i.subject_id, i.title,
+               LEAST(COALESCE(r.percent_done, 0), 100) AS completion_percent,
+               COALESCE(r.estimate, i.estimated_minutes) AS estimated_minutes,
+               COALESCE(r.minutes, 0) AS actual_minutes, COALESCE(r.missing_durations, 0) AS missing_durations, i.version,
+               (i.status = 'SCHEDULED' AND i.scheduled_date = #{date}) AS actionable
+        FROM review_item i
+        LEFT JOIN (SELECT review_item_id, SUM(progress_delta) AS percent_done,
+                          SUM(duration_minutes) AS minutes, SUM(duration_minutes IS NULL) AS missing_durations, MAX(estimated_minutes) AS estimate
+                   FROM review_record WHERE review_date = #{date} GROUP BY review_item_id) r
+               ON r.review_item_id = i.id
+        WHERE (i.status = 'SCHEDULED' AND i.scheduled_date = #{date}) OR r.review_item_id IS NOT NULL
+        ORDER BY i.id
+    </select>
 </mapper>

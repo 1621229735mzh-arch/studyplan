@@ -15,7 +15,12 @@ public record DailyItemCreateRequest(
         @DecimalMin(value = "0.01", message = "计划量必须大于 0")
         BigDecimal plannedAmount,
 
-        PlanSource source) {
+        PlanSource source,
+        @jakarta.validation.constraints.Min(0) Integer estimatedMinutes) {
+
+    public DailyItemCreateRequest(Long taskId, BigDecimal plannedAmount, PlanSource source) {
+        this(taskId, plannedAmount, source, null);
+    }
 
     public PlanSource sourceOrDefault() {
         return source == null ? PlanSource.MANUAL : source;

@@ -28,6 +28,12 @@ export interface TodayResponse {
   studyMinutes: number
   /** 后端明确列出的缺失输入（例如未设置预算/额度） */
   warnings: string[]
+  /** 新快照由后端返回汇总；旧版离线快照可没有这些字段。 */
+  actualMinutes?: number
+  remainingMinutes?: number
+  missingEstimates?: number
+  missingDurations?: number
+  sections?: TodaySubjectSection[]
 }
 
 /**
@@ -44,4 +50,24 @@ export interface TodayPlanTaskRow extends DailyPlanItemView {
 /** 今日复习任务的展示行：后端 ReviewItemResponse 不带科目名，这里用科目目录补出。 */
 export interface TodayReviewTaskRow extends ReviewItem {
   subjectName: string | null
+}
+
+export interface TodayChecklistTask {
+  kind: 'LEARNING' | 'REVIEW'
+  id: number
+  title: string
+  completionPercent: number
+  estimatedMinutes: number | null
+  remainingMinutes: number | null
+  revision: string | null
+  version: number | null
+  actionable: boolean
+}
+export interface TodaySubjectSection {
+  name: string
+  actualMinutes: number
+  remainingMinutes: number
+  missingEstimates: number
+  missingDurations: number
+  tasks: TodayChecklistTask[]
 }

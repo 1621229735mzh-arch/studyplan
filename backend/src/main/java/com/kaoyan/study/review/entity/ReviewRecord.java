@@ -5,6 +5,12 @@ import java.time.LocalDate;
 /** 复习记录：一次复习的反馈与据此得到的下次日期。 */
 public class ReviewRecord {
 
+    private java.math.BigDecimal progressDelta = new java.math.BigDecimal("100");
+    private Integer estimatedMinutes;
+    public java.math.BigDecimal getProgressDelta() { return progressDelta; }
+    public void setProgressDelta(java.math.BigDecimal value) { progressDelta = value; }
+    public Integer getEstimatedMinutes() { return estimatedMinutes; }
+    public void setEstimatedMinutes(Integer value) { estimatedMinutes = value; }
     private Long id;
     private Long reviewItemId;
     private LocalDate reviewDate;

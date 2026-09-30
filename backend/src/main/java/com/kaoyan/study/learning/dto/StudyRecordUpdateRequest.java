@@ -23,7 +23,7 @@ public record StudyRecordUpdateRequest(
         @NotNull(message = "请选择学习日期")
         LocalDate recordDate,
 
-        @DecimalMin(value = "0.01", message = "完成量必须大于 0")
+        @DecimalMin(value = "0.000001", message = "完成量必须大于 0")
         BigDecimal amount,
 
         @Min(value = 0, message = "用时不能为负数")
