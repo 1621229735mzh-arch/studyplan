@@ -52,10 +52,16 @@ MAVEN_USER_HOME=/private/tmp/408doing-maven bash mvnw -q \
 
 临时日志位于 `/private/tmp/408doing-backend-verify.log`、`/private/tmp/408doing-today-final.log`、`/private/tmp/408doing-frontend-final-build.log`；这些文件不纳入仓库，也不包含生产账号配置。预览使用示例数据，不是线上学习数据。
 
-## 生产发布与未验证项
+## 服务器验证与生产发布
 
-本次只完成代码与本地验证，未发布新版今日清单。线上只读读取 V13 迁移，仓库恢复文件与线上应用 SHA256 一致。
+2026-10-01（北京时间）已手动发布 `develop` 提交 `2a1644a` 至 https://onlystudy.loc.cc/ 。V13 文件与线上原文件 SHA256 一致，未修改已应用迁移。
 
-本次没有执行 Testcontainers / MySQL 8.4，且本机数据库表名不区分大小写。生产为 Linux MySQL：发布前需要隔离验证实际 V13 库升级 V14，以及现有 session 表与应用启动。不能把本机 9.7 的通过当成生产 8.4 的验证结论。
+服务器使用现有 Linux MySQL 8.4.11，在独立 `today_upgrade_check_r2` 库依次运行旧、新应用：旧应用 V13 成功，新应用 V14 成功，均通过 `wget` 健康检查。测试应用逐个启动，限制内存 384MiB、CPU 1，不发布端口。Python urllib 验证 CSRF、登录、持久化 JDBC 会话、今日接口及四个学科分区，脚本返回 `UPGRADE_AND_SESSION_VERIFIED`。没有执行 Testcontainers，也未在 MySQL 8.4 重跑全套 72 项测试。
+
+生产数据库完整备份另恢复至 `today_recovery_check_r2`，确认 19 张表及 V13 成功；冻结生产后端写入后又做切换时备份。实际发布执行旧后端停止、jar 原子替换、后端强制重建、V14 升级、前端文件逐项 hash 校验、Nginx 配置检查与重载。HTTPS 页面与新入口文件一致，匿名身份接口可读，未登录今日接口为 401，三个生产容器均 healthy，脚本返回 `PUBLISH_DONE`。
+
+浏览器在真实网址通过“立即更新”切换 PWA，确认四科清单、原有两项数学任务、顶部和分区时间汇总、“完成 / 剩余”按钮。只读打开“剩余”弹窗确认累计百分比和本次用时字段后取消，没有写入示例学习数据。线上没有当前复习任务，复习写入交互的验证来自本机示例库及自动测试。
+
+发布详情见 [发布记录](../operations/today-checklist-release-20261001.md)。
 
 参见 [今日清单规则与兼容性](../business/today-checklist.md)。V14 已产生部分复习记录后，旧后端对空掌握反馈不兼容；禁止只替换旧 jar 而沿用新的数据进行盲目回退。
