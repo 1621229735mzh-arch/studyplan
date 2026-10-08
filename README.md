@@ -122,10 +122,14 @@ Nginx 提供前端静态文件并转发 `/api`；数据库与管理端点都不�
 
 | 文档 | 内容 |
 | --- | --- |
+| [PROJECT_MEMORY.md](PROJECT_MEMORY.md) | 用户偏好、长期交接与 Windows 接续提醒 |
+| [DECISIONS.md](DECISIONS.md) | 已确认的设计决策、否决与暂缓边界 |
+| [IDEAS.md](IDEAS.md) | 后续创意与待办候选，未代表开发授权 |
 | [docs/STRUCTURE.md](docs/STRUCTURE.md) | 目录职责与文件落点 |
 | [docs/development/local-setup.md](docs/development/local-setup.md) | 本地环境、启动与常见问题 |
 | [docs/database/schema.md](docs/database/schema.md) | 数据模型、索引与迁移说明 |
 | [docs/api/README.md](docs/api/README.md) | 接口约定与端点清单 |
 | [docs/testing/acceptance.md](docs/testing/acceptance.md) | 验收项与对应测试 |
 | [docs/operations/deploy.md](docs/operations/deploy.md) | 部署、日志、备份、恢复与回退 |
+| [problem.md](problem.md) | 本次部署失误、排查结论与避免方法 |
 | [docs/decisions/](docs/decisions/) | 已做出的工程决策及依据 |
