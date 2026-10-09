@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kaoyan.study.plan.mapper.WorkspaceMapper">
+    <select id="entries" resultType="com.kaoyan.study.plan.dto.ScheduleEntryView">
+        SELECT d.plan_date AS date, t.id AS task_id, t.title AS task_title, t.subject_id,
+               t.unit_id, u.name AS unit_name, SUM(d.planned_amount) AS planned_amount,
+               COALESCE((SELECT SUM(r.amount) FROM study_record r
+                         WHERE r.task_id=t.id AND r.record_date=d.plan_date AND r.deleted_at IS NULL),0) AS completed_amount,
+               CASE WHEN COUNT(DISTINCT d.source)=1 THEN MIN(d.source) ELSE 'MIXED' END AS source,
+               CASE WHEN COUNT(d.estimated_minutes)=COUNT(*) THEN SUM(d.estimated_minutes) ELSE NULL END AS estimated_minutes,
+               MIN(d.sort_order) AS sort_order
+        FROM daily_plan_item d JOIN task t ON t.id=d.task_id JOIN study_unit u ON u.id=t.unit_id
+        WHERE d.source &lt;&gt; 'REVIEW'
+        <if test="start != null">AND d.plan_date &gt;= #{start}</if>
+        <if test="end != null">AND d.plan_date &lt;= #{end}</if>
+        <if test="subjectId != null">AND t.subject_id=#{subjectId}</if>
+        GROUP BY d.plan_date,t.id,t.title,t.subject_id,t.unit_id,u.name
+        ORDER BY d.plan_date,sort_order,t.id
+    </select>
+</mapper>

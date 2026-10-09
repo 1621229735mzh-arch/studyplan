@@ -2,7 +2,11 @@
 .git/
 .m2repo/
 .github/
-docs/
+docs/**
+!docs/business/
+!docs/business/plan-import-guide.md
+!docs/business/plan-import.schema.json
+!docs/business/plan-import-example.json
 deploy/backups/
 deploy/data/
 deploy/logs/

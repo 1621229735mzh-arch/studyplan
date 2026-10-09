@@ -134,6 +134,7 @@ export function reviewStatusLabel(status?: string | null): string {
 const PLAN_SOURCE_LABELS: Record<PlanSource, string> = {
   MANUAL: '手动安排',
   WEEKLY: '周计划',
+  IMPORT: '外部方案',
   REVIEW: '复习'
 }
 

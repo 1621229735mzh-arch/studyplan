@@ -4,5 +4,6 @@ package com.kaoyan.study.plan.entity;
 public enum PlanSource {
     MANUAL,
     WEEKLY,
+    IMPORT,
     REVIEW
 }

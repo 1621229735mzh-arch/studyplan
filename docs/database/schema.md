@@ -38,6 +38,10 @@ V12 是个人单用户数据迁移：复用已有科目、单位和同名计划�
   `UNIQUE (plan_date, task_id, source)` 保证同一天同一任务同一来源只有一条。
 - `plan_adjustment`：调整记录（调整前/后数量与原因），`apply_token` 唯一，用于一次性应用防重。
 
+V15 新增计划工作区表：`plan_workspace_revision` 为日安排写操作和导入确认共用修订锁；`plan_import` 唯一方案 ID/内容哈希；`plan_period_outline` 保存月、周说明；`plan_quick_submission` 保存唯一提交令牌及请求指纹；`daily_plan_item.sort_order` 保存日期内排序。新条目追加到末尾，排序需检查当天完整条目和各版本。同日同任务跨来源聚合计划量，实际学习量只读取一次，排除 REVIEW。旧 weekly_plan 数据保留，新页面不从它另加一份计划量。
+
+V15 已在独立测试库执行，不能改写；生产尚未发布。JSON 文件输入规范由 Java 校验，不把外部 AI 输出直接作为 SQL 执行。
+
 ### 学习记录
 
 `study_record` 是完成量的唯一来源：

@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "planId": "math-foundation-example-2027-01",
+  "title": "数学基础：极限入门",
+  "startDate": "2027-01-04",
+  "endDate": "2027-01-06",
+  "goals": [
+    {
+      "key": "limits",
+      "subject": "数学一",
+      "title": "理解极限的概念与基本计算",
+      "description": "先学课程，再完成配套练习。",
+      "startDate": "2027-01-04",
+      "endDate": "2027-01-06"
+    }
+  ],
+  "months": [
+    {
+      "month": "2027-01",
+      "title": "极限基础",
+      "description": "完成两讲课程与配套练习"
+    }
+  ],
+  "weeks": [
+    {
+      "startDate": "2027-01-04",
+      "title": "极限入门",
+      "description": "两天学习，一天休息"
+    }
+  ],
+  "tasks": [
+    {
+      "key": "course",
+      "subject": "数学一",
+      "unit": "讲",
+      "title": "极限基础课程",
+      "goalKey": "limits",
+      "plannedAmount": 2
+    },
+    {
+      "key": "practice",
+      "subject": "数学一",
+      "unit": "题",
+      "title": "极限配套练习",
+      "goalKey": "limits",
+      "plannedAmount": 20
+    }
+  ],
+  "days": [
+    {
+      "date": "2027-01-04",
+      "items": [
+        {
+          "taskKey": "course",
+          "amount": 1,
+          "estimatedMinutes": 60
+        },
+        {
+          "taskKey": "practice",
+          "amount": 10,
+          "estimatedMinutes": 40
+        }
+      ]
+    },
+    {
+      "date": "2027-01-05",
+      "items": [
+        {
+          "taskKey": "course",
+          "amount": 1,
+          "estimatedMinutes": 60
+        },
+        {
+          "taskKey": "practice",
+          "amount": 10,
+          "estimatedMinutes": 40
+        }
+      ]
+    },
+    {
+      "date": "2027-01-06",
+      "items": []
+    }
+  ]
+}

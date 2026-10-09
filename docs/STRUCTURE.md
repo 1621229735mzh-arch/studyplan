@@ -71,7 +71,7 @@
 | --- | --- | --- | --- |
 | `account` | 预设账号、登录、会话及退出 | 已建 | 已建 |
 | `settings` | 考试时间、科目、计量单位、学习预算与复习额度配置 | 已建 | 已建 |
-| `plan` | 阶段目标、任务、周计划、每日安排及手动调整 | 已建 | 已建 |
+| `plan` | 阶段目标、任务、按日安排、周月汇总及外部方案确认导入 | 已建 | 已建 |
 | `learning` | 实际学习记录、补记、修改及删除 | 已建 | 已建 |
 | `progress` | 进度、计划与实际对比及趋势查询 | 已建 | 已建 |
 | `review` | 复习项、复习记录、掌握反馈、建议与确认安排 | 已建 | 已建 |
@@ -114,7 +114,7 @@ SQL XML 放在 `backend/src/main/resources/mapper/<module>/`，与对应 Mapper 
 | `backend/` | `pom.xml`、`mvnw`、`mvnw.cmd`、`.mvn/wrapper/maven-wrapper.properties`（Maven 3.9.16） |
 | `backend/src/main/java/com/kaoyan/study/` | `StudyApplication.java`（`@MapperScan` + `@ConfigurationPropertiesScan`） |
 | `backend/src/main/resources/` | `application.yml`、`application-dev.yml`、`application-prod.yml` |
-| `backend/src/main/resources/db/migration/` | `V1`–`V14`（原有迁移、恢复线上 V13 会话大小写归一化、V14 今日用时与部分复习） |
+| `backend/src/main/resources/db/migration/` | `V1`–`V15`（V13 会话大小写归一化、V14 今日用时与部分复习、V15 计划工作区与导入防重） |
 | `backend/src/main/java/com/kaoyan/study/config/` | 安全（Spring Security 7 + JDBC 会话 + CSRF）、OpenAPI、预设账号配置 |
 | `frontend/` | `package.json`、`pnpm-lock.yaml`、`index.html`、Vite/TypeScript/Vitest 配置 |
 | `frontend/src/` | `main.ts`、`App.vue` 及各功能页面 |
@@ -137,3 +137,7 @@ Docker 构建上下文取仓库根目录（`deploy/compose.yaml` 中 `context: .
 `.gitkeep` 占位文件在对应目录已有真实文件后即失去作用，可按需删除，不影响构建。
 
 今日清单的完成量与并发校验归 `learning/service/StudyRecordService`，每日预计用时归计划模块，部分复习与完成反馈归 `review/service/ReviewService`。`today/service/TodayService` 只组合这些业务服务并汇总分区与时间，不写独立任务表。接口与规则见 [今日清单](business/today-checklist.md)。
+
+计划工作区由 `plan/service/PlanWorkspaceService` 汇总日安排，`PlanImportService` 校验外部 JSON 并调用任务、目标、日安排业务服务事务追加。`WorkspaceMapper` 的关联查询同日同任务只计算一次学习量，排除复习。旧周表/API 保留兼容，新页面不重复编辑周排期。
+
+前端 `features/plan/views/PlanView.vue` 组织四种时间视图；`DayScheduleEditor` 和 `PlanImportDialog` 负责日期编辑与文件预览。`workspace.ts` 只做类型和日历操作，统计由后端返回。本周日安排经 `offline/useOfflineSnapshot` 保存至原 week 切片的 schedule 字段，只读，不缓存完整工作区。导入规划书、Schema 和示例以 `docs/business/plan-import*` 为唯一源，Vite 和 Docker 构建均读取这些文件。

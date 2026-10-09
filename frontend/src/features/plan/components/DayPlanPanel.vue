@@ -172,7 +172,7 @@ async function removeItem(item: DailyPlanItemView): Promise<void> {
   } catch {
     return
   }
-  await applyWrite(() => removeDayPlanItem(date.value, item.id), '已移除')
+  await applyWrite(() => removeDayPlanItem(date.value, item.id, item.version), '已移除')
 }
 
 onMounted(() => {

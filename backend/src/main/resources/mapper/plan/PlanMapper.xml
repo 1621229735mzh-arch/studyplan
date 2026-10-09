@@ -134,7 +134,7 @@
                  JOIN task t ON t.id = d.task_id
                  JOIN study_unit u ON u.id = t.unit_id
         WHERE d.plan_date = #{planDate}
-        ORDER BY d.source, d.id
+        ORDER BY d.sort_order, d.id
     </select>
 
     <select id="findDailyItemById" resultMap="dailyPlanItemResultMap">

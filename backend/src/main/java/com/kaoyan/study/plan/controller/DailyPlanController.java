@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -60,7 +61,7 @@ public class DailyPlanController {
     @Operation(summary = "移除当天安排")
     public List<DailyPlanItemView> removeItem(
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-            @PathVariable Long itemId) {
-        return dailyPlanService.removeItem(date, itemId);
+            @PathVariable Long itemId, @RequestParam Long version) {
+        return dailyPlanService.removeItem(date, itemId, version);
     }
 }

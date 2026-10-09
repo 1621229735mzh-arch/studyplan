@@ -89,7 +89,7 @@ export interface TaskProgressView {
 }
 
 /** 每日安排来源（对应后端 PlanSource）。 */
-export type PlanSource = 'MANUAL' | 'WEEKLY' | 'REVIEW'
+export type PlanSource = 'MANUAL' | 'WEEKLY' | 'IMPORT' | 'REVIEW'
 
 /**
  * 每日安排条目（对应后端 DailyPlanItemView）。
@@ -151,6 +151,12 @@ export interface WeekPlanResponse {
   note?: string | null
   version: number
   items: WeeklyPlanItemView[]
+  /** 新计划页的本周只读切片；旧周接口没有此字段。 */
+  schedule?: {
+    syncedAt: string
+    entries: import('./workspace').ScheduleEntry[]
+    subjects: { id: number; name: string }[]
+  }
 }
 
 /** 安排任务到本周（后端 WeeklyPlanItemRequest）：同一任务重复安排即更新计划量。 */

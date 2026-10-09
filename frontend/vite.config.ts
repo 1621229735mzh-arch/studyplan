@@ -68,7 +68,7 @@ export default defineConfig({
     proxy: {
       // 本地开发把 /api 转发到 Spring Boot；Cookie 与 CSRF 头原样透传。
       '/api': {
-        target: 'http://127.0.0.1:8080',
+        target: process.env.STUDY_API_PROXY ?? 'http://127.0.0.1:8080',
         changeOrigin: false
       }
     }

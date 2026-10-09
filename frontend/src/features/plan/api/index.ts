@@ -118,6 +118,6 @@ export function adjustDayPlanItem(
 }
 
 /** 从某天安排中移除条目；返回刷新后的当天条目数组。 */
-export function removeDayPlanItem(date: string, itemId: number): Promise<DailyPlanItemView[]> {
-  return del<DailyPlanItemView[]>(`/plan/days/${date}/items/${itemId}`)
+export function removeDayPlanItem(date: string, itemId: number, version: number): Promise<DailyPlanItemView[]> {
+  return del<DailyPlanItemView[]>(`/plan/days/${date}/items/${itemId}`, { params: { version } })
 }

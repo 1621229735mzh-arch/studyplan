@@ -1,5 +1,9 @@
 package com.kaoyan.study.learning.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+
 import com.kaoyan.study.learning.dto.DayProgressRequest;
 import com.kaoyan.study.learning.dto.StudyRecordCreateRequest;
 import com.kaoyan.study.learning.dto.StudyRecordUpdateRequest;

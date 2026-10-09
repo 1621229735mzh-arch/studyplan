@@ -65,7 +65,16 @@
 | GET | `/api/plan/days/{date}` | 某天安排（含当天已完成量） |
 | POST | `/api/plan/days/{date}/items` | 加入当天安排 |
 | PUT | `/api/plan/days/{date}/items/{itemId}` | 手动调整计划量（需 `version`，会记录调整） |
-| DELETE | `/api/plan/days/{date}/items/{itemId}` | 移除当天安排 |
+| DELETE | `/api/plan/days/{date}/items/{itemId}?version=` | 按版本移除当天安排，学习记录保留 |
+| GET | `/api/plan/workspace` | 可选 startDate/endDate/subjectId；同日任务、按科目单位的月汇总、导入目标说明 |
+| POST | `/api/plan/days/{date}/quick-items` | 新建内容或已有任务入日安排；clientToken 防重 |
+| PUT | `/api/plan/days/{date}/order` | items 为当天全部条目的 id/version，过期或漏项拒绝 |
+| POST | `/api/plan/imports/preview` | 原始 JSON 字符串 document；只读校验并返回预览与 previewToken |
+| POST | `/api/plan/imports/confirm` | document 与 previewToken；重查快照后事务追加 |
+
+新页面以日安排汇总周月；旧周接口保留兼容。新增日条目不再覆盖已有同来源条目，编辑使用 PUT 携带 version；REVIEW/IMPORT 来源只能通过专用确认入口新增。quick-items 支持 `{existingTaskId,plannedAmount,estimatedMinutes,clientToken}`，或 `{subjectId,unitId,title,plannedAmount,estimatedMinutes,clientToken}`。复习仍在复习模块管理。
+
+导入合同见 [规划书](../business/plan-import-guide.md)：重复返回 PLAN_ALREADY_IMPORTED（409），过期返回 PLAN_PREVIEW_STALE（409），字段和业务校验失败返回 400。没有内置模型调用接口。
 
 ### 学习记录
 
