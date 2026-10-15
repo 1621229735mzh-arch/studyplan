@@ -32,7 +32,12 @@ public record PlanImportDocument(
             @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
             @Valid Sequence sequence,
             @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
-            @Valid Activity activity) {
+            @Valid Activity activity,
+            @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+            @Valid Continuation continuation) {
+        public Task(String key,String subject,String unit,String title,String goalKey,BigDecimal plannedAmount,Sequence sequence,Activity activity) {
+            this(key,subject,unit,title,goalKey,plannedAmount,sequence,activity,null);
+        }
         public Task(String key,String subject,String unit,String title,String goalKey,BigDecimal plannedAmount,Sequence sequence) {
             this(key,subject,unit,title,goalKey,plannedAmount,sequence,null);
         }
@@ -40,7 +45,9 @@ public record PlanImportDocument(
             this(key,subject,unit,title,goalKey,plannedAmount,null);
         }
     }
-    public record Activity(@NotBlank @Pattern(regexp="TIMED_STUDY|RECAP|CHECK_ONLY") String mode,
+    public record Continuation(@NotBlank @Pattern(regexp="[A-Za-z0-9_-]{1,64}") String streamKey,
+            @NotBlank @Size(max=200) String title,@NotNull @Min(1) Integer position) {}
+    public record Activity(@NotBlank @Pattern(regexp="TIMED_STUDY|RECAP|CHECK_ONLY|CONTINUED_STUDY") String mode,
                            @Size(max=1000) String description,
                            @NotNull @Min(0) @Max(1440) Integer flexibleMinutes) {}
     public record Sequence(@NotBlank @Pattern(regexp="COMPLETE_THEN_ADVANCE") String mode,

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "408doing 外部计划合同 v1 / v2 / v3 / v4",
+  "title": "408doing 外部计划合同 v1—v5",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -22,7 +22,8 @@
         1,
         2,
         3,
-        4
+        4,
+        5
       ]
     },
     "planId": {
@@ -275,7 +276,8 @@
                 "enum": [
                   "TIMED_STUDY",
                   "RECAP",
-                  "CHECK_ONLY"
+                  "CHECK_ONLY",
+                  "CONTINUED_STUDY"
                 ]
               },
               "description": {
@@ -289,6 +291,34 @@
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 1440
+              }
+            }
+          },
+          "continuation": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": false,
+            "required": [
+              "streamKey",
+              "title",
+              "position"
+            ],
+            "properties": {
+              "streamKey": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{1,64}$"
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "position": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 20000
               }
             }
           }
@@ -325,6 +355,76 @@
                   "properties": {
                     "flexibleMinutes": {
                       "const": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "activity"
+              ],
+              "properties": {
+                "activity": {
+                  "type": "object",
+                  "required": [
+                    "mode"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "CONTINUED_STUDY"
+                    }
+                  }
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "continuation"
+              ],
+              "properties": {
+                "continuation": {
+                  "type": "object"
+                },
+                "plannedAmount": {
+                  "type": "null"
+                },
+                "sequence": {
+                  "type": "null"
+                },
+                "activity": {
+                  "properties": {
+                    "flexibleMinutes": {
+                      "const": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "continuation"
+              ],
+              "properties": {
+                "continuation": {
+                  "type": "object"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "activity"
+              ],
+              "properties": {
+                "activity": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "const": "CONTINUED_STUDY"
                     }
                   }
                 }
@@ -483,6 +583,44 @@
                       "enum": [
                         "TIMED_STUDY",
                         "RECAP"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "enum": [
+              1,
+              2,
+              3,
+              4
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "tasks": {
+            "items": {
+              "properties": {
+                "continuation": {
+                  "type": "null"
+                },
+                "activity": {
+                  "properties": {
+                    "mode": {
+                      "enum": [
+                        "TIMED_STUDY",
+                        "RECAP",
+                        "CHECK_ONLY"
                       ]
                     }
                   }

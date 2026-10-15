@@ -1,0 +1,371 @@
+{
+  "schemaVersion": 5,
+  "planId": "zhangyu-calculus-continuation-week-example",
+  "title": "张宇高数学习接续 · 首周格式样例",
+  "startDate": "2026-10-15",
+  "endDate": "2026-10-21",
+  "goals": [],
+  "months": [
+    {
+      "month": "2026-10",
+      "title": "函数、极限与连续"
+    }
+  ],
+  "weeks": [
+    {
+      "startDate": "2026-10-12",
+      "title": "函数与基本概念"
+    },
+    {
+      "startDate": "2026-10-19",
+      "title": "极限计算与连续"
+    }
+  ],
+  "tasks": [
+    {
+      "key": "text-1",
+      "subject": "数学一",
+      "unit": "讲",
+      "title": "第1讲 · 函数概念①",
+      "plannedAmount": null,
+      "activity": {
+        "mode": "CONTINUED_STUDY",
+        "description": "函数定义、定义域与对应关系",
+        "flexibleMinutes": 0
+      },
+      "continuation": {
+        "streamKey": "text",
+        "title": "《基础30讲》高数主教材",
+        "position": 1
+      }
+    },
+    {
+      "key": "practice-1",
+      "subject": "数学一",
+      "unit": "题",
+      "title": "第1章 · 第1—3题",
+      "plannedAmount": null,
+      "activity": {
+        "mode": "CONTINUED_STUDY",
+        "description": "完成第1章第1—3题",
+        "flexibleMinutes": 0
+      },
+      "continuation": {
+        "streamKey": "practice",
+        "title": "《1000题》基础篇",
+        "position": 1
+      }
+    },
+    {
+      "key": "text-2",
+      "subject": "数学一",
+      "unit": "讲",
+      "title": "第1讲 · 函数概念②",
+      "plannedAmount": null,
+      "activity": {
+        "mode": "CONTINUED_STUDY",
+        "description": "复合函数、反函数、初等函数",
+        "flexibleMinutes": 0
+      },
+      "continuation": {
+        "streamKey": "text",
+        "title": "《基础30讲》高数主教材",
+        "position": 2
+      }
+    },
+    {
+      "key": "practice-2",
+      "subject": "数学一",
+      "unit": "题",
+      "title": "第1章 · 第4—6题",
+      "plannedAmount": null,
+      "activity": {
+        "mode": "CONTINUED_STUDY",
+        "description": "完成第1章第4—6题",
+        "flexibleMinutes": 0
+      },
+      "continuation": {
+        "streamKey": "practice",
+        "title": "《1000题》基础篇",
+        "position": 2
+      }
+    },
+    {
+      "key": "text-3",
+      "subject": "数学一",
+      "unit": "讲",
+      "title": "第1讲 · 函数性质",
+      "plannedAmount": null,
+      "activity": {
+        "mode": "CONTINUED_STUDY",
+        "description": "有界性、单调性、奇偶性与周期性",
+        "flexibleMinutes": 0
+      },
+      "continuation": {
+        "streamKey": "text",
+        "title": "《基础30讲》高数主教材",
+        "position": 3
+      }
+    },
+    {
+      "key": "practice-3",
+      "subject": "数学一",
+      "unit": "题",
+      "title": "第1章 · 第7—9题",
+      "plannedAmount": null,
+      "activity": {
+        "mode": "CONTINUED_STUDY",
+        "description": "完成第1章第7—9题",
+        "flexibleMinutes": 0
+      },
+      "continuation": {
+        "streamKey": "practice",
+        "title": "《1000题》基础篇",
+        "position": 3
+      }
+    },
+    {
+      "key": "text-4",
+      "subject": "数学一",
+      "unit": "讲",
+      "title": "第1讲 · 函数图像",
+      "plannedAmount": null,
+      "activity": {
+        "mode": "CONTINUED_STUDY",
+        "description": "基本图像、平移、伸缩与对称变换",
+        "flexibleMinutes": 0
+      },
+      "continuation": {
+        "streamKey": "text",
+        "title": "《基础30讲》高数主教材",
+        "position": 4
+      }
+    },
+    {
+      "key": "practice-4",
+      "subject": "数学一",
+      "unit": "题",
+      "title": "第1章 · 第10—12题",
+      "plannedAmount": null,
+      "activity": {
+        "mode": "CONTINUED_STUDY",
+        "description": "完成第1章第10—12题",
+        "flexibleMinutes": 0
+      },
+      "continuation": {
+        "streamKey": "practice",
+        "title": "《1000题》基础篇",
+        "position": 4
+      }
+    },
+    {
+      "key": "text-5",
+      "subject": "数学一",
+      "unit": "讲",
+      "title": "第1讲 · 函数极限",
+      "plannedAmount": null,
+      "activity": {
+        "mode": "CONTINUED_STUDY",
+        "description": "函数极限、左右极限、极限存在的条件与性质",
+        "flexibleMinutes": 0
+      },
+      "continuation": {
+        "streamKey": "text",
+        "title": "《基础30讲》高数主教材",
+        "position": 5
+      }
+    },
+    {
+      "key": "practice-5",
+      "subject": "数学一",
+      "unit": "题",
+      "title": "第1章 · 第13—15题",
+      "plannedAmount": null,
+      "activity": {
+        "mode": "CONTINUED_STUDY",
+        "description": "完成第1章第13—15题",
+        "flexibleMinutes": 0
+      },
+      "continuation": {
+        "streamKey": "practice",
+        "title": "《1000题》基础篇",
+        "position": 5
+      }
+    },
+    {
+      "key": "text-6",
+      "subject": "数学一",
+      "unit": "讲",
+      "title": "第1讲 · 极限计算",
+      "plannedAmount": null,
+      "activity": {
+        "mode": "CONTINUED_STUDY",
+        "description": "极限运算法则、重要极限与基本计算",
+        "flexibleMinutes": 0
+      },
+      "continuation": {
+        "streamKey": "text",
+        "title": "《基础30讲》高数主教材",
+        "position": 6
+      }
+    },
+    {
+      "key": "practice-6",
+      "subject": "数学一",
+      "unit": "题",
+      "title": "第1章 · 第16—19题",
+      "plannedAmount": null,
+      "activity": {
+        "mode": "CONTINUED_STUDY",
+        "description": "完成第1章第16—19题",
+        "flexibleMinutes": 0
+      },
+      "continuation": {
+        "streamKey": "practice",
+        "title": "《1000题》基础篇",
+        "position": 6
+      }
+    },
+    {
+      "key": "text-7",
+      "subject": "数学一",
+      "unit": "讲",
+      "title": "第1讲 · 连续与间断",
+      "plannedAmount": null,
+      "activity": {
+        "mode": "CONTINUED_STUDY",
+        "description": "连续的定义、间断点类型与闭区间连续函数的性质",
+        "flexibleMinutes": 0
+      },
+      "continuation": {
+        "streamKey": "text",
+        "title": "《基础30讲》高数主教材",
+        "position": 7
+      }
+    },
+    {
+      "key": "practice-7",
+      "subject": "数学一",
+      "unit": "题",
+      "title": "第1章 · 第20—23题",
+      "plannedAmount": null,
+      "activity": {
+        "mode": "CONTINUED_STUDY",
+        "description": "完成第1章第20—23题",
+        "flexibleMinutes": 0
+      },
+      "continuation": {
+        "streamKey": "practice",
+        "title": "《1000题》基础篇",
+        "position": 7
+      }
+    }
+  ],
+  "days": [
+    {
+      "date": "2026-10-15",
+      "items": [
+        {
+          "taskKey": "text-1",
+          "amount": null,
+          "estimatedMinutes": 90
+        },
+        {
+          "taskKey": "practice-1",
+          "amount": null,
+          "estimatedMinutes": 30
+        }
+      ]
+    },
+    {
+      "date": "2026-10-16",
+      "items": [
+        {
+          "taskKey": "text-2",
+          "amount": null,
+          "estimatedMinutes": 75
+        },
+        {
+          "taskKey": "practice-2",
+          "amount": null,
+          "estimatedMinutes": 45
+        }
+      ]
+    },
+    {
+      "date": "2026-10-17",
+      "items": [
+        {
+          "taskKey": "text-3",
+          "amount": null,
+          "estimatedMinutes": 75
+        },
+        {
+          "taskKey": "practice-3",
+          "amount": null,
+          "estimatedMinutes": 45
+        }
+      ]
+    },
+    {
+      "date": "2026-10-18",
+      "items": [
+        {
+          "taskKey": "text-4",
+          "amount": null,
+          "estimatedMinutes": 70
+        },
+        {
+          "taskKey": "practice-4",
+          "amount": null,
+          "estimatedMinutes": 50
+        }
+      ]
+    },
+    {
+      "date": "2026-10-19",
+      "items": [
+        {
+          "taskKey": "text-5",
+          "amount": null,
+          "estimatedMinutes": 85
+        },
+        {
+          "taskKey": "practice-5",
+          "amount": null,
+          "estimatedMinutes": 35
+        }
+      ]
+    },
+    {
+      "date": "2026-10-20",
+      "items": [
+        {
+          "taskKey": "text-6",
+          "amount": null,
+          "estimatedMinutes": 70
+        },
+        {
+          "taskKey": "practice-6",
+          "amount": null,
+          "estimatedMinutes": 50
+        }
+      ]
+    },
+    {
+      "date": "2026-10-21",
+      "items": [
+        {
+          "taskKey": "text-7",
+          "amount": null,
+          "estimatedMinutes": 80
+        },
+        {
+          "taskKey": "practice-7",
+          "amount": null,
+          "estimatedMinutes": 40
+        }
+      ]
+    }
+  ]
+}

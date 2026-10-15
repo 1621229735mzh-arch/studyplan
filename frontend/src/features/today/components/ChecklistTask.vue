@@ -14,7 +14,8 @@ defineEmits<{ action: [task: TodayChecklistTask, complete: boolean] }>()
     <div class="task-main">
       <div class="task-title">{{ task.title }}</div>
       <p v-if="task.activity?.mode === 'CHECK_ONLY'" class="sequence-item">{{ task.activity.description }}<small>只确认是否完成 · 无需数量或时长 · 不增加新学量</small></p>
-      <p v-else-if="task.activity" class="sequence-item">{{ task.activity.description }}<small>基本 {{ task.estimatedMinutes }} 分钟<span v-if="task.activity.flexibleMinutes"> · 弹性最多 {{ task.activity.flexibleMinutes }} 分钟</span> · {{ task.activity.mode === 'RECAP' ? '只计用时，不重复增加完成量' : '完成量据实记录' }}</small></p>
+      <p v-else-if="task.activity && !task.continuation" class="sequence-item">{{ task.activity.description }}<small>基本 {{ task.estimatedMinutes }} 分钟<span v-if="task.activity.flexibleMinutes"> · 弹性最多 {{ task.activity.flexibleMinutes }} 分钟</span> · {{ task.activity.mode === 'RECAP' ? '只计用时，不重复增加完成量' : '完成量据实记录' }}</small></p>
+      <p v-if="task.continuation && task.activity?.description" class="sequence-item">{{ task.activity.description }}</p>
       <p v-if="task.sequence" class="sequence-item">
         <a v-if="task.sequence.dayItem" :href="task.sequence.dayItem.url" target="_blank" rel="noopener noreferrer">{{ task.sequence.dayItem.title }} ↗</a>
         <span v-else>题目清单已全部完成</span>
@@ -22,15 +23,15 @@ defineEmits<{ action: [task: TodayChecklistTask, complete: boolean] }>()
       </p>
       <div class="task-meta">
         <span class="task-kind" :class="{ 'task-kind--review': task.kind === 'REVIEW' || task.activity?.mode === 'RECAP' || task.activity?.mode === 'CHECK_ONLY' }">{{ task.activity?.mode === 'CHECK_ONLY' ? '完成确认' : task.activity?.mode === 'RECAP' ? '复盘' : task.kind === 'REVIEW' ? '复习' : '学习' }}</span>
-        <span v-if="task.completionPercent > 0">{{ task.activity?.mode === 'CHECK_ONLY' ? '已完成' : task.activity ? '本次已结束' : `已完成 ${Math.round(task.completionPercent * 10) / 10}%` }}</span>
+        <span v-if="task.completionPercent > 0">{{ task.activity?.mode === 'CHECK_ONLY' ? '已完成' : task.activity && !task.continuation ? '本次已结束' : `已完成 ${Math.round(task.completionPercent * 10) / 10}%` }}</span>
         <span v-if="task.completionPercent < 100 && task.activity?.mode !== 'CHECK_ONLY'">{{ task.remainingMinutes == null ? '预计用时待补充' : `预计剩余 ${compactMinutes(task.remainingMinutes)}` }}</span>
         <span v-if="!task.actionable && task.completionPercent < 100">{{ task.sequence ? '当前题目已完成或不在计划日期内' : '安排已取消或调整' }}</span>
       </div>
     </div>
     <div v-if="task.activity?.mode === 'CHECK_ONLY'" class="task-actions"><ElButton size="small" :disabled="readonly || !task.actionable" @click="$emit('action',task,task.completionPercent < 100)">{{ task.completionPercent >= 100 ? '取消完成' : '确认完成' }}</ElButton></div>
     <div v-else-if="task.completionPercent < 100" class="task-actions">
-      <ElButton size="small" type="primary" plain :disabled="readonly || !task.actionable" @click="$emit('action', task, true)">{{ task.activity ? '结束本次' : '完成' }}</ElButton>
-      <ElButton size="small" :disabled="readonly || !task.actionable" @click="$emit('action', task, false)">{{ task.activity ? '记一笔' : task.sequence ? '记尝试' : '剩余' }}</ElButton>
+      <ElButton size="small" type="primary" plain :disabled="readonly || !task.actionable" @click="$emit('action', task, true)">{{ task.activity && !task.continuation ? '结束本次' : '完成' }}</ElButton>
+      <ElButton size="small" :disabled="readonly || !task.actionable" @click="$emit('action', task, false)">{{ task.activity && !task.continuation ? '记一笔' : task.sequence ? '记尝试' : '剩余' }}</ElButton>
     </div>
   </li>
 </template>

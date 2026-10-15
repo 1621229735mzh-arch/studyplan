@@ -9,6 +9,7 @@ import { downloadText, type ImportPreview } from '../workspace'
 import guide from '../../../../../docs/business/plan-import-guide.md?raw'
 import example from '../../../../../docs/business/plan-import-example.json?raw'
 import schema from '../../../../../docs/business/plan-import.schema.json?raw'
+import continuationExample from '../../../../../docs/business/plan-import-continuation-example.json?raw'
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [boolean]; imported: [] }>()
@@ -22,7 +23,7 @@ const rows = computed(() => {
   if (!doc) return []
   const tasks = new Map(doc.tasks.map(t => [t.key, t]))
   return doc.days.flatMap(day => day.items.length ? day.items.map(item => ({ date: day.date, title: tasks.get(item.taskKey)?.title ?? item.taskKey,
-    subject: tasks.get(item.taskKey)?.subject ?? '', quantity: tasks.get(item.taskKey)?.activity?.mode === 'CHECK_ONLY' ? '只确认完成 · 不计数量或用时' : item.amount == null ? (tasks.get(item.taskKey)?.activity?.mode === 'RECAP' ? '复盘 · 只计用时' : '按时间安排 · 完成量据实') : `${item.amount} ${tasks.get(item.taskKey)?.unit ?? ''}`, minutes: item.estimatedMinutes, checkOnly: tasks.get(item.taskKey)?.activity?.mode === 'CHECK_ONLY' }))
+    subject: tasks.get(item.taskKey)?.subject ?? '', quantity: tasks.get(item.taskKey)?.continuation ? '学习接续 · 按内容记录进度' : tasks.get(item.taskKey)?.activity?.mode === 'CHECK_ONLY' ? '只确认完成 · 不计数量或用时' : item.amount == null ? (tasks.get(item.taskKey)?.activity?.mode === 'RECAP' ? '复盘 · 只计用时' : '按时间安排 · 完成量据实') : `${item.amount} ${tasks.get(item.taskKey)?.unit ?? ''}`, minutes: item.estimatedMinutes, checkOnly: tasks.get(item.taskKey)?.activity?.mode === 'CHECK_ONLY' }))
     : [{ date: day.date, title: '休息 / 不安排任务', subject: '', quantity: '—', minutes: null, checkOnly: false }])
 })
 watch(source, () => { preview.value = null; checked.value = false; page.value = 1; error.value = '' })
@@ -64,6 +65,7 @@ function downloadCatalog() {
     <p class="import-hint">将规划书和你的科目、单位目录交给外部 AI，讨论完成后上传它生成的 JSON 文件。</p>
     <div class="import-downloads">
       <ElButton text @click="downloadText('计划导入规划书.md', guide)">下载规划书</ElButton>
+      <ElButton text @click="downloadText('张宇高数学习接续-首周样例.json', continuationExample, 'application/json')">张宇学习接续样例</ElButton>
       <ElButton text @click="downloadCatalog" :disabled="catalog.loading || !!catalog.error">下载我的目录</ElButton>
       <ElButton text @click="downloadText('计划示例.json', example, 'application/json')">JSON 示例</ElButton>
       <ElButton text @click="downloadText('plan-import.schema.json', schema, 'application/json')">格式规范</ElButton>
@@ -76,8 +78,12 @@ function downloadCatalog() {
     <div v-else class="import-preview">
       <h3>{{ preview.document.title }}</h3><p>{{ preview.document.startDate }} — {{ preview.document.endDate }} · {{ preview.taskCount }} 个任务 · {{ preview.dayCount }} 天 · {{ preview.itemCount }} 条安排</p>
       <p v-if="preview.document.tasks.some(t => t.activity?.mode === 'CHECK_ONLY')">完成确认型只保存当天是否完成；无需数量或时长，不增加新学量，未完成不叠加到次日。</p>
-      <p v-if="preview.document.tasks.some(t => t.activity && t.activity.mode !== 'CHECK_ONLY')">时间型安排不预填题量，结束当天安排不等于整讲完成。弹性时间为最多可用时间，未计入基本预计用时；复盘只计用时。</p>
+      <p v-if="preview.document.tasks.some(t => t.activity && t.activity.mode !== 'CHECK_ONLY' && !t.continuation)">时间型安排不预填题量，结束当天安排不等于整讲完成。弹性时间为最多可用时间，未计入基本预计用时；复盘只计用时。</p>
       <details v-if="preview.document.goals.length || preview.document.months.length || preview.document.weeks.length"><summary>查看整体目标、月目标与周目标</summary><p v-for="goal in preview.document.goals" :key="goal.key">{{ goal.subject }} · {{ goal.title }}：{{ goal.description }}</p><p v-for="month in preview.document.months" :key="month.month">{{ month.month }} · {{ month.title }}：{{ month.description }}</p><p v-for="week in preview.document.weeks" :key="week.startDate">{{ week.startDate }} 当周 · {{ week.title }}：{{ week.description }}</p></details>
+      <template v-if="preview.document.tasks.some(t => t.continuation)">
+        <p>按书独立接续。完全未做继续当前内容；部分完成后，次日保留剩余并带入下一份。只收尾旧内容不追加后续；参考结束日期可顺延。</p>
+        <details open><summary>查看学习接续内容</summary><p v-for="task in preview.document.tasks.filter(t => t.continuation)" :key="task.key">{{ task.continuation!.title }} · {{ task.title }}：{{ task.activity?.description }}</p></details>
+      </template>
       <details v-for="task in preview.document.tasks.filter(t => t.sequence)" :key="task.key" open>
         <summary>{{ task.title }} · 有序接续清单（{{ task.sequence!.items.length }} 题）</summary>
         <p>每天最多完成 1 题。未完成继续当前题，漏做名额不积压；尝试只计用时，结束日期不自动延长。</p>

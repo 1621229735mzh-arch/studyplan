@@ -32,7 +32,7 @@ const createForm = ref<InstanceType<typeof RecordEditorForm> | null>(null)
 const editForm = ref<InstanceType<typeof RecordEditorForm> | null>(null)
 const rangeLabel = computed(() => filters.from ? `${filters.from} — ${filters.to}` : '全部日期')
 const taskOptions = computed<LearningRecordTaskOption[]>(() => {
-  const options: LearningRecordTaskOption[] = planTasks.value.filter(t=>t.activityMode!=='CHECK_ONLY').map(task => ({ sequential: task.sequential, id: task.id, title: task.title, subjectId: task.subjectId, subjectName: catalog.subjectNameOf(task.subjectId), unitId: task.unitId, unitName: catalog.unitNameOf(task.unitId) }))
+  const options: LearningRecordTaskOption[] = planTasks.value.filter(t=>t.activityMode!=='CHECK_ONLY' && t.activityMode!=='CONTINUED_STUDY').map(task => ({ sequential: task.sequential, id: task.id, title: task.title, subjectId: task.subjectId, subjectName: catalog.subjectNameOf(task.subjectId), unitId: task.unitId, unitName: catalog.unitNameOf(task.unitId) }))
   const current = editing.value
   // 已归档任务可能不在候选列表中，编辑时仍保留原来的关联及单位。
   if (current?.taskId && !options.some(task => task.id === current.taskId)) options.push({ sequential: !!current.sequenceItemId, id: current.taskId, title: current.taskTitle || '原关联任务', subjectId: current.subjectId ?? null, subjectName: current.subjectName ?? null, unitId: current.unitId ?? null, unitName: current.unitName ?? null })
@@ -128,7 +128,7 @@ onBeforeUnmount(() => { request++ })
     </ElDialog>
     <ElDialog v-model="editVisible" title="修改学习记录" width="min(700px, calc(100vw - 24px))" :close-on-click-modal="false" :close-on-press-escape="!submitting" :show-close="!submitting" destroy-on-close>
       <p class="workspace-note">修改会同步反映到今日和进度中。</p>
-      <RecordEditorForm ref="editForm" mode="edit" :tasks="taskOptions" :subjects="catalog.subjects" :units="catalog.units" :submitting="submitting" @submit="save($event, true)" @cancel="editVisible = false" />
+      <RecordEditorForm ref="editForm" mode="edit" :continued="editing?.activityMode === 'CONTINUED_STUDY'" :progress-delta="editing?.continuationDelta" :tasks="taskOptions" :subjects="catalog.subjects" :units="catalog.units" :submitting="submitting" @submit="save($event, true)" @cancel="editVisible = false" />
     </ElDialog>
   </div>
 </template>

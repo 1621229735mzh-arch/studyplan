@@ -32,6 +32,7 @@ public class TaskService {
     private final TaskMapper taskMapper;
     private final TaskSequenceService sequences;
     private final TaskActivityService activities;
+    private final TaskContinuationService continuations;
     private final StageGoalMapper stageGoalMapper;
     private final SubjectService subjectService;
     private final StudyUnitService studyUnitService;
@@ -39,7 +40,8 @@ public class TaskService {
     public TaskService(TaskMapper taskMapper,
                        StageGoalMapper stageGoalMapper,
                        SubjectService subjectService,
-                       StudyUnitService studyUnitService,TaskSequenceService sequences,TaskActivityService activities) {
+                       StudyUnitService studyUnitService,TaskSequenceService sequences,TaskActivityService activities,TaskContinuationService continuations) {
+        this.continuations=continuations;
         this.activities=activities;
         this.sequences=sequences;
         this.taskMapper = taskMapper;
@@ -103,6 +105,8 @@ public class TaskService {
     @Transactional
     public Task update(Long id, TaskUpdateRequest request) {
         Task task = requireExistingForUpdate(id);
+        if (continuations.streamId(id)!=null && request.status()!=null && request.status()!=task.getStatus())
+            throw new ConflictException("CONTINUATION_ORDER","学习接续内容保留完整顺序，不能单独结束或归档其中一份");
         if (activities.get(id)!=null && (request.plannedAmount()!=null || !task.getUnitId().equals(request.unitId()) || !task.getSubjectId().equals(request.subjectId())))
             throw new ConflictException("ACTIVITY_TASK_MEASUREMENT","时间型安排保留原科目和实际完成量单位，不填写计划数量");
         if (!task.getVersion().equals(request.version())) {
@@ -140,6 +144,8 @@ public class TaskService {
     @Transactional
     public void delete(Long id) {
         requireExistingForUpdate(id);
+        if (continuations.streamId(id)!=null)
+            throw new ConflictException("CONTINUATION_ORDER","学习接续内容保留完整清单，不能单独删除其中一份");
         if (taskMapper.countRecords(id) > 0) {
             throw new ConflictException("TASK_HAS_RECORDS", "该任务已有学习记录，不能删除；可改为归档");
         }

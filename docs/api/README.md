@@ -174,3 +174,7 @@
 POST /api/learning/records/day-confirmation 接收 `{taskId,date,completed,revision,clientToken}`，返回更新后的当天任务视图。仅用于 CHECK_ONLY；无需数量、时长或掌握评分。确认保存数量和用时均空的学习记录，取消软删除该日确认。重复目标状态不重复写入；改变状态时校验revision，包含删除历史以防旧请求覆盖新状态。身份、CSRF与任务行锁保持。
 
 任务、日安排、工作区条目、学习记录增加activityMode。月份confirmationCount单独显示安排项数，与同科目学习数量分开。确认可在今日取消或从记录页删除，不可改为数量／用时记录。
+
+### 学习接续（v5）
+
+原计划导入 preview/confirm 支持 CONTINUED_STUDY + continuation（streamKey、title、position）。原 day-progress 接受每份内容的累计百分比，实际量 actualAmount 留空；今日 checklist 增加 continuation（streamId、title、position、referenceDate、carried），学习记录响应增加 continuationDelta。普通任务响应该字段为空。身份验证、CSRF、版本检查、防重及事务沿用原接口。日历日期为参考排期，实际继续内容由今日接口返回，允许超过参考截止日期。

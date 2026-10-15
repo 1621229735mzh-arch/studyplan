@@ -117,3 +117,9 @@ V17：`task_sequence` 保存本期日期，`task_sequence_item` 保存有序 key
 ## V19：完成确认型安排
 
 新增迁移 V19__confirmation_only_activities.sql 扩展 task_activity.mode 约束，允许 CHECK_ONLY，并约束其 flexible_minutes=0。任务和日安排计划量、预计用时由业务层强制为空。有效确认仍为 study_record，activity_completed=true，amount、duration_minutes为空；取消沿用软删除。任务行锁确保一天只有一份有效确认，revision纳入软删除历史防止状态重放。不新增独立完成量表，不改写V18。
+
+## V20 按书学习接续
+
+`study_continuation_stream` 按导入批次与 stream key 标识一本书，`task_continuation` 将独立内容任务映射到书籍与连续顺序。参考日期和预计用时仍由原 `daily_plan_item` 保存。`task_activity.mode=CONTINUED_STUDY` 不填写计划数量。
+
+`study_record.continuation_delta` 为本次增加的百分点（0 < delta <= 100），同记录的 amount 必须为 null。累计百分比、旧内容和下一份内容均实时派生，删除记录后重算；不增加一份独立完成量表或可失同步的游标。书籍行锁串行化同书各内容的写入。V1—V19 未修改。

@@ -49,6 +49,8 @@ public class StudyRecordService {
 
     private final DailyPlanService dailyPlanService;
     private final SequenceLearningService sequences;
+    private final ContinuationLearningService continuedLearning;
+    private final com.kaoyan.study.plan.service.TaskContinuationService continuations;
     private final com.kaoyan.study.plan.service.TaskActivityService activities;
     private final StudyRecordMapper studyRecordMapper;
     private final TaskService taskService;
@@ -59,7 +61,9 @@ public class StudyRecordService {
                               TaskService taskService,
                               SubjectService subjectService,
                               StudyUnitService studyUnitService,
-                              DailyPlanService dailyPlanService, SequenceLearningService sequences, com.kaoyan.study.plan.service.TaskActivityService activities) {
+                              DailyPlanService dailyPlanService, SequenceLearningService sequences, com.kaoyan.study.plan.service.TaskActivityService activities,
+                              ContinuationLearningService continuedLearning,com.kaoyan.study.plan.service.TaskContinuationService continuations) {
+        this.continuedLearning=continuedLearning; this.continuations=continuations;
         this.activities=activities;
         this.sequences=sequences;
         this.dailyPlanService = dailyPlanService;
@@ -102,6 +106,9 @@ public class StudyRecordService {
         return createEntry(request,false);
     }
     private StudyRecordView createEntry(StudyRecordCreateRequest request,boolean activityCompleted) {
+        return createEntry(request,activityCompleted,null);
+    }
+    private StudyRecordView createEntry(StudyRecordCreateRequest request,boolean activityCompleted,BigDecimal continuationDelta) {
         if (request.clientToken() != null && !request.clientToken().isBlank()) {
             StudyRecord existing = studyRecordMapper.findByClientToken(request.clientToken());
             if (existing != null) {
@@ -116,6 +123,7 @@ public class StudyRecordService {
         record.setNote(request.note());
         record.setClientToken(request.clientToken());
         record.setActivityCompleted(activityCompleted);
+        record.setContinuationDelta(continuationDelta);
         applyTaskAndUnit(record, request.taskId(), request.subjectId(), request.unitId(),
                 request.amount() != null);
 
@@ -124,6 +132,9 @@ public class StudyRecordService {
             var retry=studyRecordMapper.findByClientToken(request.clientToken());
             if (retry!=null) return get(retry.getId());
         }
+        if (continuations.streamId(request.taskId())!=null && continuedLearning.dayTasks(request.recordDate()).stream()
+                .noneMatch(t->t.id().equals(request.taskId())))
+            throw new ConflictException("CONTINUATION_NOT_AVAILABLE","该内容尚未进入当天安排，请刷新当前学习内容");
         sequences.bind(record,request.sequenceItemId(),null);
         try {
             studyRecordMapper.insert(record);
@@ -133,6 +144,8 @@ public class StudyRecordService {
             if (existing != null) {
                 return get(existing.getId());
             }
+            if (continuations.streamId(record.getTaskId())!=null)
+                throw new ConflictException("TOKEN_REUSED","该提交令牌已使用或已撤销，请刷新后重新提交");
             throw ex;
         }
         return get(record.getId());
@@ -150,6 +163,9 @@ public class StudyRecordService {
         if (existing == null || !existing.getVersion().equals(request.version())) {
             throw new ConflictException("STUDY_RECORD_STALE", "该记录已在其他设备上修改，请刷新后重试");
         }
+        continuations.lockForTasks(existing.getTaskId(),request.taskId());
+        if (continuations.streamId(existing.getTaskId())!=null && (!Objects.equals(existing.getTaskId(),request.taskId()) || !existing.getRecordDate().equals(request.recordDate())))
+            throw new BusinessException("CONTINUATION_IDENTITY","接续进度记录保留原内容与日期；需要更正请删除后重新记录");
         var originalActivity=existing.getTaskId()==null ? null:activities.get(existing.getTaskId());
         var targetActivity=request.taskId()==null ? null:activities.get(request.taskId());
         if (originalActivity!=null && "CHECK_ONLY".equals(originalActivity.mode())
@@ -167,6 +183,9 @@ public class StudyRecordService {
         existing.setNote(request.note());
         applyTaskAndUnit(existing, request.taskId(), request.subjectId(), request.unitId(),
                 request.amount() != null);
+        if (continuations.streamId(request.taskId())!=null && continuedLearning.dayTasks(request.recordDate()).stream()
+                .noneMatch(t->t.id().equals(request.taskId())))
+            throw new ConflictException("CONTINUATION_NOT_AVAILABLE","该内容尚未进入当天安排，不能将其他记录改挂到这里");
         sequences.bind(existing,request.sequenceItemId(),original);
         if (studyRecordMapper.update(existing) == 0) {
             throw new ConflictException("STUDY_RECORD_STALE", "该记录已在其他设备上修改，请刷新后重试");
@@ -186,6 +205,7 @@ public class StudyRecordService {
         if (existing == null || !existing.getVersion().equals(version)) {
             throw new ConflictException("STUDY_RECORD_STALE", "该记录已在其他设备上修改，请刷新后重试");
         }
+        continuations.lockForTasks(existing.getTaskId());
         if (studyRecordMapper.softDelete(id, version) == 0) {
             throw new ConflictException("STUDY_RECORD_STALE", "该记录已在其他设备上修改，请刷新后重试");
         }
@@ -199,7 +219,10 @@ public class StudyRecordService {
                     DailyPlanItemView::taskId, LinkedHashMap::new,
                     Collectors.toList()));
         var records = list(date, date, null, null);
-        return plans.entrySet().stream().map(entry -> {
+        var ordinary = plans.entrySet().stream().filter(entry -> {
+            var activity=activities.get(entry.getKey());
+            return activity==null || !"CONTINUED_STUDY".equals(activity.mode());
+        }).map(entry -> {
             var items = entry.getValue();
             var first = items.getFirst();
             var taskRecords = records.stream().filter(x -> entry.getKey().equals(x.taskId())).toList();
@@ -233,6 +256,7 @@ public class StudyRecordService {
             return new DayLearningTaskView(entry.getKey(), first.subjectId(),
                     first.taskTitle(), planned, completed, fraction.movePointRight(2), estimate, remaining, revision, sequence,activity,first.unitName());
         }).toList();
+        return Stream.concat(ordinary.stream(),continuedLearning.dayTasks(date).stream()).toList();
     }
 
     /** Task lock serializes all confirmations and cancellations for this shared task. */
@@ -271,10 +295,23 @@ public class StudyRecordService {
                 throw new ConflictException("TOKEN_REUSED", "提交令牌已被其他记录使用");
             return get(retry.getId());
         }
+        continuations.lockForTasks(request.taskId());
         var snapshot = dayTasks(request.date()).stream().filter(x -> x.id().equals(request.taskId()))
                 .findFirst().orElseThrow(() -> new NotFoundException("当天学习安排不存在"));
         if (!snapshot.revision().equals(request.revision()))
             throw new ConflictException("DAY_PROGRESS_STALE", "当天计划或学习记录已变化，请刷新后重试");
+        if (snapshot.continuation()!=null) {
+            if (request.actualAmount()!=null)
+                throw new BusinessException("CONTINUATION_QUANTITY","学习接续只填写完成百分比，不虚构讲数或题数");
+            BigDecimal delta=BigDecimal.valueOf(request.completionPercent()).subtract(snapshot.completionPercent());
+            if (delta.signum()<0) throw new BusinessException("PROGRESS_DECREASE","累计完成比例不能降低；请修改或删除原学习记录");
+            if (continuedLearning.total(request.taskId()).add(delta).compareTo(BigDecimal.valueOf(100))>0)
+                throw new BusinessException("CONTINUATION_FUTURE_PROGRESS","该内容已有后续日期进度，请先修改或删除后续记录再补记");
+            if (delta.signum()==0 && request.durationMinutes()==0)
+                throw new BusinessException("EMPTY_PROGRESS","请增加完成比例或填写本次用时");
+            return createEntry(new StudyRecordCreateRequest(request.taskId(),null,null,request.date(),null,
+                    request.durationMinutes(),null,request.note(),request.clientToken()),false,delta.signum()>0 ? delta:null);
+        }
         if (snapshot.activity()!=null) {
             if ("CHECK_ONLY".equals(snapshot.activity().mode()))
                 throw new BusinessException("CONFIRMATION_ENTRY","此安排只需勾选完成，不填写数量或用时");
@@ -311,7 +348,10 @@ public class StudyRecordService {
     private void applyTaskAndUnit(StudyRecord record, Long taskId, Long subjectId, Long unitId, boolean hasAmount) {
         if (taskId != null) {
             Task task = taskService.requireExistingForUpdate(taskId);
+            continuations.lockForTasks(taskId);
             var activity=activities.get(taskId);
+            if (activity!=null && "CONTINUED_STUDY".equals(activity.mode()) && hasAmount)
+                throw new BusinessException("CONTINUATION_QUANTITY","学习接续百分比独立于实际题量，不填写虚构完成量");
             if (activity!=null && "CHECK_ONLY".equals(activity.mode())
                     && (!record.isActivityCompleted() || hasAmount || record.getDurationMinutes()!=null))
                 throw new BusinessException("CONFIRMATION_ENTRY","完成确认只能通过当日勾选保存，不能填写数量或时长");

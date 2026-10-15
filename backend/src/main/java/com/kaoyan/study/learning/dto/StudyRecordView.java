@@ -17,5 +17,5 @@ public record StudyRecordView(
         Integer durationMinutes,
         String content,
         String note,
-        Long version, Long sequenceItemId, String sequenceTitle, String sequenceUrl, String activityMode) {
+        Long version, Long sequenceItemId, String sequenceTitle, String sequenceUrl, String activityMode, BigDecimal continuationDelta) {
 }

@@ -19,6 +19,7 @@ const form = reactive({ date: '', mode: 'new', title: '', subjectId: undefined a
   unitId: undefined as number | undefined, existingTaskId: undefined as number | undefined, amount: 1, minutes: undefined as number | undefined })
 const editing = computed(() => !!props.item)
 const timed = computed(() => !!props.item && props.item.plannedAmount == null)
+const continued = computed(() => props.item?.activityMode === 'CONTINUED_STUDY')
 const confirmationOnly = computed(() => props.item?.activityMode === 'CHECK_ONLY')
 watch(() => props.modelValue, open => {
   if (!open) return
@@ -62,7 +63,7 @@ async function save() {
       </template>
       <ElFormItem v-else label="已有任务"><ElSelect v-model="form.existingTaskId" filterable placeholder="搜索学习任务" :disabled="busy"><ElOption v-for="task in tasks.filter(t => t.status === 'ACTIVE')" :key="task.id" :label="`${catalog.subjectNameOf(task.subjectId)} · ${task.title}（${catalog.unitNameOf(task.unitId)}）`" :value="task.id" /></ElSelect></ElFormItem>
       <div class="editor-columns">
-        <ElFormItem label="当日计划量"><span v-if="confirmationOnly">只确认完成，不设置数量</span><span v-else-if="timed">按时间安排，完成量据实记录</span><ElInputNumber v-else v-model="form.amount" :min="editing ? 0 : 0.01" :max="99999999.99" :precision="2" :disabled="busy" /></ElFormItem>
+        <ElFormItem label="当日计划量"><span v-if="confirmationOnly">只确认完成，不设置数量</span><span v-else-if="continued">按内容记录百分比，日期为参考安排</span><span v-else-if="timed">按时间安排，完成量据实记录</span><ElInputNumber v-else v-model="form.amount" :min="editing ? 0 : 0.01" :max="99999999.99" :precision="2" :disabled="busy" /></ElFormItem>
         <ElFormItem v-if="!confirmationOnly" label="预计用时（分钟，可留空）"><ElInputNumber v-model="form.minutes" :min="0" :max="2147483647" :precision="0" :disabled="busy" /></ElFormItem>
       </div>
     </ElForm>

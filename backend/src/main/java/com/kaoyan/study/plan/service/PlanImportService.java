@@ -34,6 +34,7 @@ public class PlanImportService {
     private final Validator validator;
     private final TaskSequenceService sequences;
     private final TaskActivityService activities;
+    private final TaskContinuationService continuations;
     private final WorkspaceMapper mapper;
     private final SubjectService subjects;
     private final StudyUnitService units;
@@ -42,7 +43,8 @@ public class PlanImportService {
     private final DailyPlanService daily;
 
     public PlanImportService(Validator validator,WorkspaceMapper mapper,SubjectService subjects,
-            StudyUnitService units,TaskService tasks,StageGoalService goals,DailyPlanService daily,TaskSequenceService sequences,TaskActivityService activities) {
+            StudyUnitService units,TaskService tasks,StageGoalService goals,DailyPlanService daily,TaskSequenceService sequences,TaskActivityService activities,TaskContinuationService continuations) {
+        this.continuations=continuations;
         this.activities=activities;
         this.sequences=sequences;
         this.validator=validator; this.mapper=mapper; this.subjects=subjects; this.units=units;
@@ -104,6 +106,7 @@ public class PlanImportService {
         }
         for (var day:doc.days()) for (var item:day.items())
             daily.appendImported(day.date(),new DailyItemCreateRequest(taskIds.get(item.taskKey()),item.amount(),PlanSource.IMPORT,item.estimatedMinutes()));
+        continuations.create(importId,doc.tasks(),taskIds);
         mapper.touch();
         return preview;
     }
@@ -138,11 +141,11 @@ public class PlanImportService {
         if (node.isObject()) {
             node.properties().forEach(e -> {
                 String name=e.getKey(); var value=e.getValue(); String p=path.isEmpty()?name:path+"."+name;
-                if (Set.of("schemaVersion","plannedAmount","amount","estimatedMinutes","flexibleMinutes").contains(name)) {
+                if (Set.of("schemaVersion","plannedAmount","amount","estimatedMinutes","flexibleMinutes","position").contains(name)) {
                     if (!value.isNull() && !value.isNumber()) invalid(p,"必须是 JSON 数字");
-                    if (Set.of("schemaVersion","estimatedMinutes","flexibleMinutes").contains(name) && !value.isNull()
+                    if (Set.of("schemaVersion","estimatedMinutes","flexibleMinutes","position").contains(name) && !value.isNull()
                             && (!value.isIntegralNumber() || !value.canConvertToInt())) invalid(p,"必须是整数");
-                } else if (!Set.of("goals","months","weeks","tasks","days","items","sequence","activity").contains(name)
+                } else if (!Set.of("goals","months","weeks","tasks","days","items","sequence","activity","continuation").contains(name)
                         && !value.isNull() && !value.isString()) invalid(p,"必须是字符串");
                 if (Set.of("startDate","endDate","date").contains(name) && value.isString()) {
                     try {
@@ -158,7 +161,7 @@ public class PlanImportService {
     }
 
     public void validate(PlanImportDocument doc) {
-        if (doc.schemaVersion()<1 || doc.schemaVersion()>4) invalid("schemaVersion","仅支持版本 1、2、3 或 4");
+        if (doc.schemaVersion()<1 || doc.schemaVersion()>5) invalid("schemaVersion","仅支持版本 1—5");
         range(doc.startDate(),doc.endDate(),doc.startDate(),doc.endDate(),"起止日期");
         if (doc.startDate().getYear()<1000 || doc.endDate().getYear()>9999) invalid("日期","年份必须在 1000—9999 范围内");
         long days=ChronoUnit.DAYS.between(doc.startDate(),doc.endDate())+1;
@@ -172,10 +175,13 @@ public class PlanImportService {
             range(g.startDate(),g.endDate(),doc.startDate(),doc.endDate(),"goals."+g.key());
         }
         for (var t:doc.tasks()) {
+            boolean continued=t.activity()!=null && "CONTINUED_STUDY".equals(t.activity().mode());
+            if (continued != (t.continuation()!=null) || continued && (doc.schemaVersion()!=5 || t.activity().flexibleMinutes()!=0))
+                invalid("tasks."+t.key()+".continuation","学习接续须使用版本 5、CONTINUED_STUDY 与 continuation，弹性分钟为 0");
             if (t.activity()!=null) {
                 if (doc.schemaVersion()<3 || t.sequence()!=null || t.plannedAmount()!=null)
                     invalid("tasks."+t.key()+".activity","活动安排须使用版本 3 或 4，数量留空，不能同时声明接续题目");
-                if ("CHECK_ONLY".equals(t.activity().mode()) && (doc.schemaVersion()!=4 || t.activity().flexibleMinutes()!=0))
+                if ("CHECK_ONLY".equals(t.activity().mode()) && (doc.schemaVersion()<4 || t.activity().flexibleMinutes()!=0))
                     invalid("tasks."+t.key()+".activity","完成确认型须使用版本 4，弹性分钟为 0，不设置数量或用时");
             } else if (t.plannedAmount()==null) invalid("tasks."+t.key()+".plannedAmount","数量型任务必须填写总量");
             if (t.sequence()!=null) {
@@ -229,6 +235,23 @@ public class PlanImportService {
             if (t.activity()==null && sums.getOrDefault(t.key(),BigDecimal.ZERO).compareTo(t.plannedAmount())!=0)
                 invalid("tasks."+t.key()+".plannedAmount","必须等于该任务所有日安排的数量之和");
         }
+        var streamGroups=doc.tasks().stream().filter(t->t.continuation()!=null)
+                .collect(Collectors.groupingBy(t->t.continuation().streamKey()));
+        for (var members:streamGroups.values()) {
+            var ordered=members.stream().sorted(Comparator.comparing(t->t.continuation().position())).toList();
+            LocalDate previous=null;
+            for (int i=0;i<ordered.size();i++) {
+                var task=ordered.get(i);
+                if (task.continuation().position()!=i+1 || !task.continuation().title().equals(ordered.getFirst().continuation().title())
+                        || !task.subject().equals(ordered.getFirst().subject()))
+                    invalid("continuation","同一本书须使用一致名称和科目，顺序从 1 开始连续且不重复");
+                var scheduled=doc.days().stream().filter(d->d.items().stream().anyMatch(item->item.taskKey().equals(task.key()))).toList();
+                if (scheduled.size()!=1) invalid("continuation","每份内容只能有一个参考日期");
+                var date=scheduled.getFirst().date();
+                if (previous!=null && !date.equals(previous.plusDays(1))) invalid("continuation","同一本书的参考日期须逐日连续");
+                previous=date;
+            }
+        }
         var monthKeys=new HashSet<String>();
         for (var m:doc.months()) {
             YearMonth month;
@@ -264,12 +287,12 @@ public class PlanImportService {
     }
     private String contentHash(PlanImportDocument doc) {
         // 去除 planId，并按语义键排序，换 id / JSON 字段顺序 / 数组顺序不能重复导入同一内容。
-        var canonical=new PlanImportDocument(doc.tasks().stream().anyMatch(t -> t.activity()!=null && "CHECK_ONLY".equals(t.activity().mode())) ? 4 : doc.tasks().stream().anyMatch(t -> t.activity()!=null) ? 3 : doc.tasks().stream().anyMatch(t -> t.sequence()!=null) ? 2 : 1,"content",doc.title(),doc.startDate(),doc.endDate(),
+        var canonical=new PlanImportDocument(doc.tasks().stream().anyMatch(t -> t.continuation()!=null) ? 5 : doc.tasks().stream().anyMatch(t -> t.activity()!=null && "CHECK_ONLY".equals(t.activity().mode())) ? 4 : doc.tasks().stream().anyMatch(t -> t.activity()!=null) ? 3 : doc.tasks().stream().anyMatch(t -> t.sequence()!=null) ? 2 : 1,"content",doc.title(),doc.startDate(),doc.endDate(),
                 doc.goals().stream().sorted(Comparator.comparing(PlanImportDocument.Goal::key)).toList(),
                 doc.months().stream().sorted(Comparator.comparing(PlanImportDocument.Month::month)).toList(),
                 doc.weeks().stream().sorted(Comparator.comparing(PlanImportDocument.Week::startDate)).toList(),
                 doc.tasks().stream().sorted(Comparator.comparing(PlanImportDocument.Task::key))
-                        .map(t -> new PlanImportDocument.Task(t.key(),t.subject(),t.unit(),t.title(),t.goalKey(),t.plannedAmount()==null ? null:t.plannedAmount().setScale(2),t.sequence(),t.activity())).toList(),
+                        .map(t -> new PlanImportDocument.Task(t.key(),t.subject(),t.unit(),t.title(),t.goalKey(),t.plannedAmount()==null ? null:t.plannedAmount().setScale(2),t.sequence(),t.activity(),t.continuation())).toList(),
                 doc.days().stream().sorted(Comparator.comparing(PlanImportDocument.Day::date))
                         .map(d -> new PlanImportDocument.Day(d.date(),d.items().stream()
                                 .sorted(Comparator.comparing(PlanImportDocument.Item::taskKey))

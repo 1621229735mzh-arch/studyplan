@@ -49,6 +49,8 @@ const props = withDefaults(
     /** 修改模式：按钮文案与提示不同 */
     mode?: 'create' | 'edit'
     /** 提交中：禁用按钮避免重复提交 */
+    continued?: boolean
+    progressDelta?: number | null
     submitting?: boolean
   }>(),
   {
@@ -225,6 +227,7 @@ defineExpose({ form, submit, reset, fillFrom, setServerError })
           type="date"
           value-format="YYYY-MM-DD"
           placeholder="记录日期"
+          :disabled="continued"
           @update:model-value="onDateChange"
         />
       </ElFormItem>
@@ -232,6 +235,7 @@ defineExpose({ form, submit, reset, fillFrom, setServerError })
       <ElFormItem label="任务" :error="fieldErrors.taskId">
         <ElSelect
           :model-value="form.taskId ?? undefined"
+          :disabled="continued"
           clearable
           filterable
           placeholder="选择任务（可留空记计划外学习）"
@@ -254,7 +258,7 @@ defineExpose({ form, submit, reset, fillFrom, setServerError })
         </ElFormItem>
       </template>
 
-      <ElFormItem label="完成量" :error="fieldErrors.amount">
+      <ElFormItem v-if="!continued" label="完成量" :error="fieldErrors.amount">
         <div class="record-form__inline">
           <ElInputNumber
             :model-value="form.amount ?? undefined"
@@ -267,6 +271,7 @@ defineExpose({ form, submit, reset, fillFrom, setServerError })
         </div>
       </ElFormItem>
 
+      <p v-if="continued" class="record-form__wide">本次增加进度：{{ progressDelta ?? 0 }}%。需要更正进度时删除此记录，再填写正确百分比。</p>
       <ElFormItem label="用时" :error="fieldErrors.durationMinutes">
         <div class="record-form__inline">
           <ElInputNumber

@@ -88,7 +88,7 @@ public class TodayService {
             String group = sectionName(subjectNames.get(task.subjectId()));
             groups.computeIfAbsent(group, x -> new ArrayList<>()).add(new TodayChecklistTask(
                     "LEARNING", task.id(), task.title(), task.completionPercent(), task.estimatedMinutes(),
-                    task.remainingMinutes(), task.revision(), null, (task.activity()!=null || task.plannedAmount()!=null && task.plannedAmount().signum() > 0) && (task.sequence()==null || task.sequence().actionable()), task.sequence()==null ? null : task.sequence().summary(),task.activity(),task.unitName()));
+                    task.remainingMinutes(), task.revision(), null, (task.activity()!=null || task.plannedAmount()!=null && task.plannedAmount().signum() > 0) && (task.sequence()==null || task.sequence().actionable()), task.sequence()==null ? null : task.sequence().summary(),task.activity(),task.unitName(),task.continuation()));
         }
         for (var record : records) {
             String group = sectionName(subjectNames.get(record.subjectId()));

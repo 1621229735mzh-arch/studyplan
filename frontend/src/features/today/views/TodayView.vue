@@ -13,6 +13,7 @@ import type { LearningRecordFormSubmission } from '@/features/learning/types'
 import type { MasteryLevel } from '@/types/domain'
 import { fetchToday, saveLearningProgress, saveReviewProgress, saveDayConfirmation } from '../api'
 import ChecklistTask from '../components/ChecklistTask.vue'
+import ContinuationBook from '../components/ContinuationBook.vue'
 import { compactMinutes } from '../time'
 import type { TodayChecklistTask, TodayResponse } from '../types'
 const session = useSessionStore()
@@ -77,7 +78,17 @@ function onDateChange(value: unknown): void {
   today.value = null
   void loadToday()
 }
+function bookGroups(tasks: TodayChecklistTask[]) {
+  const groups = new Map<number, {id: number; title: string; tasks: TodayChecklistTask[]}>()
+  for (const task of tasks) if (task.continuation) {
+    const {streamId,title} = task.continuation
+    if (!groups.has(streamId)) groups.set(streamId,{id:streamId,title,tasks:[]})
+    groups.get(streamId)!.tasks.push(task)
+  }
+  return [...groups.values()]
+}
 const selected = ref<TodayChecklistTask | null>(null)
+const timedAction = computed(() => !!selected.value?.activity && !selected.value.continuation)
 const dialogVisible = ref(false)
 const isComplete = ref(false)
 const percent = ref<number | undefined>(0)
@@ -125,13 +136,13 @@ async function saveAction(): Promise<void> {
     saveError.value = '请填写不低于当前进度、且不超过 100 的累计完成百分比。'; return
   }
   if (duration.value == null || duration.value < 0) { saveError.value = '请填写本次学习用时（分钟）。'; return }
-  if (task.activity && duration.value < 1) { saveError.value = '时间型安排请填写至少 1 分钟实际用时。'; return }
+  if (task.activity && !task.continuation && duration.value < 1) { saveError.value = '时间型安排请填写至少 1 分钟实际用时。'; return }
   if (task.activity && actualAmount.value != null && actualAmount.value <= 0) { saveError.value = '新增完成量请填写正数，尚未完成可留空。'; return }
   if (task.kind === 'REVIEW' && percent.value === 100 && !mastery.value) { saveError.value = '请选择本次复习的掌握情况。'; return }
   const signature = JSON.stringify([percent.value, duration.value, mastery.value, actualAmount.value, activityNote.value])
   if (attempt?.signature !== signature) attempt = { signature, token: crypto.randomUUID() }
   const payload = { date: actionDate, completionPercent: percent.value, durationMinutes: duration.value, clientToken: attempt!.token,
-    ...(task.activity ? {actualAmount: task.activity.mode === 'RECAP' ? null : actualAmount.value ?? null, note: activityNote.value || null} : {}) }
+    ...(task.activity && !task.continuation ? {actualAmount: task.activity.mode === 'RECAP' ? null : actualAmount.value ?? null, note: activityNote.value || null} : {}) }
   saving.value = true
   saveError.value = null
   try {
@@ -147,7 +158,7 @@ async function saveAction(): Promise<void> {
 }
 const recordFormRef = ref<InstanceType<typeof RecordForm> | null>(null)
 const recording = ref(false)
-const taskOptions = computed(() => (today.value?.plannedTasks ?? []).filter(t=>t.activityMode!=='CHECK_ONLY').map(t => ({
+const taskOptions = computed(() => (today.value?.plannedTasks ?? []).filter(t=>t.activityMode!=='CHECK_ONLY' && t.activityMode!=='CONTINUED_STUDY').map(t => ({
   sequential: !!today.value?.sections?.flatMap(s => s.tasks).find(task => task.kind === 'LEARNING' && task.id === t.taskId)?.sequence,
   id: t.taskId, title: t.taskTitle, subjectId: t.subjectId ?? null, unitId: t.unitId ?? null,
   unitName: t.unitName, subjectName: catalog.subjectNameOf(t.subjectId)
@@ -195,34 +206,35 @@ onMounted(() => { void catalog.load(); void loadToday() })
         <p v-if="section.missingEstimates" class="section-note">{{ section.missingEstimates }} 项预计用时待补充，可在计划的每日安排中填写。</p>
         <p v-if="section.missingDurations" class="section-note">{{ section.missingDurations }} 条学习记录尚未填写用时。</p>
         <ul class="checklist">
-          <ChecklistTask v-for="task in section.tasks.filter(t => t.completionPercent < 100)" :key="`${task.kind}-${task.id}`"
+          <ChecklistTask v-for="task in section.tasks.filter(t => !t.continuation && t.completionPercent < 100)" :key="`${task.kind}-${task.id}`"
             :task="task" :readonly="readonly || saving" @action="openAction" />
+          <ContinuationBook v-for="book in bookGroups(section.tasks)" :key="`book-${book.id}`" :title="book.title" :tasks="book.tasks" :readonly="readonly || saving" @action="openAction" />
         </ul>
         <p v-if="!section.tasks.some(t => t.completionPercent < 100)" class="empty-subject">
           {{ section.tasks.length ? '今日任务已完成' : '今天暂无任务' }}
         </p>
-        <details v-if="section.tasks.some(t => t.completionPercent >= 100)" class="completed">
-          <summary>已完成 · {{ section.tasks.filter(t => t.completionPercent >= 100).length }}</summary>
-          <ul class="checklist"><ChecklistTask v-for="task in section.tasks.filter(t => t.completionPercent >= 100)" :key="`${task.kind}-${task.id}`" :task="task" :readonly="readonly || saving" @action="openAction" /></ul>
+        <details v-if="section.tasks.some(t => !t.continuation && t.completionPercent >= 100)" class="completed">
+          <summary>已完成 · {{ section.tasks.filter(t => !t.continuation && t.completionPercent >= 100).length }}</summary>
+          <ul class="checklist"><ChecklistTask v-for="task in section.tasks.filter(t => !t.continuation && t.completionPercent >= 100)" :key="`${task.kind}-${task.id}`" :task="task" :readonly="readonly || saving" @action="openAction" /></ul>
         </details>
       </section>
       <details class="section-card extra-record"><summary>补记学习 / 计划外记录</summary>
         <fieldset :disabled="readonly" class="extra-record-fields"><RecordForm ref="recordFormRef" :tasks="taskOptions" :submitting="recording" @submit="saveExtraRecord" /></fieldset>
       </details>
     </template>
-    <ElDialog v-model="dialogVisible" :title="selected?.activity ? (isComplete ? '结束本次安排' : '记录本次学习') : isComplete ? '完成任务' : selected?.sequence ? '记录本次尝试' : '记录剩余进度'" width="min(440px, 92vw)"
+    <ElDialog v-model="dialogVisible" :title="timedAction ? (isComplete ? '结束本次安排' : '记录本次学习') : isComplete ? '完成任务' : selected?.sequence ? '记录本次尝试' : '记录剩余进度'" width="min(440px, 92vw)"
       :close-on-click-modal="!saving" :close-on-press-escape="!saving" :show-close="!saving"
       :before-close="(done: () => void) => { if (!saving) done() }">
       <p class="dialog-task">{{ selected?.title }}</p>
-      <p v-if="selected?.activity" class="section-note">结束本次安排只表示今天收工，不表示整讲或整章已经学完。{{ selected.activity.mode === 'RECAP' ? '复做与订正只计用时。' : '只填写本次首次完成的数量；已做过的题不重复计数。' }}</p>
+      <p v-if="timedAction && selected?.activity" class="section-note">结束本次安排只表示今天收工，不表示整讲或整章已经学完。{{ selected.activity.mode === 'RECAP' ? '复做与订正只计用时。' : '只填写本次首次完成的数量；已做过的题不重复计数。' }}</p>
       <p v-if="selected?.sequence?.dayItem">{{ selected.sequence.dayItem.title }} · {{ isComplete ? '完成整题后推进' : '本次只计用时，题目继续保留' }}</p>
-      <label v-if="!isComplete && !selected?.sequence && !selected?.activity" class="field-label">累计已完成 (%)</label>
-      <ElInputNumber v-if="!isComplete && !selected?.sequence && !selected?.activity" v-model="percent" :min="Math.ceil(selected?.completionPercent ?? 0)" :max="100" :precision="0" :disabled="saving" aria-label="累计已完成百分比" />
-      <p v-if="!isComplete && !selected?.sequence && !selected?.activity" class="section-note">填写 30 表示已完成 30%，剩余 70%。</p>
+      <label v-if="!isComplete && !selected?.sequence && !timedAction" class="field-label">累计已完成 (%)</label>
+      <ElInputNumber v-if="!isComplete && !selected?.sequence && !timedAction" v-model="percent" :min="Math.ceil(selected?.completionPercent ?? 0)" :max="100" :precision="0" :disabled="saving" aria-label="累计已完成百分比" />
+      <p v-if="!isComplete && !selected?.sequence && !timedAction" class="section-note">填写 30 表示已完成 30%，剩余 70%。</p>
       <template v-if="selected?.activity?.mode === 'TIMED_STUDY'"><label class="field-label">本次新增完成量（{{ selected.unitName }}，可留空）</label><ElInputNumber v-model="actualAmount" :min="0.000001" :precision="6" :controls="false" :disabled="saving" aria-label="本次新增完成量" /></template>
       <label class="field-label">本次用时（分钟）</label>
       <ElInputNumber v-model="duration" :min="0" :precision="0" :disabled="saving" placeholder="填写本次用时" aria-label="本次用时（分钟）" />
-      <template v-if="selected?.activity"><label class="field-label">进度位置与卡点</label><ElInput v-model="activityNote" type="textarea" :rows="3" maxlength="500" :disabled="saving" aria-label="进度位置与卡点" placeholder="教材页码、1000题最后题号、未完成内容及一个卡点" /></template>
+      <template v-if="timedAction"><label class="field-label">进度位置与卡点</label><ElInput v-model="activityNote" type="textarea" :rows="3" maxlength="500" :disabled="saving" aria-label="进度位置与卡点" placeholder="教材页码、1000题最后题号、未完成内容及一个卡点" /></template>
       <template v-if="selected?.kind === 'REVIEW' && percent === 100">
         <label class="field-label">掌握情况</label>
         <ElRadioGroup v-model="mastery" :disabled="saving"><ElRadioButton value="FORGOT">不会</ElRadioButton><ElRadioButton value="VAGUE">模糊</ElRadioButton><ElRadioButton value="MASTERED">掌握</ElRadioButton></ElRadioGroup>

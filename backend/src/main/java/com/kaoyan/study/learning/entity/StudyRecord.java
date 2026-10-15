@@ -14,6 +14,9 @@ public class StudyRecord {
     private Long id;
     private Long taskId;
     private Long sequenceItemId;
+    private BigDecimal continuationDelta;
+    public BigDecimal getContinuationDelta() { return continuationDelta; }
+    public void setContinuationDelta(BigDecimal value) { continuationDelta=value; }
     private boolean activityCompleted;
     public boolean isActivityCompleted() { return activityCompleted; }
     public void setActivityCompleted(boolean value) { activityCompleted=value; }

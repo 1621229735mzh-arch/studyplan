@@ -7,7 +7,8 @@
 
 /** 学习记录（对应后端 StudyRecordView）。 */
 export interface LearningRecord {
-  activityMode?: 'TIMED_STUDY' | 'RECAP' | 'CHECK_ONLY' | null
+  continuationDelta?: number | null
+  activityMode?: 'TIMED_STUDY' | 'RECAP' | 'CHECK_ONLY' | 'CONTINUED_STUDY' | null
   sequenceItemId?: number | null
   sequenceTitle?: string | null
   sequenceUrl?: string | null

@@ -124,7 +124,7 @@ SQL XML 放在 `backend/src/main/resources/mapper/<module>/`，与对应 Mapper 
 | `backend/` | `pom.xml`、`mvnw`、`mvnw.cmd`、`.mvn/wrapper/maven-wrapper.properties`（Maven 3.9.16） |
 | `backend/src/main/java/com/kaoyan/study/` | `StudyApplication.java`（`@MapperScan` + `@ConfigurationPropertiesScan`） |
 | `backend/src/main/resources/` | `application.yml`、`application-dev.yml`、`application-prod.yml` |
-| `backend/src/main/resources/db/migration/` | `V1`–`V19`（V13 会话大小写归一化、V14 今日用时与部分复习、V15 计划工作区与导入防重、V16 课程目录与学习归属、V17 接续题目、V18 时间型安排、V19 每日完成确认） |
+| `backend/src/main/resources/db/migration/` | `V1`–`V20`（V13 会话大小写归一化、V14 今日用时与部分复习、V15 计划工作区与导入防重、V16 课程目录与学习归属、V17 接续题目、V18 时间型安排、V19 每日完成确认、V20 按书学习接续） |
 | `backend/src/main/java/com/kaoyan/study/config/` | 安全（Spring Security 7 + JDBC 会话 + CSRF）、OpenAPI、预设账号配置 |
 | `frontend/` | `package.json`、`pnpm-lock.yaml`、`index.html`、Vite/TypeScript/Vitest 配置 |
 | `frontend/src/` | `main.ts`、`App.vue` 及各功能页面 |
@@ -165,3 +165,5 @@ V17 增加任务序列及学习记录题目关联。`TaskSequenceService` / `Tas
 V18 增加 `task_activity` 时间型安排元数据，允许日计划量为空，并在学习记录保存当天结束标记。`TaskActivityService` / `TaskActivityMapper` 属于计划模块；学习业务服务检查复盘不能增量，依据有效记录推导当天状态。`TodayService` 只组合展示，不保存独立完成量。v3 导入仍由原 `PlanImportService` 事务应用，不新增模块或模型依赖。
 
 V19 为 `task_activity` 增加 `CHECK_ONLY` 模式，v4 合同支持无数量、无用时的每日确认。`DayConfirmationRequest` 与 `StudyRecordService.confirmDay` 管理勾选／取消，任务行锁防止并发重复确认；revision 包含软删除历史以防完成／取消后旧设备重放。`StudyRecordView.activityMode` 区分有意不计时的确认，记录、今日和计划统计均不把确认当作新学数量或缺失用时。仍使用原学习记录及软删除机制，没有新增完成事实表。
+
+V20 新增学习接续规划表与原学习记录的 `continuation_delta`。`TaskContinuationService` / `TaskContinuationMapper` 属于计划模块，仅维护书籍、内容顺序与参考日安排；`ContinuationLearningService` / `ContinuationProgressMapper` 属于学习模块，依据有效学习记录派生累计百分比和日期执行内容。今日使用 `ContinuationBook.vue` 按书收纳各段；不另存完成游标，不改变普通任务和原每日一题规则。导入 v5、Schema 与可下载首周样例仍放在原 `docs/business/plan-import*`，详见导入规划书。

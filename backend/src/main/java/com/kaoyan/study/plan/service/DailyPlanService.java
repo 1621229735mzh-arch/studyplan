@@ -29,10 +29,12 @@ public class DailyPlanService {
     private final PlanMapper planMapper;
     private final TaskSequenceService sequences;
     private final TaskActivityService activities;
+    private final TaskContinuationService continuations;
     private final TaskService taskService;
     private final com.kaoyan.study.plan.mapper.WorkspaceMapper workspace;
 
-    public DailyPlanService(PlanMapper planMapper, TaskService taskService, com.kaoyan.study.plan.mapper.WorkspaceMapper workspace,TaskSequenceService sequences,TaskActivityService activities) {
+    public DailyPlanService(PlanMapper planMapper, TaskService taskService, com.kaoyan.study.plan.mapper.WorkspaceMapper workspace,TaskSequenceService sequences,TaskActivityService activities,TaskContinuationService continuations) {
+        this.continuations=continuations;
         this.activities=activities;
         this.sequences=sequences;
         this.planMapper = planMapper;
@@ -79,6 +81,8 @@ public class DailyPlanService {
     private void writeItem(LocalDate date, DailyItemCreateRequest request) {
         workspace.lock();
         taskService.requireExistingForUpdate(request.taskId());
+        if (continuations.streamId(request.taskId())!=null)
+            throw new ConflictException("CONTINUATION_REFERENCE","接续内容已有参考日期，由学习进度决定实际执行日期");
         validateSequence(request.taskId(),date,request.plannedAmount());
         validateActivity(request.taskId(),request.plannedAmount(),request.estimatedMinutes());
         if (sequences.definition(request.taskId())!=null && list(date).stream().anyMatch(i -> i.taskId().equals(request.taskId())))
@@ -145,6 +149,8 @@ public class DailyPlanService {
         if (item.getSource() == PlanSource.REVIEW) {
             throw new ConflictException("REVIEW_MANAGED_SEPARATELY", "请在复习页面管理复习安排");
         }
+        if (continuations.streamId(item.getTaskId())!=null)
+            throw new ConflictException("CONTINUATION_REFERENCE","接续内容的参考安排不能单独移除，请保留清单顺序");
         planMapper.deleteDailyItem(itemId);
         workspace.touch();
         return list(date);

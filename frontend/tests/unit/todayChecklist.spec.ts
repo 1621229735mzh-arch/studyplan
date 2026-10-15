@@ -97,3 +97,43 @@ describe('每日完成确认',()=>{
   mocks.online.value=false;mocks.snapshot=checkFixture();const w=await page();expect(button(w,'确认完成').attributes('disabled')).toBeDefined();expect(mocks.confirmation).not.toHaveBeenCalled();
  })
 })
+
+describe('按书接续学习',()=>{
+ function continuedFixture() {
+  const data=fixture()
+  const base=data.sections![0].tasks[0]
+  const task=(id:number,title:string,streamId:number,book:string,carried:boolean,progress:number) => ({...base,id,title,completionPercent:progress,
+   activity:{mode:'CONTINUED_STUDY' as const,description:title==='函数定义'?'函数定义、定义域与对应关系':'完成第1章第1—3题',flexibleMinutes:0},
+   continuation:{streamId,title:book,position:id,referenceDate:'2026-09-30',carried},revision:`rev-${id}`})
+  data.sections![0].tasks=[task(11,'函数定义',1,'《基础30讲》',true,40),task(12,'函数性质',1,'《基础30讲》',false,0),task(13,'第1章①',2,'《1000题》基础篇',true,0)]
+  return data
+ }
+ it('按书收纳旧内容和新内容，省去执行说明和教材位置要求',async()=>{
+  mocks.fetch.mockResolvedValue(continuedFixture());const w=await page()
+  expect(w.findAll('.book-task')).toHaveLength(2)
+  expect(w.findAll('.book-task')[0].text()).toContain('函数定义')
+  expect(w.findAll('.book-task')[0].text()).toContain('函数性质')
+  expect(w.text()).toContain('剩余内容');expect(w.text()).toContain('新内容')
+  expect(w.text()).toContain('已完成 40%');expect(w.text()).not.toContain('完成量据实记录')
+  expect(button(w,'结束本次')).toBeUndefined()
+ })
+ it('旧内容和新内容分别提交百分比，接续任务不要求填写新增题量或位置',async()=>{
+  mocks.fetch.mockResolvedValue(continuedFixture());const w=await page()
+  await button(w,'剩余',0).trigger('click');await flushPromises()
+  expect(w.text()).not.toContain('进度位置与卡点');expect(w.text()).not.toContain('不表示整讲')
+  const fields=w.findAllComponents(ElInputNumber);expect(fields).toHaveLength(2)
+  fields[0].vm.$emit('update:modelValue',70);fields[1].vm.$emit('update:modelValue',20);await flushPromises()
+  await button(w,'保存').trigger('click');await flushPromises()
+  expect(mocks.learning.mock.calls[0].slice(0,2)).toEqual([11,'rev-11'])
+  expect(mocks.learning.mock.calls[0][2]).toMatchObject({completionPercent:70,durationMinutes:20})
+  expect(mocks.learning.mock.calls[0][2]).not.toHaveProperty('actualAmount')
+  await button(w,'剩余',1).trigger('click');await flushPromises()
+  expect(w.findAllComponents(ElInputNumber)[0].props('modelValue')).toBe(0)
+ })
+ it('离线快照的两本书及各段百分比均只读',async()=>{
+  mocks.online.value=false;mocks.snapshot=continuedFixture();const w=await page()
+  expect(w.findAll('.book-task')).toHaveLength(2)
+  w.findAllComponents(ElButton).filter(b=>['完成','剩余'].includes(b.text())).forEach(b=>expect(b.attributes('disabled')).toBeDefined())
+  expect(mocks.learning).not.toHaveBeenCalled()
+ })
+})
