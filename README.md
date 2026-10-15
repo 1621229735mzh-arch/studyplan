@@ -135,6 +135,9 @@ Nginx 提供前端静态文件并转发 `/api`；数据库与管理端点都不�
 
 | 文档 | 内容 |
 | --- | --- |
+| [PROJECT_MEMORY.md](PROJECT_MEMORY.md) | 用户偏好、长期交接与 Windows 接续提醒 |
+| [DECISIONS.md](DECISIONS.md) | 已确认的设计决策、否决与暂缓边界 |
+| [IDEAS.md](IDEAS.md) | 后续创意与待办候选，未代表开发授权 |
 | [docs/STRUCTURE.md](docs/STRUCTURE.md) | 目录职责与文件落点 |
 | [docs/development/local-setup.md](docs/development/local-setup.md) | 本地环境、启动与常见问题 |
 | [docs/database/schema.md](docs/database/schema.md) | 数据模型、索引与迁移说明 |
@@ -142,6 +145,7 @@ Nginx 提供前端静态文件并转发 `/api`；数据库与管理端点都不�
 | [docs/testing/acceptance.md](docs/testing/acceptance.md) | 验收项与对应测试 |
 | [docs/operations/deploy.md](docs/operations/deploy.md) | 部署、日志、备份、恢复与回退 |
 | [docs/operations/deployment-journal-2026-09.md](docs/operations/deployment-journal-2026-09.md) | 本次首次部署的 30 个步骤、每步作用、排错与最终状态 |
+| [problem.md](problem.md) | 本次部署失误、排查结论与避免方法 |
 | [docs/decisions/](docs/decisions/) | 已做出的工程决策及依据 |
 
 有序每日练习使用计划导入 v2：每日一个名额，完成后推进，尝试只记用时。启动会自动执行 V17，须先备份；旧 v1 导入兼容。详见 [接续练习说明](docs/business/sequential-practice.md)。

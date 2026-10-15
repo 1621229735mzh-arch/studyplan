@@ -9,6 +9,10 @@
 ├── PLAN.md
 ├── AGENTS.md
 ├── README.md
+├── PROJECT_MEMORY.md             用户偏好、项目交接与 Windows 接续提醒
+├── DECISIONS.md                  本次对话确认的设计决策及暂缓边界
+├── IDEAS.md                      尚未批准实现的后续创意
+├── problem.md                    部署问题与避免方法，部署和线上排障前阅读
 ├── .github/workflows/             CI 与手动发布
 ├── frontend/
 │   ├── public/                    无需打包处理的公共静态资源
