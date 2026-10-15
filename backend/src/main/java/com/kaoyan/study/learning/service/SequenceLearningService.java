@@ -5,7 +5,6 @@ import com.kaoyan.study.common.exception.ConflictException;
 import com.kaoyan.study.learning.dto.StudyRecordView;
 import com.kaoyan.study.learning.entity.StudyRecord;
 import com.kaoyan.study.learning.mapper.StudyRecordMapper;
-import com.kaoyan.study.plan.mapper.TaskSequenceMapper.Item;
 import com.kaoyan.study.plan.service.TaskSequenceService;
 import org.springframework.stereotype.Service;
 import java.math.BigDecimal;

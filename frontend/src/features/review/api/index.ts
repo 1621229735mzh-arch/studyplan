@@ -4,8 +4,7 @@
  * 复习项只能来自已学内容；建议必须经确认才进入今日安排；
  * 额度校验由后端执行，前端只展示后端返回的额度与拒绝原因（见 ./quota.ts）。
  */
-import { asList, cleanParams, get, post } from '@/api/http'
-import type { PageResult } from '@/types/api'
+import { cleanParams, get, post } from '@/api/http'
 import type {
   ReviewConfirmRequest,
   ReviewConfirmResponse,
@@ -17,10 +16,8 @@ import type {
 } from '../types'
 
 /** 复习项列表（可按状态、科目筛选）。 */
-export async function listReviewItems(params: { status?: string; subjectId?: number } = {}): Promise<ReviewItem[]> {
-  return asList(
-    await get<ReviewItem[] | PageResult<ReviewItem>>('/review/items', { params: cleanParams({ ...params }) })
-  )
+export function listReviewItems(params: { status?: string; subjectId?: number } = {}): Promise<ReviewItem[]> {
+  return get<ReviewItem[]>('/review/items', { params: cleanParams({ ...params }) })
 }
 
 /** 把已学内容加入复习。 */

@@ -39,7 +39,7 @@
 │       │   ├── java/com/kaoyan/study/
 │       │   │   ├── config/        框架装配与安全配置
 │       │   │   ├── common/
-│       │   │   │   ├── api/       通用响应与分页等接口基础类型
+│       │   │   │   ├── api/       通用错误响应等接口基础类型
 │       │   │   │   └── exception/ 通用异常与异常处理
 │       │   │   └── <module>/     下表所列业务模块
 │       │   └── resources/
@@ -105,7 +105,7 @@ SQL XML 放在 `backend/src/main/resources/mapper/<module>/`，与对应 Mapper 
 
 `plan/advisor/` 预留业务层的建议接口及其输入输出类型，未来由 `ai/` 实现。当前不预建模型 SDK 配置或工具执行代码。
 
-前端除预留的 `ai` 外，每个功能均有 `api/`、`components/`、`views/`：分别放业务接口调用、功能内组件与页面。功能专用的类型或状态按需放回该功能目录，共享目录只放真正跨功能的内容。
+前端除预留的 `ai` 外，各功能按需使用 `api/`、`components/`、`views/`：分别放业务接口调用、功能内组件与页面。功能专用的类型或状态按需放回该功能目录，共享目录只放真正跨功能的内容。
 
 后端测试已按八个当前业务模块建立同名包。AI 的测试与真实模型评估在智能阶段建立并隔离执行。
 
@@ -130,7 +130,7 @@ SQL XML 放在 `backend/src/main/resources/mapper/<module>/`，与对应 Mapper 
 | `frontend/src/` | `main.ts`、`App.vue` 及各功能页面 |
 | `deploy/` | `compose.yaml`、`.env.example`、`docker/*.Dockerfile`、`nginx/default.conf`、`scripts/*.sh` |
 | `.github/workflows/` | `ci.yml`（提交触发）、`release.yml`（手动触发的生产发布） |
-| `docs/decisions/` | 已记录 4 项工程决策（版本锁定、Boot 4 模块拆分、复习参数可配置、复习安排落点） |
+| `docs/decisions/` | 已记录 5 项工程决策（版本锁定、Boot 4 模块拆分、复习参数可配置、复习安排落点、仅记录用时） |
 
 `progress` 的实际完成量只从学习记录推导，目录结构和归属是新增的持久化元数据，不能成为第二份完成量事实。`plan/advisor/` 仍为智能阶段的预留位置。
 
@@ -139,6 +139,8 @@ SQL XML 放在 `backend/src/main/resources/mapper/<module>/`，与对应 Mapper 
 进度首页 `ProgressView.vue` 只显示四个方向；`DirectionProgressView.vue` 根据路由及 query 组织分科、课程和完整目录。`CourseRing` 显示课程完成比例，`CatalogNodeTree` 展示内容，`CatalogEditorDialog` 与 `CatalogImportDialog` 共用后端预览确认流程。`CatalogService` / `CatalogMapper` 管理本模块目录和归属，通过学习业务服务检查原记录版本；旧 `ProgressMapper` 的区间查询保留兼容。
 
 记录与进度共用 `styles/retrospective.css`；记录日期筛选使用 `PeriodFilter.vue`。进度概览通过原 offline store 保存，`useCatalogWorkspace` 不新增本地缓存层。目录说明、Schema 与示例统一放在 `docs/business/progress-catalog*`，由 Vite 和 Docker 构建打包。
+
+旧 `RecordTimeline`、`EChart`、`SubjectProgressChart`、`TrendChart` 和无调用方的 `progress/api/index.ts` 已移除。当前进度请求集中在 `progress/api/catalog.ts`，课程环形图使用 SVG，无需 ECharts；旧进度响应类型仍供离线快照兼容读取，后端区间统计 API 仍保留。`useFormat` 的 `amountText` 与 `weekStartOf` 被新页面使用，必须保留。
 
 Docker 构建上下文取仓库根目录（`deploy/compose.yaml` 中 `context: ..`），
 手动发布工作流也使用仓库根目录（`context: .`）。
@@ -152,9 +154,9 @@ Docker 构建上下文取仓库根目录（`deploy/compose.yaml` 中 `context: .
 
 `.gitkeep` 占位文件在对应目录已有真实文件后即失去作用，可按需删除，不影响构建。
 
-今日清单的完成量与并发校验归 `learning/service/StudyRecordService`，每日预计用时归计划模块，部分复习与完成反馈归 `review/service/ReviewService`。`today/service/TodayService` 只组合这些业务服务并汇总分区与时间，不写独立任务表。接口与规则见 [今日清单](business/today-checklist.md)。
+今日清单的完成量与并发校验归 `learning/service/StudyRecordService`，每日预计用时归计划模块，部分复习与完成反馈归 `review/service/ReviewService`。`today/service/TodayService` 只组合这些业务服务并汇总分区与时间，不写独立任务表。接口与规则见 [今日清单](business/today-checklist.md)。前端使用 `ChecklistTask`，已移除旧 `PlannedTaskTable` 与 `ReviewedTaskList`。
 
-计划工作区由 `plan/service/PlanWorkspaceService` 汇总日安排，`PlanImportService` 校验外部 JSON 并调用任务、目标、日安排业务服务事务追加。`WorkspaceMapper` 的关联查询同日同任务只计算一次学习量，排除复习。旧周表/API 保留兼容，新页面不重复编辑周排期。
+计划工作区由 `plan/service/PlanWorkspaceService` 汇总日安排，`PlanImportService` 校验外部 JSON 并调用任务、目标、日安排业务服务事务追加。`WorkspaceMapper` 的关联查询同日同任务只计算一次学习量，排除复习。旧周表/API 保留兼容，新页面不重复编辑周排期。旧 `WeekPlanPanel`、`DayPlanPanel` 已移除；日编辑统一使用 `DayScheduleEditor`。
 
 前端 `features/plan/views/PlanView.vue` 组织四种时间视图；`DayScheduleEditor` 和 `PlanImportDialog` 负责日期编辑与文件预览。`workspace.ts` 只做类型和日历操作，统计由后端返回。本周日安排经 `offline/useOfflineSnapshot` 保存至原 week 切片的 schedule 字段，只读，不缓存完整工作区。导入规划书、Schema 和示例以 `docs/business/plan-import*` 为唯一源，Vite 和 Docker 构建均读取这些文件。
 

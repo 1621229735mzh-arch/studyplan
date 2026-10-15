@@ -5,14 +5,14 @@
 
 ## 环境要求
 
-- Node.js ≥ 20（Vite 6 要求）
-- pnpm（本项目唯一的包管理器；`package.json` 已声明 `packageManager`，未提交锁文件，首次安装会生成）
+- Node.js 22（版本要求见 `package.json`；当前使用 Vite 5.4.21）
+- pnpm 9.15.0（本项目唯一的包管理器；已提交 `pnpm-lock.yaml`）
 
 ## 命令
 
 ```bash
 # 1. 安装依赖（在 frontend/ 目录执行）
-pnpm install
+pnpm install --frozen-lockfile
 
 # 2. 本地开发（默认 http://localhost:5173，/api 代理到 http://127.0.0.1:8080）
 pnpm dev
@@ -33,7 +33,6 @@ pnpm test
 配置：复制 `.env.example` 为 `.env`（只放无敏感信息的变量）。可用变量：
 
 - `VITE_API_BASE`：接口前缀，默认 `/api`。
-- `VITE_APP_TITLE`：页面标题，可选。
 
 ## 目录说明（与 docs/STRUCTURE.md 一致）
 
@@ -48,7 +47,7 @@ src/
 ├── router/        路由与登录守卫
 ├── stores/        全局会话（session）与科目单位缓存（catalog）
 ├── styles/        全局样式
-├── types/         跨功能通用类型（ApiError、PageResult、科目、单位……）
+├── types/         跨功能通用类型（ApiError、科目、单位……）
 ├── offline/       IndexedDB 快照读写（唯一的数据缓存入口）
 └── pwa/           Service Worker 注册与更新提示
 tests/
@@ -74,10 +73,9 @@ tests/
    不同单位不求和、不生成总体百分比；学习时长、内容完成量、掌握情况分开显示。
    预算/额度为空表示“未设置”，不能当作 0。
 5. **并发与防重**：修改类请求都带上从服务端读取的 `version`，冲突（409）时提示刷新而不是静默覆盖；
-   学习记录创建时附带 `clientRequestId`（配合后端防重），并在提交中禁用按钮。
-6. **显式导入**：业务代码显式导入 Vue / Element Plus 的 API，`unplugin-auto-import` 与
-   `unplugin-vue-components` 只用于按需解析且 `dts: false`，这样干净检出（没有生成 d.ts）时
-   `vue-tsc --noEmit` 依然可用。Element Plus 的全局组件类型来自 `element-plus/global`（见 `env.d.ts`）。
+   学习记录创建时附带 `clientToken`（配合后端防重），并在提交中禁用按钮。
+6. **显式导入**：业务代码显式导入 Vue / Element Plus 的 API，Element Plus 在 `main.ts` 全局注册并加载样式。
+   构建不使用自动导入插件或生成的类型声明；全局组件类型来自 `element-plus/global`（见 `env.d.ts`）。
 7. **Element Plus 输入组件的绑定**：数值/日期/下拉组件使用 `:model-value` + `@update:model-value`
    而不是 `v-model`，因为这些组件的 `modelValue` 是较宽的联合类型，`v-model` 在 `vue-tsc` 下会报类型不兼容。
 
@@ -86,8 +84,10 @@ tests/
 - 账号：`GET /api/auth/csrf`、`POST /api/auth/login`、`GET /api/auth/me`、`POST /api/auth/logout`（204）
 - 设置：`/api/settings/subjects`、`/api/settings/units`、`/api/settings/study`（PUT 需带 `version`）
 - 其余模块（plan / learning / today / progress / review / memo / target）的路径集中在各
-  `src/features/<module>/api/index.ts`，字段类型在同目录 `types.ts`。
-  这些接口由并行开发实现，若字段命名或返回结构有差异，只需改对应功能的 `api` 与 `types` 文件。
+  `src/features/<module>/api/`，字段类型在对应功能的 `types.ts` 或 `catalog.ts`。
+  列表接口按后端实际合同返回数组，不维护未实现的分页兼容结构。
+
+当前进度页使用 `api/catalog.ts` 与 SVG 课程环形图；旧趋势、对比图及其 ECharts 依赖已清理。
 
 ## 验收要点（前端相关）
 
@@ -99,4 +99,4 @@ tests/
 
 ## 今日清单更新
 
-今日页按数学一、英语一、政治、408 展示学习与复习清单。顶部显示后端合计的实际用时和预计剩余；完成/剩余操作分别录入 100% 或累计百分比及本次用时。完成复习需填写掌握反馈。每日安排面板可录入外部 AI 计划的预计分钟。离线快照仍只读，旧快照提示联网更新。细则见 [今日清单](../docs/business/today-checklist.md)。
+今日页按数学一、英语一、政治、408 展示学习与复习清单。顶部显示后端合计的实际用时和预计剩余；完成/剩余操作分别录入 100% 或累计百分比及本次用时。完成复习需填写掌握反馈。计划页的日安排编辑器可录入外部 AI 计划的预计分钟。离线快照仍只读，旧快照提示联网更新。细则见 [今日清单](../docs/business/today-checklist.md)。

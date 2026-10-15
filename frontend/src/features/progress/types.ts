@@ -19,9 +19,6 @@ export interface UnitProgressView {
   studyMinutes?: number | null
 }
 
-/** 趋势中的某一天的某个单位完成量（对应后端 DailyUnitAmountView）。 */
-export type DailyUnitAmountView = UnitAmount
-
 /** 趋势中的单日数据（对应后端 TrendPointView）：时长与各单位完成量分开呈现。 */
 export interface TrendPointView {
   date: string

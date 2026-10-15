@@ -117,16 +117,6 @@ export interface DailyPlanItemView {
   completedAmount?: number | null
 }
 
-/** 加入某一天的安排（后端 DailyItemCreateRequest）。 */
-export interface DailyItemCreateRequest {
-  /** 外部计划给出的完整预计用时（分钟），缺失不是 0 */
-  estimatedMinutes?: number | null
-  taskId: number
-  plannedAmount: number
-  /** 为空时后端按 MANUAL 处理 */
-  source?: PlanSource | null
-}
-
 /** 手动调整某一天的安排量（后端 DailyItemAdjustRequest）；调整不会顺延未完成内容。 */
 export interface DailyItemAdjustRequest {
   /** 外部计划给出的完整预计用时（分钟），缺失不是 0 */
@@ -160,12 +150,6 @@ export interface WeekPlanResponse {
     entries: import('./workspace').ScheduleEntry[]
     subjects: { id: number; name: string }[]
   }
-}
-
-/** 安排任务到本周（后端 WeeklyPlanItemRequest）：同一任务重复安排即更新计划量。 */
-export interface WeeklyPlanItemRequest {
-  taskId: number
-  plannedAmount: number
 }
 
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {

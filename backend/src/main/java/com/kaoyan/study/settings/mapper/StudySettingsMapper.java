@@ -2,7 +2,6 @@ package com.kaoyan.study.settings.mapper;
 
 import com.kaoyan.study.settings.entity.StudySettings;
 import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Param;
 
 /** 学习设置数据访问（单行，id 固定为 1）。 */
 @Mapper

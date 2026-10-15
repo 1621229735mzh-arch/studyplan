@@ -81,19 +81,6 @@ export async function kvPut(key: string, value: unknown): Promise<void> {
   }
 }
 
-/** 删除一个键。 */
-export async function kvDelete(key: string): Promise<void> {
-  memoryStore.delete(key)
-  if (!isIndexedDbAvailable()) {
-    return
-  }
-  try {
-    await withStore<undefined>('readwrite', (store) => store.delete(key))
-  } catch (error) {
-    console.warn('[offline] 删除本地快照失败', error)
-  }
-}
-
 /** 清空全部本地数据（退出登录时必须调用）。 */
 export async function kvClear(): Promise<void> {
   memoryStore.clear()

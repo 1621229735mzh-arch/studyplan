@@ -4,24 +4,17 @@
  * “转为任务”使用后端专门接口 `POST /api/memo/{id}/convert-to-task`：
  * 任务由计划模块创建、备忘录原文保留，不需要前端“先建任务再回写备忘录”。
  */
-import { asList, cleanParams, del, get, post, put } from '@/api/http'
-import type { PageResult } from '@/types/api'
+import { cleanParams, del, get, post, put } from '@/api/http'
 import type { Memo, MemoConvertRequest, MemoQuery, MemoRequest } from '../types'
 
 /** 备忘录列表（支持状态、科目与关键字筛选）。 */
-export async function listMemos(query: MemoQuery = {}): Promise<Memo[]> {
-  const response = await get<Memo[] | PageResult<Memo>>('/memo', { params: cleanParams({ ...query }) })
-  return asList(response)
+export function listMemos(query: MemoQuery = {}): Promise<Memo[]> {
+  return get<Memo[]>('/memo', { params: cleanParams({ ...query }) })
 }
 
 /** 到期提醒列表（默认当天，含此前未完成的备忘录）。 */
-export async function listDueMemos(date?: string): Promise<Memo[]> {
-  return asList(await get<Memo[] | PageResult<Memo>>('/memo/due', { params: cleanParams({ date }) }))
-}
-
-/** 单条备忘录。 */
-export function getMemo(id: number): Promise<Memo> {
-  return get<Memo>(`/memo/${id}`)
+export function listDueMemos(date?: string): Promise<Memo[]> {
+  return get<Memo[]>('/memo/due', { params: cleanParams({ date }) })
 }
 
 /** 新建备忘录；version 传 0。 */

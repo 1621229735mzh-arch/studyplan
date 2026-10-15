@@ -48,13 +48,12 @@ export function addDays(isoDate: string, days: number): string {
   return toIsoDate(date)
 }
 
-/** 所在周的周一（后端周计划以 weekStart 标识）。 */
+/** 所在周的周一。 */
 export function weekStartOf(isoDate: string): string {
   const date = parseIsoDate(isoDate)
   if (date === null) {
     return isoDate
   }
-  // getDay(): 0 表示周日，转换为“距离本周一的天数”。
   const offset = (date.getDay() + 6) % 7
   date.setDate(date.getDate() - offset)
   return toIsoDate(date)
@@ -159,7 +158,7 @@ export function reviewPhaseLabel(phase?: string | null): string {
   return REVIEW_PHASE_LABELS[phase as ReviewPhase] ?? phase
 }
 
-/** 数量 + 单位；缺少单位时明确标注，避免读者误以为是无单位数字。 */
+/** 数量与单位展示；缺少单位时明确标注。 */
 export function amountText(amount?: number | null, unit?: string | null): string {
   if (amount === null || amount === undefined) {
     return '—'

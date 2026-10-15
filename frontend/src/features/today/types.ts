@@ -36,22 +36,6 @@ export interface TodayResponse {
   sections?: TodaySubjectSection[]
 }
 
-/**
- * 今日计划任务的展示行。
- *
- * 后端 DailyPlanItemView 不带科目名，这里用科目目录按 subjectId 补出名称用于展示；
- * `hasRecord` 表示后端返回的当天学习记录里是否有该任务（不是新的统计口径）。
- */
-export interface TodayPlanTaskRow extends DailyPlanItemView {
-  subjectName: string | null
-  hasRecord: boolean
-}
-
-/** 今日复习任务的展示行：后端 ReviewItemResponse 不带科目名，这里用科目目录补出。 */
-export interface TodayReviewTaskRow extends ReviewItem {
-  subjectName: string | null
-}
-
 export interface TodayChecklistTask {
   activity?: { mode: 'TIMED_STUDY' | 'RECAP' | 'CHECK_ONLY'; description: string | null; flexibleMinutes: number } | null
   unitName?: string | null

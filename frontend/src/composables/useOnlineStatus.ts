@@ -27,8 +27,3 @@ export function useOnlineStatus(): { online: Ref<boolean> } {
   ensureListeners()
   return { online }
 }
-
-/** 当前是否联网。 */
-export function isOnline(): boolean {
-  return online.value
-}

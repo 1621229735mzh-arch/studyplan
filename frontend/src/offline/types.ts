@@ -29,8 +29,6 @@ export interface OfflineSnapshotData {
   progress: ProgressOverview | null
 }
 
-export type SnapshotSlice = keyof OfflineSnapshotData
-
 /** 读取结果：元信息加上三个切片。 */
 export interface OfflineSnapshot extends OfflineSnapshotData {
   meta: OfflineSnapshotMeta

@@ -1,6 +1,5 @@
 package com.kaoyan.study.progress.mapper;
 
-import com.kaoyan.study.progress.dto.DailyUnitAmountView;
 import com.kaoyan.study.progress.dto.UnitProgressView;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;

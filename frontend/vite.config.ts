@@ -1,26 +1,12 @@
 import { fileURLToPath, URL } from 'node:url'
 
 import vue from '@vitejs/plugin-vue'
-import AutoImport from 'unplugin-auto-import/vite'
-import Components from 'unplugin-vue-components/vite'
-import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
   plugins: [
     vue(),
-    // 说明：业务代码显式导入 Vue / Element Plus 的 API，不依赖自动导入的类型声明，
-    // 这样干净检出（尚未生成 auto-imports.d.ts）时 vue-tsc --noEmit 依然可用。
-    AutoImport({
-      dts: false,
-      imports: ['vue'],
-      resolvers: [ElementPlusResolver({ importStyle: 'css' })]
-    }),
-    Components({
-      dts: false,
-      resolvers: [ElementPlusResolver({ importStyle: 'css' })]
-    }),
     VitePWA({
       registerType: 'prompt',
       // 由 src/pwa/registerServiceWorker.ts 自行注册，便于展示“有新版本”提示。

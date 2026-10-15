@@ -4,9 +4,8 @@
 .github/
 docs/**
 !docs/business/
-!docs/business/plan-import-guide.md
-!docs/business/plan-import.schema.json
-!docs/business/plan-import-example.json
+!docs/business/plan-import*
+!docs/business/progress-catalog*
 deploy/backups/
 deploy/data/
 deploy/logs/

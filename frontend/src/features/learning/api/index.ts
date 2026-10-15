@@ -5,26 +5,22 @@
  * 修改必须回传 version，后端检测到数据已变化时返回冲突错误（前端提示刷新）。
  * 创建时附带 clientToken 以配合后端防重；删除也必须带上 version。
  */
-import { asList, cleanParams, del, get, post, put } from '@/api/http'
-import type { PageResult } from '@/types/api'
+import { cleanParams, del, get, post, put } from '@/api/http'
 import type {
   LearningRecord,
   LearningRecordCreateRequest,
   LearningRecordQuery,
-  LearningRecordUpdateRequest
+  LearningRecordUpdateRequest,
+  RecordArchive
 } from '../types'
-import type { RecordArchive } from '../types'
 
 export function getRecordArchive(query: LearningRecordQuery = {}): Promise<RecordArchive> {
   return get<RecordArchive>('/learning/archive', { params: cleanParams({ ...query }) })
 }
 
 /** 记录列表（支持日期区间、任务、科目筛选）。 */
-export async function listLearningRecords(query: LearningRecordQuery = {}): Promise<LearningRecord[]> {
-  const response = await get<LearningRecord[] | PageResult<LearningRecord>>('/learning/records', {
-    params: cleanParams({ ...query })
-  })
-  return asList(response)
+export function listLearningRecords(query: LearningRecordQuery = {}): Promise<LearningRecord[]> {
+  return get<LearningRecord[]>('/learning/records', { params: cleanParams({ ...query }) })
 }
 
 /** 新增学习记录（带 clientToken 时重复提交不会生成第二条）。 */

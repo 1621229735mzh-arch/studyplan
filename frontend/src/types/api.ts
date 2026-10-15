@@ -1,6 +1,5 @@
 /**
- * 后端统一错误结构与分页结构（对应 backend 的
- * com.kaoyan.study.common.api.ApiError / PageResult）。
+ * 后端统一错误结构（对应 com.kaoyan.study.common.api.ApiError）。
  */
 
 /** 单个字段的校验失败信息。 */
@@ -25,14 +24,6 @@ export interface ApiError {
   timestamp: string
   /** 参数校验失败的字段明细，可为空数组 */
   fieldErrors: FieldViolation[]
-}
-
-/** 分页结果。 */
-export interface PageResult<T> {
-  items: T[]
-  page: number
-  size: number
-  total: number
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {

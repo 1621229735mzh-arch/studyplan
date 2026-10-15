@@ -1,13 +1,12 @@
 /**
  * 候选目标接口。
  */
-import { asList, cleanParams, del, get, patch, post, put } from '@/api/http'
-import type { PageResult } from '@/types/api'
+import { cleanParams, del, get, patch, post, put } from '@/api/http'
 import type { Target, TargetRequest, TargetStatus, TargetStatusRequest } from '../types'
 
 /** 候选目标列表（可按状态筛选）。 */
-export async function listTargets(status?: TargetStatus): Promise<Target[]> {
-  return asList(await get<Target[] | PageResult<Target>>('/targets', { params: cleanParams({ status }) }))
+export function listTargets(status?: TargetStatus): Promise<Target[]> {
+  return get<Target[]>('/targets', { params: cleanParams({ status }) })
 }
 
 /** 新增候选目标；version 传 0。 */

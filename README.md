@@ -11,14 +11,15 @@
 已实现并验证：工程基础、核心闭环、信息反馈、复习机制。智能升级（Spring AI）按计划留到后续阶段，当前未安装相关依赖。
 
 - 后端：Spring Boot 4.1.1 模块化单体，8 个业务模块全部实现。
-- 数据库：Flyway 迁移 V1–V15，随应用启动执行；V12 会一次性导入 2027 考研数学一轮计划；V15 支持计划工作区及外部方案防重。
+- 本地清理复核（2026-10-15）：前端 84 项测试、类型检查及 PWA 构建，后端 13 项单元测试、干净编译及打包通过；本轮未运行数据库集成测试和 Docker 构建。见 [清理记录](docs/development/cleanup-20261009.md)。
+- 数据库：Flyway 迁移 V1–V19，随应用启动执行；V12 导入数学一轮计划，V15 支持计划工作区，V16–V19 支持课程目录、接续练习、时间型安排与每日确认。
 - 登录：预设账号 + Spring Security + Spring Session JDBC（会话存 MySQL）+ CSRF 防护。
-- 本轮验证（2026-10-08）：后端 92 项在隔离 MySQL 8.0.45 上通过并打包；前端 49 项测试、类型检查和生产构建通过。浏览器验证四视图、导入确认、日编辑/排序及离线本周；生产 MySQL 8.4.11 的隔离恢复、V14 → V15、会话及接口验收通过。未运行本地 Docker 专用会话迁移测试或重建 Docker 镜像，详见 [计划页验收](docs/testing/planning-workspace-20261008.md)。
+- 历史验证（2026-10-08）：后端 92 项在隔离 MySQL 8.0.45 上通过并打包；前端 49 项测试、类型检查和生产构建通过。浏览器验证四视图、导入确认、日编辑/排序及离线本周；生产 MySQL 8.4.11 的隔离恢复、V14 → V15、会话及接口验收通过。未运行本地 Docker 专用会话迁移测试或重建 Docker 镜像，详见 [计划页验收](docs/testing/planning-workspace-20261008.md)。
 - 历史验证（2026-10-01）：后端 72 项在隔离 MySQL 9.7.0 上通过；前端 38 项测试与构建通过。服务器 MySQL 8.4.11 隔离库验证 V13 → V14、登录与 JDBC 会话，今日清单已发布。见 [今日清单验证](docs/testing/today-checklist-20261001.md)和 [早期验收记录](docs/testing/acceptance.md)。
 - 今日页：四科学习/复习清单、累计百分比与本次用时、后端时间合计；规则见 [今日清单](docs/business/today-checklist.md)。
 - 计划页：默认整体时间轴、月历、周历和日安排，手动按日期规划；外部 JSON 方案校验、预览、确认追加。内置 AI 当前封锁。使用说明见 [导入规划书](docs/business/plan-import-guide.md)；已于 2026-10-08 发布，数据核对与线上验收见 [发布记录](docs/operations/planning-workspace-release-20261008.md)。
 - 首次部署与会话修复的历史记录见 [首次部署全过程](docs/operations/deployment-journal-2026-09.md)。
-- 前端：Vue 3 + TypeScript + Vite + Element Plus + ECharts，含离线只读快照。
+- 前端：Vue 3 + TypeScript + Vite + Element Plus，含离线只读快照；当前课程完成比例使用 SVG，不安装无使用入口的图表库。
 - 部署：Docker Compose + Nginx，CI 自动检查、生产发布手动触发。
 
 ## 环境要求
@@ -140,6 +141,7 @@ Nginx 提供前端静态文件并转发 `/api`；数据库与管理端点都不�
 | [IDEAS.md](IDEAS.md) | 后续创意与待办候选，未代表开发授权 |
 | [docs/STRUCTURE.md](docs/STRUCTURE.md) | 目录职责与文件落点 |
 | [docs/development/local-setup.md](docs/development/local-setup.md) | 本地环境、启动与常见问题 |
+| [docs/development/cleanup-20261009.md](docs/development/cleanup-20261009.md) | 本地冗余清理范围与验证结果 |
 | [docs/database/schema.md](docs/database/schema.md) | 数据模型、索引与迁移说明 |
 | [docs/api/README.md](docs/api/README.md) | 接口约定与端点清单 |
 | [docs/testing/acceptance.md](docs/testing/acceptance.md) | 验收项与对应测试 |

@@ -1,6 +1,6 @@
 import axios, { AxiosError, type AxiosRequestConfig, type InternalAxiosRequestConfig } from 'axios'
 
-import { isApiError, type ApiError, type FieldViolation, type PageResult } from '../types/api'
+import { isApiError, type ApiError, type FieldViolation } from '../types/api'
 import type { CsrfTokenResponse } from './types'
 
 /**
@@ -300,16 +300,4 @@ export function cleanParams(input: Record<string, unknown>): Record<string, unkn
     result[key] = value
   }
   return result
-}
-
-/**
- * 列表类接口既可能返回数组，也可能返回分页结构，这里统一取数组。
- *
- * 列表接口是并行开发中的接口，后端最终形态确定后只需调整此函数。
- */
-export function asList<T>(response: T[] | PageResult<T> | null | undefined): T[] {
-  if (Array.isArray(response)) {
-    return response
-  }
-  return response?.items ?? []
 }
