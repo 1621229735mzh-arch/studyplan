@@ -17,6 +17,7 @@
 - 历史验证（2026-10-01）：后端 72 项在隔离 MySQL 9.7.0 上通过；前端 38 项测试与构建通过。服务器 MySQL 8.4.11 隔离库验证 V13 → V14、登录与 JDBC 会话，今日清单已发布。见 [今日清单验证](docs/testing/today-checklist-20261001.md)和 [早期验收记录](docs/testing/acceptance.md)。
 - 今日页：四科学习/复习清单、累计百分比与本次用时、后端时间合计；规则见 [今日清单](docs/business/today-checklist.md)。
 - 计划页：默认整体时间轴、月历、周历和日安排，手动按日期规划；外部 JSON 方案校验、预览、确认追加。内置 AI 当前封锁。使用说明见 [导入规划书](docs/business/plan-import-guide.md)；已于 2026-10-08 发布，数据核对与线上验收见 [发布记录](docs/operations/planning-workspace-release-20261008.md)。
+- 首次部署与会话修复的历史记录见 [首次部署全过程](docs/operations/deployment-journal-2026-09.md)。
 - 前端：Vue 3 + TypeScript + Vite + Element Plus + ECharts，含离线只读快照。
 - 部署：Docker Compose + Nginx，CI 自动检查、生产发布手动触发。
 
@@ -102,6 +103,16 @@ export TEST_MYSQL_PASSWORD=你的口令
 
 当前远程网站采用本地构建产物、上传到服务器的手动部署方式，服务器使用 `compose.bundle.yaml`；它与本仓库下述 `compose.yaml` 镜像发布流程不同。今日清单已于 2026-10-01 发布，升级验证、备份位置与回退限制见 [今日清单发布记录](docs/operations/today-checklist-release-20261001.md)。此前的前端更新见 [发布记录](docs/operations/frontend-update-20260930.md)。
 
+2 GB 服务器首次手动部署、HTTPS、已有本地数据迁移，使用
+[手动部署说明](docs/operations/manual-deploy.md) 中的 `compose.bundle.yaml`。
+在 Windows 本地构建：`./deploy/scripts/build-bundle.ps1 -Offline`，再上传生成的版本包。
+已有学习数据须先备份并恢复验证，不要直接启动一个空数据库当作迁移完成。
+
+本次从服务器选型、域名与 DNS、数据迁移，到排错、上线、定时维护的实际步骤及作用，
+见 [首次部署全过程记录](docs/operations/deployment-journal-2026-09.md)。
+
+以下为原 GHCR 镜像发布流程，需另行配置 HTTPS 入口，不与手动部署配置混用：
+
 ```bash
 cd deploy
 cp .env.example .env   # 填写数据库口令与预设账号口令
@@ -120,6 +131,8 @@ Nginx 提供前端静态文件并转发 `/api`；数据库与管理端点都不�
 
 ## 文档索引
 
+记录采用月 → 周 → 日展开，进度采用四个方向 → 分科 → 课程／资料 → 完整目录。目录导入与手动维护先预览确认，关联学习记录自动累计；今日和计划保持现状。见 [工作区说明](docs/business/records-progress-workspace.md)、[目录导入说明](docs/business/progress-catalog-guide.md) 与 [第二轮验收](docs/testing/records-progress-catalog-20261013.md)。本地启动、测试和构建命令保持不变，启动时由 Flyway 执行新增 V16 目录迁移。
+
 | 文档 | 内容 |
 | --- | --- |
 | [docs/STRUCTURE.md](docs/STRUCTURE.md) | 目录职责与文件落点 |
@@ -128,4 +141,13 @@ Nginx 提供前端静态文件并转发 `/api`；数据库与管理端点都不�
 | [docs/api/README.md](docs/api/README.md) | 接口约定与端点清单 |
 | [docs/testing/acceptance.md](docs/testing/acceptance.md) | 验收项与对应测试 |
 | [docs/operations/deploy.md](docs/operations/deploy.md) | 部署、日志、备份、恢复与回退 |
+| [docs/operations/deployment-journal-2026-09.md](docs/operations/deployment-journal-2026-09.md) | 本次首次部署的 30 个步骤、每步作用、排错与最终状态 |
 | [docs/decisions/](docs/decisions/) | 已做出的工程决策及依据 |
+
+有序每日练习使用计划导入 v2：每日一个名额，完成后推进，尝试只记用时。启动会自动执行 V17，须先备份；旧 v1 导入兼容。详见 [接续练习说明](docs/business/sequential-practice.md)。
+
+2026-10-14 已发布 V17，并通过网页导入数据结构每日一题计划。服务器升级、数据保留和最终线上核对见 [接续练习发布记录](docs/operations/sequence-release-20261014.md)。
+
+时间型计划使用导入 v3：基本用时与弹性上限分别填写，未知题量留空，实际完成量据实记录；复盘只计用时。升级前备份，启动会执行 V18。字段及操作见 [导入规划书](docs/business/plan-import-guide.md)。
+
+每日勾选清单使用导入 v4 的 CHECK_ONLY：无需数量或时长，今日可确认／取消，不增加新学量。启动执行新增 V19；已有 V1–V18 不改写，旧 v1–v3 导入兼容。启动、测试与构建命令保持不变，字段见 docs/business/plan-import-guide.md。

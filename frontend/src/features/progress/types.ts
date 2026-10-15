@@ -12,7 +12,7 @@ export interface UnitProgressView {
   subjectName: string
   unitId: number
   unitName: string
-  /** 计划量；null 表示该单位下没有设置计划量，不是 0 */
+  /** 日期区间内的日安排量；null 表示没有安排，不是 0 */
   plannedAmount?: number | null
   completedAmount?: number | null
   /** 该科目该单位下的学习时长（分钟） */
@@ -32,6 +32,10 @@ export interface TrendPointView {
 
 /** `GET /api/progress/overview` 响应（后端 ProgressOverviewResponse）。 */
 export interface ProgressOverview {
+  /** 快照的统计口径与独立同步时间，不使用其他切片的更新时间。 */
+  planningBasis?: 'daily' | 'catalog'
+  catalog?: import('./catalog').CatalogSummary
+  syncedAt?: string
   from: string
   to: string
   items: UnitProgressView[]

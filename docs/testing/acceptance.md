@@ -1,5 +1,33 @@
 # 验收项与验证方式
 
+## 2026-09-29 会话表跨平台修复（最新）
+
+- 问题：Windows 导出的 `spring_session` / `spring_session_attributes` 在 Linux
+  `lower_case_table_names=0` 下与程序使用的大写表名不匹配，匿名业务 API 返回 500。
+- 新增 V13，只重命名会话表，保留 V2 及其校验和，不删除表或业务数据。
+- 执行 `backend/mvnw.cmd -B -Dmaven.repo.local=../.m2repo -o verify`（工作目录 backend）：
+  67 项测试通过，0 失败/错误/跳过；新增测试分别覆盖大小写敏感与不敏感 MySQL，
+  验证会话及属性保留、读写、删除、清理、迁移重复执行；原测试覆盖全新库 V1–V13。
+- 原 SQL 的隔离恢复副本修复前 `/api/today` 实测 500，修复后匿名 401；
+  `release/test-restored-session.ps1` 验证无 CSRF 登录 403、带 CSRF 测试账号登录 200、
+  会话读取、今日/任务 200、退出 204、退出后 401。
+  测试仅绑定本机 127.0.0.1:18081，并为 HTTP 测试覆盖 Secure Cookie；生产配置未改。
+- 业务数量仍为 30 任务、1 阶段目标、15 周计划、113 每日安排、0 学习记录。
+  原备份哈希不变，Windows MySQL80 未修改。测试副本新增了虚拟登录账号，不用于生产导入。
+- 前端未修改，本轮未重跑前端测试；生产服务器尚未应用修复，原账号登录仍待用户验证。
+
+## 此前验证记录
+
+2026-09-28 手动部署准备补充：本地已启动 Docker Desktop，执行
+`./deploy/scripts/build-bundle.ps1 -Offline`。后端在 Testcontainers MySQL 8.4.11
+通过 65 个测试（0 失败/错误/跳过），V1–V12 迁移成功；前端 31 个测试与生产构建通过。
+独立的 `study-smoke-20260928` 项目运行部署包，三服务 healthy；本地自签 HTTPS
+登录、CSRF、Secure Cookie、未登录 401、管理端点 404 均通过。
+同日晚，用户实际导出的备份通过包内 `bundle-import.sh` 恢复到另一独立 MySQL 8.4 项目，
+后端健康检查 UP、Flyway V12 校验通过；30 个任务、0 条学习记录符合用户确认的情况。
+原备份哈希未变化，源 MySQL80 未修改。公网证书签发、服务器上线、原账号浏览器登录与离线流程尚未完成。
+详细命令、包路径与恢复位置见 [部署交接](../operations/DEPLOYMENT-HANDOFF.md)。
+
 对应 `PLAN.md` 第五节列出的重点验证项。状态列只反映**实际执行过**的验证。
 
 2026-09-22 修复后验证：Windows、Java 21.0.6、Maven Wrapper 3.9.16，
@@ -94,3 +122,7 @@ pnpm run build            # 构建成功，生成 dist 与 PWA Service Worker
 | AI 计划建议、只读工具、结构化输出与业务校验 | 阶段五，当前未安装 Spring AI 依赖；`plan/advisor/` 为预留位置 |
 | 模型异常/超时不改变原计划 | 随智能阶段一并实现与验证 |
 | 错题录入方式 | PLAN 中明确待定，第一版不实现拍照识别或题库 |
+
+## 每日完成确认（2026-10-15）
+
+ConfirmationActivityIntegrationTest 在真实MySQL8.0.45通过5项：确认／取消／重试、并发同日单记录、删除历史防重放、统计不增加词量或缺失用时、拒绝其他写入口造数量与时间。相关后端63项回归通过，前端84项通过；类型检查和构建通过。隔离HTTP导入两份123天方案以及真实浏览器无弹窗确认、取消通过。生产候选及正式导入须另行验收，不以本机通过替代线上结果。

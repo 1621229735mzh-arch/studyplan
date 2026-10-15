@@ -32,6 +32,8 @@ public class PlanImportService {
             .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
             .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build();
     private final Validator validator;
+    private final TaskSequenceService sequences;
+    private final TaskActivityService activities;
     private final WorkspaceMapper mapper;
     private final SubjectService subjects;
     private final StudyUnitService units;
@@ -40,7 +42,9 @@ public class PlanImportService {
     private final DailyPlanService daily;
 
     public PlanImportService(Validator validator,WorkspaceMapper mapper,SubjectService subjects,
-            StudyUnitService units,TaskService tasks,StageGoalService goals,DailyPlanService daily) {
+            StudyUnitService units,TaskService tasks,StageGoalService goals,DailyPlanService daily,TaskSequenceService sequences,TaskActivityService activities) {
+        this.activities=activities;
+        this.sequences=sequences;
         this.validator=validator; this.mapper=mapper; this.subjects=subjects; this.units=units;
         this.tasks=tasks; this.goals=goals; this.daily=daily;
     }
@@ -95,6 +99,8 @@ public class PlanImportService {
             var task=tasks.create(new TaskCreateRequest(subjectId(t.subject()),
                     t.goalKey()==null ? null:goalIds.get(t.goalKey()),t.title(),unitId(t.unit()),t.plannedAmount()));
             taskIds.put(t.key(),task.getId());
+            if (t.sequence()!=null) sequences.create(task.getId(),doc.startDate(),doc.endDate(),t.sequence());
+            if (t.activity()!=null) activities.create(task.getId(),new TaskActivityService.Activity(t.activity().mode(),t.activity().description(),t.activity().flexibleMinutes()));
         }
         for (var day:doc.days()) for (var item:day.items())
             daily.appendImported(day.date(),new DailyItemCreateRequest(taskIds.get(item.taskKey()),item.amount(),PlanSource.IMPORT,item.estimatedMinutes()));
@@ -132,11 +138,11 @@ public class PlanImportService {
         if (node.isObject()) {
             node.properties().forEach(e -> {
                 String name=e.getKey(); var value=e.getValue(); String p=path.isEmpty()?name:path+"."+name;
-                if (Set.of("schemaVersion","plannedAmount","amount","estimatedMinutes").contains(name)) {
+                if (Set.of("schemaVersion","plannedAmount","amount","estimatedMinutes","flexibleMinutes").contains(name)) {
                     if (!value.isNull() && !value.isNumber()) invalid(p,"必须是 JSON 数字");
-                    if (Set.of("schemaVersion","estimatedMinutes").contains(name) && !value.isNull()
+                    if (Set.of("schemaVersion","estimatedMinutes","flexibleMinutes").contains(name) && !value.isNull()
                             && (!value.isIntegralNumber() || !value.canConvertToInt())) invalid(p,"必须是整数");
-                } else if (!Set.of("goals","months","weeks","tasks","days","items").contains(name)
+                } else if (!Set.of("goals","months","weeks","tasks","days","items","sequence","activity").contains(name)
                         && !value.isNull() && !value.isString()) invalid(p,"必须是字符串");
                 if (Set.of("startDate","endDate","date").contains(name) && value.isString()) {
                     try {
@@ -152,7 +158,7 @@ public class PlanImportService {
     }
 
     public void validate(PlanImportDocument doc) {
-        if (doc.schemaVersion()!=1) invalid("schemaVersion","仅支持版本 1");
+        if (doc.schemaVersion()<1 || doc.schemaVersion()>4) invalid("schemaVersion","仅支持版本 1、2、3 或 4");
         range(doc.startDate(),doc.endDate(),doc.startDate(),doc.endDate(),"起止日期");
         if (doc.startDate().getYear()<1000 || doc.endDate().getYear()>9999) invalid("日期","年份必须在 1000—9999 范围内");
         long days=ChronoUnit.DAYS.between(doc.startDate(),doc.endDate())+1;
@@ -166,6 +172,25 @@ public class PlanImportService {
             range(g.startDate(),g.endDate(),doc.startDate(),doc.endDate(),"goals."+g.key());
         }
         for (var t:doc.tasks()) {
+            if (t.activity()!=null) {
+                if (doc.schemaVersion()<3 || t.sequence()!=null || t.plannedAmount()!=null)
+                    invalid("tasks."+t.key()+".activity","活动安排须使用版本 3 或 4，数量留空，不能同时声明接续题目");
+                if ("CHECK_ONLY".equals(t.activity().mode()) && (doc.schemaVersion()!=4 || t.activity().flexibleMinutes()!=0))
+                    invalid("tasks."+t.key()+".activity","完成确认型须使用版本 4，弹性分钟为 0，不设置数量或用时");
+            } else if (t.plannedAmount()==null) invalid("tasks."+t.key()+".plannedAmount","数量型任务必须填写总量");
+            if (t.sequence()!=null) {
+                if (doc.schemaVersion()<2) invalid("sequence","接续任务须使用版本 2 或 3");
+                if (t.plannedAmount().compareTo(BigDecimal.valueOf(t.sequence().items().size()))!=0)
+                    invalid("sequence.items","有序题目数须等于计划总名额，每题对应 1 单位");
+                unique(t.sequence().items(),PlanImportDocument.SequenceItem::key,"sequence.items.key");
+                for (var item:t.sequence().items()) {
+                    try {
+                        var uri=java.net.URI.create(item.url());
+                        if (!"https".equals(uri.getScheme()) || uri.getHost()==null || uri.getUserInfo()!=null)
+                            invalid("sequence.items.url","使用完整 HTTPS 题目链接");
+                    } catch (IllegalArgumentException ex) { invalid("sequence.items.url","链接无效"); }
+                }
+            }
             if (!subjectNames.contains(t.subject().trim())) invalid("tasks."+t.key()+".subject","科目未配置或未启用："+t.subject());
             if (!unitNames.contains(t.unit().trim())) invalid("tasks."+t.key()+".unit","单位未配置或未启用："+t.unit());
             if (t.goalKey()!=null) {
@@ -182,17 +207,28 @@ public class PlanImportService {
                 count++;
                 var t=taskMap.get(item.taskKey());
                 if (t==null) invalid("days."+d.date(),"未知 taskKey："+item.taskKey());
+                if (t.activity()!=null) {
+                    if ("CHECK_ONLY".equals(t.activity().mode())) {
+                        if (item.amount()!=null || item.estimatedMinutes()!=null)
+                            invalid("days."+d.date(),"完成确认型不填写数量或预计用时");
+                    } else if (item.amount()!=null || item.estimatedMinutes()==null || item.estimatedMinutes()<=0 || item.estimatedMinutes()>1440)
+                        invalid("days."+d.date(),"时间型安排须将数量留空并填写 1—1440 分钟基本用时");
+                } else if (item.amount()==null) invalid("days."+d.date()+".amount","数量型任务必须填写日计划量");
+                if (t.sequence()!=null && item.amount().compareTo(BigDecimal.ONE)!=0) invalid("days.items.amount","接续任务每天只能安排 1 个名额");
                 if (!dayKeys.add(item.taskKey())) invalid("days."+d.date(),"同一任务同一天只能出现一次");
                 if (t.goalKey()!=null) {
                     var g=goalMap.get(t.goalKey());
                     range(d.date(),d.date(),g.startDate(),g.endDate(),"days."+d.date()+"."+item.taskKey());
                 }
-                sums.merge(item.taskKey(),item.amount(),BigDecimal::add);
+                if (item.amount()!=null) sums.merge(item.taskKey(),item.amount(),BigDecimal::add);
             }
         }
         if (count>20000) invalid("days.items","最多导入 20000 条安排");
-        for (var t:doc.tasks()) if (sums.getOrDefault(t.key(),BigDecimal.ZERO).compareTo(t.plannedAmount())!=0)
-            invalid("tasks."+t.key()+".plannedAmount","必须等于该任务所有日安排的数量之和");
+        for (var t:doc.tasks()) {
+            if (doc.days().stream().noneMatch(d -> d.items().stream().anyMatch(i -> i.taskKey().equals(t.key())))) invalid("tasks."+t.key(),"任务必须有日安排");
+            if (t.activity()==null && sums.getOrDefault(t.key(),BigDecimal.ZERO).compareTo(t.plannedAmount())!=0)
+                invalid("tasks."+t.key()+".plannedAmount","必须等于该任务所有日安排的数量之和");
+        }
         var monthKeys=new HashSet<String>();
         for (var m:doc.months()) {
             YearMonth month;
@@ -228,16 +264,16 @@ public class PlanImportService {
     }
     private String contentHash(PlanImportDocument doc) {
         // 去除 planId，并按语义键排序，换 id / JSON 字段顺序 / 数组顺序不能重复导入同一内容。
-        var canonical=new PlanImportDocument(1,"content",doc.title(),doc.startDate(),doc.endDate(),
+        var canonical=new PlanImportDocument(doc.tasks().stream().anyMatch(t -> t.activity()!=null && "CHECK_ONLY".equals(t.activity().mode())) ? 4 : doc.tasks().stream().anyMatch(t -> t.activity()!=null) ? 3 : doc.tasks().stream().anyMatch(t -> t.sequence()!=null) ? 2 : 1,"content",doc.title(),doc.startDate(),doc.endDate(),
                 doc.goals().stream().sorted(Comparator.comparing(PlanImportDocument.Goal::key)).toList(),
                 doc.months().stream().sorted(Comparator.comparing(PlanImportDocument.Month::month)).toList(),
                 doc.weeks().stream().sorted(Comparator.comparing(PlanImportDocument.Week::startDate)).toList(),
                 doc.tasks().stream().sorted(Comparator.comparing(PlanImportDocument.Task::key))
-                        .map(t -> new PlanImportDocument.Task(t.key(),t.subject(),t.unit(),t.title(),t.goalKey(),t.plannedAmount().setScale(2))).toList(),
+                        .map(t -> new PlanImportDocument.Task(t.key(),t.subject(),t.unit(),t.title(),t.goalKey(),t.plannedAmount()==null ? null:t.plannedAmount().setScale(2),t.sequence(),t.activity())).toList(),
                 doc.days().stream().sorted(Comparator.comparing(PlanImportDocument.Day::date))
                         .map(d -> new PlanImportDocument.Day(d.date(),d.items().stream()
                                 .sorted(Comparator.comparing(PlanImportDocument.Item::taskKey))
-                                .map(i -> new PlanImportDocument.Item(i.taskKey(),i.amount().setScale(2),i.estimatedMinutes())).toList())).toList());
+                                .map(i -> new PlanImportDocument.Item(i.taskKey(),i.amount()==null ? null:i.amount().setScale(2),i.estimatedMinutes())).toList())).toList());
         return digest(json.writeValueAsString(canonical));
     }
     public static String digest(String text) {

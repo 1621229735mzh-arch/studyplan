@@ -50,6 +50,8 @@ export interface StageGoalUpdateRequest extends StageGoalRequest {
  * 科目/单位目录里取，完成量与剩余量见 `TaskProgressView`。
  */
 export interface PlanTask {
+  activityMode?: string | null
+  sequential?: boolean
   id: number
   subjectId: number
   stageGoalId?: number | null
@@ -98,6 +100,7 @@ export type PlanSource = 'MANUAL' | 'WEEKLY' | 'IMPORT' | 'REVIEW'
  * 当天完成量是 `completedAmount`（不是 actualAmount）。后端不返回剩余量。
  */
 export interface DailyPlanItemView {
+  activityMode?: string | null
   /** 外部计划给出的完整预计用时（分钟），缺失不是 0 */
   estimatedMinutes?: number | null
   id: number
@@ -106,7 +109,7 @@ export interface DailyPlanItemView {
   subjectId?: number | null
   unitId?: number | null
   unitName: string
-  plannedAmount: number
+  plannedAmount: number | null
   source: PlanSource
   /** 由复习建议确认而来的条目会带复习项 id */
   reviewItemId?: number | null
@@ -128,7 +131,7 @@ export interface DailyItemCreateRequest {
 export interface DailyItemAdjustRequest {
   /** 外部计划给出的完整预计用时（分钟），缺失不是 0 */
   estimatedMinutes?: number | null
-  plannedAmount: number
+  plannedAmount: number | null
   version: number
   reason?: string | null
 }

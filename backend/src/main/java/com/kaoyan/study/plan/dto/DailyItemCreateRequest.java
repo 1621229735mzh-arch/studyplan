@@ -11,7 +11,6 @@ public record DailyItemCreateRequest(
         @NotNull(message = "请选择任务")
         Long taskId,
 
-        @NotNull(message = "请填写计划量")
         @DecimalMin(value = "0.01", message = "计划量必须大于 0")
         BigDecimal plannedAmount,
 

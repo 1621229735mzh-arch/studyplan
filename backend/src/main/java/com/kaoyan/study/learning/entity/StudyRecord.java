@@ -13,6 +13,12 @@ public class StudyRecord {
 
     private Long id;
     private Long taskId;
+    private Long sequenceItemId;
+    private boolean activityCompleted;
+    public boolean isActivityCompleted() { return activityCompleted; }
+    public void setActivityCompleted(boolean value) { activityCompleted=value; }
+    public Long getSequenceItemId() { return sequenceItemId; }
+    public void setSequenceItemId(Long value) { sequenceItemId=value; }
     private Long subjectId;
     private Long unitId;
     private LocalDate recordDate;

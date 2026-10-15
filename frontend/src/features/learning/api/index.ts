@@ -13,6 +13,11 @@ import type {
   LearningRecordQuery,
   LearningRecordUpdateRequest
 } from '../types'
+import type { RecordArchive } from '../types'
+
+export function getRecordArchive(query: LearningRecordQuery = {}): Promise<RecordArchive> {
+  return get<RecordArchive>('/learning/archive', { params: cleanParams({ ...query }) })
+}
 
 /** 记录列表（支持日期区间、任务、科目筛选）。 */
 export async function listLearningRecords(query: LearningRecordQuery = {}): Promise<LearningRecord[]> {

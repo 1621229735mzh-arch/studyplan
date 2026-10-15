@@ -81,6 +81,7 @@
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | GET | `/api/learning/records` | 列表（`from`/`to`/`taskId`/`subjectId`） |
+| GET | `/api/learning/archive` | 同样筛选下的月／周／日／课程组汇总及原始记录；缺失用时单独标注 |
 | GET | `/api/learning/records/{id}` | 详情 |
 | POST | `/api/learning/records` | 提交（带 `clientToken` 时重复提交不生成第二条） |
 | PUT | `/api/learning/records/{id}` | 修改（需 `version`） |
@@ -96,6 +97,23 @@
 | GET | `/api/today?date=` | 当天安排、当天记录、已确认的复习任务与提示 |
 | GET | `/api/progress/overview` | 按科目+单位的计划与实际（含趋势） |
 | GET | `/api/progress/trend` | 学习量与时长趋势（单位分别成列） |
+
+进度的 `from/to` 同时约束日安排与学习记录日期。overview 的 `plannedAmount` 汇总区间内日安排（排除 REVIEW），不再读取全部任务的总计划量；无日安排为 null。`studyMinutes` 在该分组的记录均未填用时时为 null。完整交互与离线范围见 [记录与进度工作区](../business/records-progress-workspace.md)。
+
+### 课程目录与累计进度
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/progress/catalog` | 目录版本、课程与完整节点、按科目单位的累计学习量、待归类记录 |
+| GET | `/api/progress/catalog/candidates` | 现有任务候选及已关联节点；只读，不自动建课程 |
+| POST | `/api/progress/catalog/preview` | `{document: JSON文本}`，校验后返回预览令牌、15 分钟期限、原／新总量及提交目录 |
+| POST | `/api/progress/catalog/confirm` | `{previewToken}`，版本及上下文校验后事务保存；同令牌重试不重复应用 |
+| PUT | `/api/progress/catalog/records/{id}` | `{nodeId, recordVersion, revision}`，确认单条归属；nodeId 为 null 恢复任务默认归属 |
+| PUT | `/api/progress/catalog/nodes/{id}/tasks` | `{taskIds, revision}`，替换末级目录的任务关联，科目单位一致且任务唯一归属 |
+
+课程总量由完整目录末级项产生，不从日安排产生。`completedAmount` 对每个末级条目分别以总量封顶后求和；`recordedAmount` 保留真实累计，学科累计同样不封顶。节点的 `completedAmount` 是真实记录量，可以超出其总量。实际数量都由未删除学习记录推导，目录不存手动完成量。
+
+导入规则见 [目录导入说明](../business/progress-catalog-guide.md)。未知字段、重复字段、错误 JSON 类型、重复或跨单位归属返回 400；目录版本、记录版本或预览过期返回 409。新增接口沿用身份验证及 CSRF 防护。旧 overview/trend 仍保留，但新进度首页只展示四个入口。
 
 ### 复习
 
@@ -143,3 +161,16 @@
 - 未完成的安排不会自动出现在次日。
 - 复习只针对已学内容；建议必须经确认才进入某一天；超出额度的内容留在待安排列表。
 - 缺少复习额度或预计用时时，接口返回明确的提示字段，不声称满足额度。
+
+有序练习：计划导入 v2 增加 `tasks[].sequence`；任务响应增加 `sequential`。`GET /api/learning/sequences/{taskId}?date=YYYY-MM-DD` 查询题目清单与日期展示题。记录 create/update 支持 `sequenceItemId`，响应增加题名与链接；已有接续记录编辑保持原题目身份。今日响应增加 sequence 摘要，day-progress 仅接受 0/100，详情见 [接续规则](../business/sequential-practice.md)。
+# 时间型学习安排（V18 / 导入 v3）
+
+`POST /api/learning/records/day-progress` 对时间型任务接受 `actualAmount`（本次实际首次完成量，可留空）与 `note`（教材位置、最后题号和卡点）。`completionPercent` 只能为 0（继续记录）或 100（结束当天安排），不是整讲完成比例。用时必须为正数；RECAP 任务禁止填写完成量，包括普通记录的新建和修改入口。身份、CSRF、clientToken 和 revision 检查沿用原流程。
+
+今日清单额外返回 `activity: {mode,description,flexibleMinutes}` 和 `unitName`。时间型日安排 `plannedAmount` 可为空，月份不得将其当作 0 或已知题量；基本预计用时不含弹性上限。删除结束记录后，当天安排重新开放。
+
+## 完成确认（V19 / 导入 v4）
+
+POST /api/learning/records/day-confirmation 接收 `{taskId,date,completed,revision,clientToken}`，返回更新后的当天任务视图。仅用于 CHECK_ONLY；无需数量、时长或掌握评分。确认保存数量和用时均空的学习记录，取消软删除该日确认。重复目标状态不重复写入；改变状态时校验revision，包含删除历史以防旧请求覆盖新状态。身份、CSRF与任务行锁保持。
+
+任务、日安排、工作区条目、学习记录增加activityMode。月份confirmationCount单独显示安排项数，与同科目学习数量分开。确认可在今日取消或从记录页删除，不可改为数量／用时记录。

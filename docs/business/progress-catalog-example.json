@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "courses": [
+    {
+      "key": "calculus-foundation",
+      "direction": "MATH",
+      "branch": "高等数学",
+      "title": "高数基础课程（示例，请替换真实目录）",
+      "subjectId": 1,
+      "unitId": 1,
+      "nodes": [
+        { "key": "chapter1", "parentKey": null, "title": "第一章", "totalAmount": null, "sortOrder": 0, "taskIds": [] },
+        { "key": "lesson1", "parentKey": "chapter1", "title": "第 1 讲：函数", "totalAmount": 1, "sortOrder": 1, "taskIds": [] },
+        { "key": "lesson2", "parentKey": "chapter1", "title": "第 2 讲：极限", "totalAmount": 1, "sortOrder": 2, "taskIds": [] }
+      ]
+    }
+  ]
+}

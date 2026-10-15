@@ -5,6 +5,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
 import com.kaoyan.study.learning.dto.DayProgressRequest;
+import com.kaoyan.study.learning.dto.DayConfirmationRequest;
+import com.kaoyan.study.learning.dto.DayLearningTaskView;
 import com.kaoyan.study.learning.dto.StudyRecordCreateRequest;
 import com.kaoyan.study.learning.dto.StudyRecordUpdateRequest;
 import com.kaoyan.study.learning.dto.StudyRecordView;
@@ -65,6 +67,11 @@ public class StudyRecordController {
     @ResponseStatus(HttpStatus.CREATED)
     public StudyRecordView dayProgress(@Valid @RequestBody DayProgressRequest request) {
         return studyRecordService.recordDayProgress(request);
+    }
+
+    @PostMapping("/day-confirmation")
+    public DayLearningTaskView dayConfirmation(@Valid @RequestBody DayConfirmationRequest request) {
+        return studyRecordService.confirmDay(request);
     }
 
     @PutMapping("/{id}")

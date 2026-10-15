@@ -95,7 +95,7 @@
 └── entity/      持久化数据类型，不直接用于接口响应
 ```
 
-`progress` 已建立 `controller/dto/service/mapper`，只读统计结果放 DTO，不预建一份独立完成量实体。
+`progress` 已建立 `controller/dto/service/mapper`，派生完成量放 DTO，不预建一份独立完成量实体。课程目录与归属元数据由本模块服务管理，不修改计划或原始学习记录。
 
 SQL XML 放在 `backend/src/main/resources/mapper/<module>/`，与对应 Mapper 接口的 namespace 一致；初始化时配置加载路径。数据库迁移集中在 `db/migration/`，不能给每个模块各自从 `V1` 开始编号。
 
@@ -107,6 +107,12 @@ SQL XML 放在 `backend/src/main/resources/mapper/<module>/`，与对应 Mapper 
 
 ## 实际创建的工程文件
 
+手动交付增加 `deploy/compose.bundle.yaml`、`deploy/nginx/bundle.conf.template`、
+`deploy/scripts/build-bundle.ps1`、`export-local-database.ps1` 与 `bundle-*.sh`。
+这是同一应用的上传产物部署方式，不新增服务模块；服务器不执行 Maven/pnpm 编译。
+生成的程序包位于被忽略的 `release/`，个人数据备份在被忽略的 `deploy/backups/`，二者分离。
+启动顺序与 HTTPS、备份恢复说明见 `docs/operations/manual-deploy.md`。
+
 工程基础与业务模块已实现，下表文件均已创建并经过真实构建与测试：
 
 | 位置 | 文件 |
@@ -114,7 +120,7 @@ SQL XML 放在 `backend/src/main/resources/mapper/<module>/`，与对应 Mapper 
 | `backend/` | `pom.xml`、`mvnw`、`mvnw.cmd`、`.mvn/wrapper/maven-wrapper.properties`（Maven 3.9.16） |
 | `backend/src/main/java/com/kaoyan/study/` | `StudyApplication.java`（`@MapperScan` + `@ConfigurationPropertiesScan`） |
 | `backend/src/main/resources/` | `application.yml`、`application-dev.yml`、`application-prod.yml` |
-| `backend/src/main/resources/db/migration/` | `V1`–`V15`（V13 会话大小写归一化、V14 今日用时与部分复习、V15 计划工作区与导入防重） |
+| `backend/src/main/resources/db/migration/` | `V1`–`V19`（V13 会话大小写归一化、V14 今日用时与部分复习、V15 计划工作区与导入防重、V16 课程目录与学习归属、V17 接续题目、V18 时间型安排、V19 每日完成确认） |
 | `backend/src/main/java/com/kaoyan/study/config/` | 安全（Spring Security 7 + JDBC 会话 + CSRF）、OpenAPI、预设账号配置 |
 | `frontend/` | `package.json`、`pnpm-lock.yaml`、`index.html`、Vite/TypeScript/Vitest 配置 |
 | `frontend/src/` | `main.ts`、`App.vue` 及各功能页面 |
@@ -122,7 +128,13 @@ SQL XML 放在 `backend/src/main/resources/mapper/<module>/`，与对应 Mapper 
 | `.github/workflows/` | `ci.yml`（提交触发）、`release.yml`（手动触发的生产发布） |
 | `docs/decisions/` | 已记录 4 项工程决策（版本锁定、Boot 4 模块拆分、复习参数可配置、复习安排落点） |
 
-`progress` 只使用只读关联查询，不预建独立完成量实体。`plan/advisor/` 仍为智能阶段的预留位置。
+`progress` 的实际完成量只从学习记录推导，目录结构和归属是新增的持久化元数据，不能成为第二份完成量事实。`plan/advisor/` 仍为智能阶段的预留位置。
+
+记录回看由 `learning/views/LearningView.vue` 和 `RecordArchiveTree.vue` 组织，月/周/日/课程汇总由 `RecordArchiveService` 生成。记录页独立使用 `RecordEditorForm.vue`、`recordEditorValidation.ts`，通过 `RecordClassificationDialog.vue` 更正目录归属。今日保留原有 `RecordForm.vue` 及 `validation.ts`，两页表单演进互不影响。
+
+进度首页 `ProgressView.vue` 只显示四个方向；`DirectionProgressView.vue` 根据路由及 query 组织分科、课程和完整目录。`CourseRing` 显示课程完成比例，`CatalogNodeTree` 展示内容，`CatalogEditorDialog` 与 `CatalogImportDialog` 共用后端预览确认流程。`CatalogService` / `CatalogMapper` 管理本模块目录和归属，通过学习业务服务检查原记录版本；旧 `ProgressMapper` 的区间查询保留兼容。
+
+记录与进度共用 `styles/retrospective.css`；记录日期筛选使用 `PeriodFilter.vue`。进度概览通过原 offline store 保存，`useCatalogWorkspace` 不新增本地缓存层。目录说明、Schema 与示例统一放在 `docs/business/progress-catalog*`，由 Vite 和 Docker 构建打包。
 
 Docker 构建上下文取仓库根目录（`deploy/compose.yaml` 中 `context: ..`），
 手动发布工作流也使用仓库根目录（`context: .`）。
@@ -141,3 +153,9 @@ Docker 构建上下文取仓库根目录（`deploy/compose.yaml` 中 `context: .
 计划工作区由 `plan/service/PlanWorkspaceService` 汇总日安排，`PlanImportService` 校验外部 JSON 并调用任务、目标、日安排业务服务事务追加。`WorkspaceMapper` 的关联查询同日同任务只计算一次学习量，排除复习。旧周表/API 保留兼容，新页面不重复编辑周排期。
 
 前端 `features/plan/views/PlanView.vue` 组织四种时间视图；`DayScheduleEditor` 和 `PlanImportDialog` 负责日期编辑与文件预览。`workspace.ts` 只做类型和日历操作，统计由后端返回。本周日安排经 `offline/useOfflineSnapshot` 保存至原 week 切片的 schedule 字段，只读，不缓存完整工作区。导入规划书、Schema 和示例以 `docs/business/plan-import*` 为唯一源，Vite 和 Docker 构建均读取这些文件。
+
+V17 增加任务序列及学习记录题目关联。`TaskSequenceService` / `TaskSequenceMapper` 属于计划模块，管理顺序、题名和链接；`SequenceLearningService` 属于学习模块，依据本模块记录推导当前题并校验每日名额。今日只保存当前展示题的只读快照，完整题目目录通过认证接口联网读取。
+
+V18 增加 `task_activity` 时间型安排元数据，允许日计划量为空，并在学习记录保存当天结束标记。`TaskActivityService` / `TaskActivityMapper` 属于计划模块；学习业务服务检查复盘不能增量，依据有效记录推导当天状态。`TodayService` 只组合展示，不保存独立完成量。v3 导入仍由原 `PlanImportService` 事务应用，不新增模块或模型依赖。
+
+V19 为 `task_activity` 增加 `CHECK_ONLY` 模式，v4 合同支持无数量、无用时的每日确认。`DayConfirmationRequest` 与 `StudyRecordService.confirmDay` 管理勾选／取消，任务行锁防止并发重复确认；revision 包含软删除历史以防完成／取消后旧设备重放。`StudyRecordView.activityMode` 区分有意不计时的确认，记录、今日和计划统计均不把确认当作新学数量或缺失用时。仍使用原学习记录及软删除机制，没有新增完成事实表。

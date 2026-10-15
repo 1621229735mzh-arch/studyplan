@@ -88,13 +88,13 @@ public class TodayService {
             String group = sectionName(subjectNames.get(task.subjectId()));
             groups.computeIfAbsent(group, x -> new ArrayList<>()).add(new TodayChecklistTask(
                     "LEARNING", task.id(), task.title(), task.completionPercent(), task.estimatedMinutes(),
-                    task.remainingMinutes(), task.revision(), null, task.plannedAmount().signum() > 0));
+                    task.remainingMinutes(), task.revision(), null, (task.activity()!=null || task.plannedAmount()!=null && task.plannedAmount().signum() > 0) && (task.sequence()==null || task.sequence().actionable()), task.sequence()==null ? null : task.sequence().summary(),task.activity(),task.unitName()));
         }
         for (var record : records) {
             String group = sectionName(subjectNames.get(record.subjectId()));
             groups.computeIfAbsent(group, x -> new ArrayList<>());
             actual.merge(group, record.durationMinutes() == null ? 0 : record.durationMinutes(), Integer::sum);
-            if (record.durationMinutes() == null) missingDurations.merge(group, 1, Integer::sum);
+            if (record.durationMinutes() == null && !"CHECK_ONLY".equals(record.activityMode())) missingDurations.merge(group, 1, Integer::sum);
         }
         for (var task : reviewService.dayTasks(planDate)) {
             String group = sectionName(subjectNames.get(task.subjectId()));
@@ -113,7 +113,8 @@ public class TodayService {
         var sections = groups.entrySet().stream().map(entry -> {
             var remaining = entry.getValue().stream().map(TodayChecklistTask::remainingMinutes)
                     .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
-            int missing = (int) entry.getValue().stream().filter(x -> x.remainingMinutes() == null).count();
+            int missing = (int) entry.getValue().stream().filter(x -> x.remainingMinutes() == null
+                    && (x.activity()==null || !"CHECK_ONLY".equals(x.activity().mode()))).count();
             return new TodaySubjectSection(entry.getKey(), actual.getOrDefault(entry.getKey(), 0),
                     remaining, missing, missingDurations.getOrDefault(entry.getKey(), 0), entry.getValue());
         }).toList();

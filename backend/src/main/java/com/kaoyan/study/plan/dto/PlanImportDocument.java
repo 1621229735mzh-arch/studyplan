@@ -28,9 +28,28 @@ public record PlanImportDocument(
     public record Task(@NotBlank @Size(max=64) String key,@NotBlank @Size(max=100) String subject,
             @NotBlank @Size(max=100) String unit,@NotBlank @Size(max=200) String title,
             @Size(max=64) String goalKey,
-            @NotNull @DecimalMin("0.01") @Digits(integer=8,fraction=2) BigDecimal plannedAmount) { }
+            @DecimalMin("0.01") @Digits(integer=8,fraction=2) BigDecimal plannedAmount,
+            @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+            @Valid Sequence sequence,
+            @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+            @Valid Activity activity) {
+        public Task(String key,String subject,String unit,String title,String goalKey,BigDecimal plannedAmount,Sequence sequence) {
+            this(key,subject,unit,title,goalKey,plannedAmount,sequence,null);
+        }
+        public Task(String key,String subject,String unit,String title,String goalKey,BigDecimal plannedAmount) {
+            this(key,subject,unit,title,goalKey,plannedAmount,null);
+        }
+    }
+    public record Activity(@NotBlank @Pattern(regexp="TIMED_STUDY|RECAP|CHECK_ONLY") String mode,
+                           @Size(max=1000) String description,
+                           @NotNull @Min(0) @Max(1440) Integer flexibleMinutes) {}
+    public record Sequence(@NotBlank @Pattern(regexp="COMPLETE_THEN_ADVANCE") String mode,
+            @NotNull @Size(min=1,max=5000) List<@NotNull @Valid SequenceItem> items) {}
+    public record SequenceItem(@NotBlank @Pattern(regexp="[A-Za-z0-9_-]{1,64}") String key,
+            @NotBlank @Size(max=200) String title,
+            @NotBlank @Size(max=1000) String url) {}
     public record Day(@NotNull LocalDate date,@NotNull @Size(max=2000) List<@Valid Item> items) { }
     public record Item(@NotBlank @Size(max=64) String taskKey,
-            @NotNull @DecimalMin("0.01") @Digits(integer=8,fraction=2) BigDecimal amount,
+            @DecimalMin("0.01") @Digits(integer=8,fraction=2) BigDecimal amount,
             @Min(0) Integer estimatedMinutes) { }
 }

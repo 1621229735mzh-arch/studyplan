@@ -49,6 +49,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '进度' }
       },
       {
+        path: 'progress/:direction',
+        name: 'progress-direction',
+        component: () => import('@/features/progress/views/DirectionProgressView.vue'),
+        meta: { title: '学科进度' }
+      },
+      {
         path: 'review',
         name: 'review',
         component: () => import('@/features/review/views/ReviewView.vue'),

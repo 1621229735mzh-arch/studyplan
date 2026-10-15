@@ -29,8 +29,12 @@ import java.util.List;
 public class TaskController {
 
     private final TaskService taskService;
+    private final com.kaoyan.study.plan.service.TaskSequenceService sequences;
+    private final com.kaoyan.study.plan.service.TaskActivityService activities;
 
-    public TaskController(TaskService taskService) {
+    public TaskController(TaskService taskService, com.kaoyan.study.plan.service.TaskSequenceService sequences,com.kaoyan.study.plan.service.TaskActivityService activities) {
+        this.activities=activities;
+        this.sequences=sequences;
         this.taskService = taskService;
     }
 
@@ -39,13 +43,13 @@ public class TaskController {
     public List<TaskResponse> list(@RequestParam(required = false) Long subjectId,
                                    @RequestParam(required = false) Long stageGoalId,
                                    @RequestParam(required = false) String status) {
-        return taskService.list(subjectId, stageGoalId, status).stream().map(TaskResponse::from).toList();
+        return taskService.list(subjectId, stageGoalId, status).stream().map(t -> response(t)).toList();
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "任务详情")
     public TaskResponse get(@PathVariable Long id) {
-        return TaskResponse.from(taskService.get(id));
+        return response(taskService.get(id));
     }
 
     @PostMapping
@@ -58,7 +62,12 @@ public class TaskController {
     @PutMapping("/{id}")
     @Operation(summary = "修改任务（需携带 version）")
     public TaskResponse update(@PathVariable Long id, @Valid @RequestBody TaskUpdateRequest request) {
-        return TaskResponse.from(taskService.update(id, request));
+        return response(taskService.update(id, request));
+    }
+
+    private TaskResponse response(com.kaoyan.study.plan.entity.Task task) {
+        var activity=activities.get(task.getId());
+        return TaskResponse.from(task,sequences.definition(task.getId())!=null,activity==null ? null:activity.mode());
     }
 
     @DeleteMapping("/{id}")

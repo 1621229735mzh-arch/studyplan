@@ -30,6 +30,8 @@ import java.util.List;
 public class TaskService {
 
     private final TaskMapper taskMapper;
+    private final TaskSequenceService sequences;
+    private final TaskActivityService activities;
     private final StageGoalMapper stageGoalMapper;
     private final SubjectService subjectService;
     private final StudyUnitService studyUnitService;
@@ -37,7 +39,9 @@ public class TaskService {
     public TaskService(TaskMapper taskMapper,
                        StageGoalMapper stageGoalMapper,
                        SubjectService subjectService,
-                       StudyUnitService studyUnitService) {
+                       StudyUnitService studyUnitService,TaskSequenceService sequences,TaskActivityService activities) {
+        this.activities=activities;
+        this.sequences=sequences;
         this.taskMapper = taskMapper;
         this.stageGoalMapper = stageGoalMapper;
         this.subjectService = subjectService;
@@ -99,6 +103,8 @@ public class TaskService {
     @Transactional
     public Task update(Long id, TaskUpdateRequest request) {
         Task task = requireExistingForUpdate(id);
+        if (activities.get(id)!=null && (request.plannedAmount()!=null || !task.getUnitId().equals(request.unitId()) || !task.getSubjectId().equals(request.subjectId())))
+            throw new ConflictException("ACTIVITY_TASK_MEASUREMENT","时间型安排保留原科目和实际完成量单位，不填写计划数量");
         if (!task.getVersion().equals(request.version())) {
             throw new ConflictException("TASK_STALE", "该任务已在其他设备上修改，请刷新后重试");
         }
@@ -107,6 +113,9 @@ public class TaskService {
                 && taskMapper.countRecords(id) > 0) {
             throw new ConflictException("TASK_MEASUREMENT_IN_USE", "该任务已有学习记录，不能修改科目或计量单位；请新建任务");
         }
+        if (sequences.definition(id)!=null && (!task.getUnitId().equals(request.unitId())
+                || request.plannedAmount()==null || task.getPlannedAmount().compareTo(request.plannedAmount())!=0))
+            throw new ConflictException("SEQUENCE_TASK_QUANTITY","接续任务的单位与总名额固定；新的安排请另建计划");
         task.setSubjectId(request.subjectId());
         task.setStageGoalId(request.stageGoalId());
         task.setTitle(request.title().trim());

@@ -1,5 +1,9 @@
 # 部署、日志、备份与回退
 
+首次通过 Workbench 上传、2 GB 内存限制及自带 HTTPS 的手动部署流程见
+[manual-deploy.md](manual-deploy.md)，使用 `compose.bundle.yaml`。
+本文描述原镜像仓库发布流程；其 Nginx 配置只提供 HTTP，生产使用前必须有可信 HTTPS 入口。
+
 ## 结构
 
 ```text

@@ -28,6 +28,8 @@ frontend/test-results/
 deploy/data/
 deploy/backups/
 deploy/logs/
+release/
+/个人资料/
 *.log
 
 # Local IDE and OS state

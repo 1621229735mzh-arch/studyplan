@@ -14,10 +14,14 @@ public record TaskResponse(
         Long unitId,
         BigDecimal plannedAmount,
         TaskStatus status,
-        Long version) {
+        Long version, boolean sequential, String activityMode) {
 
-    public static TaskResponse from(Task task) {
+    public static TaskResponse from(Task task) { return from(task,false); }
+    public static TaskResponse from(Task task,boolean sequential) {
+        return from(task,sequential,null);
+    }
+    public static TaskResponse from(Task task,boolean sequential,String activityMode) {
         return new TaskResponse(task.getId(), task.getSubjectId(), task.getStageGoalId(), task.getTitle(),
-                task.getUnitId(), task.getPlannedAmount(), task.getStatus(), task.getVersion());
+                task.getUnitId(), task.getPlannedAmount(), task.getStatus(), task.getVersion(), sequential,activityMode);
     }
 }

@@ -47,6 +47,7 @@
             <arg column="version" name="version" javaType="java.lang.Long"/>
             <arg column="completed_amount" name="completedAmount" javaType="java.math.BigDecimal"/>
             <arg column="estimated_minutes" name="estimatedMinutes" javaType="java.lang.Integer"/>
+            <arg column="activity_mode" name="activityMode" javaType="java.lang.String"/>
         </constructor>
     </resultMap>
 
@@ -125,6 +126,7 @@
                d.review_item_id,
                d.version,
                d.estimated_minutes,
+               a.mode AS activity_mode,
                COALESCE((SELECT SUM(r.amount)
                          FROM study_record r
                          WHERE r.task_id = d.task_id
@@ -133,6 +135,7 @@
         FROM daily_plan_item d
                  JOIN task t ON t.id = d.task_id
                  JOIN study_unit u ON u.id = t.unit_id
+                 LEFT JOIN task_activity a ON a.task_id=t.id
         WHERE d.plan_date = #{planDate}
         ORDER BY d.sort_order, d.id
     </select>

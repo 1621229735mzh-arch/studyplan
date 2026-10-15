@@ -27,6 +27,7 @@ import {
   ElTag
 } from 'element-plus'
 
+import SequenceRecordItem from './SequenceRecordItem.vue'
 import AmountUnit from '@/components/AmountUnit.vue'
 import { todayIso } from '@/composables/useFormat'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
@@ -68,6 +69,7 @@ function createEmptyModel(): LearningRecordFormModel {
   return {
     recordDate: todayIso(),
     taskId: null,
+    sequenceItemId: null,
     subjectId: null,
     unitId: null,
     amount: null,
@@ -89,6 +91,7 @@ function newClientToken(): string {
 }
 
 const clientToken = ref(newClientToken())
+const sequenceReady = ref(true)
 
 const selectedTask = computed<LearningRecordTaskOption | null>(
   () => props.tasks.find((task) => task.id === form.taskId) ?? null
@@ -126,6 +129,8 @@ function onDateChange(value: unknown): void {
 }
 
 function onTaskChange(value: unknown): void {
+  form.sequenceItemId = null
+  sequenceReady.value = true
   form.taskId = typeof value === 'number' ? value : null
 }
 
@@ -202,6 +207,7 @@ defineExpose({ form, submit, reset, fillFrom, setServerError })
     />
 
     <div class="record-form__grid">
+      <SequenceRecordItem v-if="selectedTask?.sequential || form.sequenceItemId" :task-id="form.taskId" :date="form.recordDate" :item-id="form.sequenceItemId" :editing="mode === 'edit'" @item="form.sequenceItemId = $event" @ready="sequenceReady = $event" />
       <ElFormItem label="日期" :error="fieldErrors.recordDate">
         <ElDatePicker
           :model-value="form.recordDate"
@@ -292,7 +298,7 @@ defineExpose({ form, submit, reset, fillFrom, setServerError })
     />
 
     <div class="form-actions">
-      <ElButton type="primary" :loading="submitting" :disabled="!online" @click="submit">
+      <ElButton type="primary" :loading="submitting" :disabled="!online || !sequenceReady" @click="submit">
         {{ submitLabel }}
       </ElButton>
       <ElButton v-if="mode === 'edit'" @click="emit('cancel')">取消</ElButton>

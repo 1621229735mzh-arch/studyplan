@@ -7,6 +7,10 @@
 
 /** 学习记录（对应后端 StudyRecordView）。 */
 export interface LearningRecord {
+  activityMode?: 'TIMED_STUDY' | 'RECAP' | 'CHECK_ONLY' | null
+  sequenceItemId?: number | null
+  sequenceTitle?: string | null
+  sequenceUrl?: string | null
   id: number
   /** 关联任务；允许计划外学习（不关联任务） */
   taskId?: number | null
@@ -29,6 +33,9 @@ export interface LearningRecord {
 
 /** 提交学习记录（后端 StudyRecordCreateRequest）。 */
 export interface LearningRecordCreateRequest {
+  sequenceItemId?: number | null
+  sequenceTitle?: string | null
+  sequenceUrl?: string | null
   taskId?: number | null
   subjectId?: number | null
   unitId?: number | null
@@ -47,6 +54,9 @@ export interface LearningRecordCreateRequest {
 
 /** 修改学习记录（后端 StudyRecordUpdateRequest）；version 必填。 */
 export interface LearningRecordUpdateRequest {
+  sequenceItemId?: number | null
+  sequenceTitle?: string | null
+  sequenceUrl?: string | null
   taskId?: number | null
   subjectId?: number | null
   unitId?: number | null
@@ -68,6 +78,10 @@ export interface LearningRecordQuery {
 
 /** 记录表单的本地校验字段（表单字段名与请求字段保持一致）。 */
 export interface LearningRecordFormModel {
+  sequenceItemId?: number | null
+  sequenceTitle?: string | null
+  sequenceUrl?: string | null
+  content?: string
   recordDate: string
   taskId: number | null
   subjectId: number | null
@@ -80,6 +94,7 @@ export interface LearningRecordFormModel {
 
 /** 表单里的任务选项（只取快速记录需要的字段，避免依赖计划模块的完整类型）。 */
 export interface LearningRecordTaskOption {
+  sequential?: boolean
   id: number
   title: string
   subjectId?: number | null
@@ -103,3 +118,14 @@ export interface LearningRecordFormSubmission {
   /** 幂等标识（对应后端 clientToken）：一次填写生成一次，失败重试复用，避免重复记录 */
   clientToken: string
 }
+
+export interface ArchiveAmount { subjectId: number; subjectName: string; unitId: number; unitName: string; amount: number }
+export interface ArchiveStats { learningDays: number; recordCount: number; studyMinutes: number | null; missingDurationRecords: number; amounts: ArchiveAmount[] }
+export interface ArchiveGroup { key: string; subjectId: number | null; subjectName: string | null; courseId: number | null; title: string; unitId: number | null; unitName: string | null; amount: number | null; studyMinutes: number | null; missingDurationRecords: number; records: LearningRecord[] }
+export interface ArchiveDay { date: string; stats: ArchiveStats; groups: ArchiveGroup[] }
+export interface ArchiveWeek { weekStart: string; from: string; to: string; stats: ArchiveStats; days: ArchiveDay[] }
+export interface ArchiveMonth { month: string; stats: ArchiveStats; weeks: ArchiveWeek[] }
+export interface RecordArchive { stats: ArchiveStats; months: ArchiveMonth[] }
+
+export interface SequenceEntry { id: number; key: string; title: string; url: string; completed: boolean }
+export interface SequenceState { items: SequenceEntry[]; current: SequenceEntry | null; dayItem: SequenceEntry | null; revision: string; actionable: boolean }

@@ -53,6 +53,9 @@ export interface TodayReviewTaskRow extends ReviewItem {
 }
 
 export interface TodayChecklistTask {
+  activity?: { mode: 'TIMED_STUDY' | 'RECAP' | 'CHECK_ONLY'; description: string | null; flexibleMinutes: number } | null
+  unitName?: string | null
+  sequence?: import('@/features/learning/types').SequenceState | null
   kind: 'LEARNING' | 'REVIEW'
   id: number
   title: string

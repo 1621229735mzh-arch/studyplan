@@ -18,6 +18,8 @@ const token = ref('')
 const form = reactive({ date: '', mode: 'new', title: '', subjectId: undefined as number | undefined,
   unitId: undefined as number | undefined, existingTaskId: undefined as number | undefined, amount: 1, minutes: undefined as number | undefined })
 const editing = computed(() => !!props.item)
+const timed = computed(() => !!props.item && props.item.plannedAmount == null)
+const confirmationOnly = computed(() => props.item?.activityMode === 'CHECK_ONLY')
 watch(() => props.modelValue, open => {
   if (!open) return
   error.value = ''
@@ -28,13 +30,14 @@ watch(() => props.modelValue, open => {
 watch(form, () => { token.value = crypto.randomUUID() })
 async function save() {
   if (busy.value || !online.value) return
-  if (!form.date || !Number.isFinite(form.amount) || form.amount < (editing.value ? 0 : 0.01)) { error.value = '请填写日期和有效的计划量'; return }
+  if (!form.date || (!timed.value && (!Number.isFinite(form.amount) || form.amount < (editing.value ? 0 : 0.01)))) { error.value = '请填写日期和有效的计划量'; return }
+  if (timed.value && !confirmationOnly.value && (!form.minutes || form.minutes < 1 || form.minutes > 1440)) { error.value = '时间型安排请填写 1—1440 分钟基本用时'; return }
   if (!editing.value && (form.mode === 'new' ? (!form.title.trim() || !form.subjectId || !form.unitId) : !form.existingTaskId)) {
     error.value = form.mode === 'new' ? '请填写学习内容、科目和单位' : '请选择已有任务'; return
   }
   busy.value = true; error.value = ''
   try {
-    if (props.item) await adjustDayPlanItem(form.date, props.item.id, { plannedAmount: form.amount, estimatedMinutes: form.minutes ?? null, version: props.item.version, reason: '计划页手动调整' })
+    if (props.item) await adjustDayPlanItem(form.date, props.item.id, { plannedAmount: timed.value ? null : form.amount, estimatedMinutes: confirmationOnly.value ? null : form.minutes ?? null, version: props.item.version, reason: '计划页手动调整' })
     else await quickAddDay(form.date, { ...(form.mode === 'existing' ? { existingTaskId: form.existingTaskId } : { subjectId: form.subjectId, unitId: form.unitId, title: form.title.trim() }),
       plannedAmount: form.amount, estimatedMinutes: form.minutes ?? null, clientToken: token.value })
     ElMessage.success(editing.value ? '安排已更新' : '已加入安排')
@@ -59,8 +62,8 @@ async function save() {
       </template>
       <ElFormItem v-else label="已有任务"><ElSelect v-model="form.existingTaskId" filterable placeholder="搜索学习任务" :disabled="busy"><ElOption v-for="task in tasks.filter(t => t.status === 'ACTIVE')" :key="task.id" :label="`${catalog.subjectNameOf(task.subjectId)} · ${task.title}（${catalog.unitNameOf(task.unitId)}）`" :value="task.id" /></ElSelect></ElFormItem>
       <div class="editor-columns">
-        <ElFormItem label="当日计划量"><ElInputNumber v-model="form.amount" :min="editing ? 0 : 0.01" :max="99999999.99" :precision="2" :disabled="busy" /></ElFormItem>
-        <ElFormItem label="预计用时（分钟，可留空）"><ElInputNumber v-model="form.minutes" :min="0" :max="2147483647" :precision="0" :disabled="busy" /></ElFormItem>
+        <ElFormItem label="当日计划量"><span v-if="confirmationOnly">只确认完成，不设置数量</span><span v-else-if="timed">按时间安排，完成量据实记录</span><ElInputNumber v-else v-model="form.amount" :min="editing ? 0 : 0.01" :max="99999999.99" :precision="2" :disabled="busy" /></ElFormItem>
+        <ElFormItem v-if="!confirmationOnly" label="预计用时（分钟，可留空）"><ElInputNumber v-model="form.minutes" :min="0" :max="2147483647" :precision="0" :disabled="busy" /></ElFormItem>
       </div>
     </ElForm>
     <template #footer><ElButton :disabled="busy" @click="emit('update:modelValue', false)">取消</ElButton><ElButton type="primary" :disabled="!online" :loading="busy" @click="save">保存安排</ElButton></template>

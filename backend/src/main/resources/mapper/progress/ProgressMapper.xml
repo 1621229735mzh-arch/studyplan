@@ -32,7 +32,7 @@
     </resultMap>
 
     <!--
-      计划量聚合 task.planned_amount（允许为空：全部为空时 SUM 为 NULL，表示未设置计划量）；
+      计划量聚合区间内的日安排，排除复习；学习记录单独聚合，避免关联导致重复累计。
       完成量与时长聚合未删除的学习记录。分组键包含单位，避免跨单位相加。
     -->
     <select id="findUnitProgress" resultMap="unitProgressMap">
@@ -42,20 +42,22 @@
                u.name AS unit_name,
                SUM(p.planned_amount) AS planned_amount,
                COALESCE(SUM(p.completed_amount), 0) AS completed_amount,
-               CAST(COALESCE(SUM(p.study_minutes), 0) AS SIGNED) AS study_minutes
+               CAST(SUM(p.study_minutes) AS SIGNED) AS study_minutes
         FROM (SELECT t.subject_id,
                      t.unit_id,
-                     t.planned_amount,
+                     d.planned_amount,
                      0 AS completed_amount,
-                     0 AS study_minutes
-              FROM task t
-              WHERE t.status &lt;&gt; 'ARCHIVED'
+                     NULL AS study_minutes
+              FROM daily_plan_item d JOIN task t ON t.id = d.task_id
+              WHERE d.source &lt;&gt; 'REVIEW'
+                <if test="from != null">AND d.plan_date &gt;= #{from}</if>
+                <if test="to != null">AND d.plan_date &lt;= #{to}</if>
               UNION ALL
               SELECT r.subject_id,
                      r.unit_id,
-                     0 AS planned_amount,
+                     NULL AS planned_amount,
                      r.amount AS completed_amount,
-                     COALESCE(r.duration_minutes, 0) AS study_minutes
+                     r.duration_minutes AS study_minutes
               FROM study_record r
               WHERE r.deleted_at IS NULL
                 <!-- 只记时长、没有单位的记录无法归入任何单位，因此不参与按单位的完成量聚合；

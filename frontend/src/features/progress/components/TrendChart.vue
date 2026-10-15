@@ -8,7 +8,7 @@
  * - 只画后端确实返回了数据的日期，不把缺失数据补成 0。
  */
 import { computed, ref } from 'vue'
-import { ElAlert, ElEmpty, ElOption, ElSelect } from 'element-plus'
+import { ElEmpty, ElOption, ElSelect } from 'element-plus'
 import type { EChartsOption } from 'echarts'
 
 import EChart from './EChart.vue'
@@ -31,6 +31,7 @@ const units = computed(() => {
 })
 
 const selectedUnitId = ref<number | null>(null)
+const metric = ref<'time' | 'amount'>('time')
 
 const effectiveUnitId = computed<number | null>(() => {
   if (selectedUnitId.value !== null && units.value.some((unit) => unit.unitId === selectedUnitId.value)) {
@@ -54,32 +55,35 @@ const amountPoints = computed(() =>
 )
 
 const durationOption = computed<EChartsOption>(() => ({
+  color: ['#39776d'],
   title: { text: '学习时长趋势（分钟）', left: 0, textStyle: { fontSize: 13 } },
   tooltip: { trigger: 'axis' },
-  grid: { left: 56, right: 24, top: 48, bottom: 40 },
+  grid: { left: 12, right: 12, top: 48, bottom: 20, containLabel: true },
   xAxis: { type: 'category', data: props.points.map((point) => point.date) },
   yAxis: { type: 'value', name: '分钟' },
   series: [
     {
       name: '学习时长（分钟）',
       type: 'line',
-      smooth: true,
+      smooth: false,
+      areaStyle: { color: '#edf4ef' },
       data: props.points.map((point) => point.studyMinutes)
     }
   ]
 }))
 
 const amountOption = computed<EChartsOption>(() => ({
+  color: ['#739584'],
   title: { text: `内容完成量趋势（${currentUnitName.value || '按单位'}）`, left: 0, textStyle: { fontSize: 13 } },
   tooltip: { trigger: 'axis' },
-  grid: { left: 56, right: 24, top: 48, bottom: 40 },
+  grid: { left: 12, right: 12, top: 48, bottom: 20, containLabel: true },
   xAxis: { type: 'category', data: amountPoints.value.map((point) => point.date) },
   yAxis: { type: 'value', name: currentUnitName.value === '' ? '数量' : `数量（${currentUnitName.value}）` },
   series: [
     {
       name: `完成量（${currentUnitName.value || '未选择单位'}）`,
       type: 'line',
-      smooth: true,
+      smooth: false,
       data: amountPoints.value.map((point) => point.amount)
     }
   ]
@@ -96,8 +100,10 @@ function onUnitChange(value: unknown): void {
 
     <template v-else>
       <div class="trend-chart__toolbar">
-        <span class="hint-text">完成量单位</span>
+        <button :class="{ active: metric === 'time' }" :aria-pressed="metric === 'time'" @click="metric = 'time'">学习用时</button>
+        <button :class="{ active: metric === 'amount' }" :aria-pressed="metric === 'amount'" @click="metric = 'amount'">完成数量</button>
         <ElSelect
+          v-if="metric === 'amount' && units.length"
           :model-value="effectiveUnitId ?? undefined"
           class="trend-chart__select"
           placeholder="选择单位"
@@ -105,19 +111,12 @@ function onUnitChange(value: unknown): void {
         >
           <ElOption v-for="unit in units" :key="unit.unitId" :label="unit.unitName" :value="unit.unitId" />
         </ElSelect>
-        <span class="hint-text">时长与数量分开统计，不相互换算。</span>
       </div>
 
-      <EChart :option="durationOption" height="300px" />
-      <EChart v-if="units.length > 0" :option="amountOption" height="300px" />
-      <ElAlert
-        v-else
-        type="info"
-        show-icon
-        :closable="false"
-        title="所选区间内没有内容完成量数据"
-        description="只有学习记录里填写了完成数量时，才会有完成量趋势。"
-      />
+      <EChart v-if="metric === 'time'" :option="durationOption" height="320px" />
+      <EChart v-else-if="units.length > 0" :option="amountOption" height="320px" />
+      <ElEmpty v-else description="这段时间只记录了用时，尚未记录完成数量" />
+      <p class="hint-text">这里展示学习记录中的用时和数量；复习用时可在复习页查看。未填用时不代表没有学习。</p>
     </template>
   </div>
 </template>
@@ -134,4 +133,7 @@ function onUnitChange(value: unknown): void {
 .trend-chart__select {
   width: 160px;
 }
+.trend-chart__toolbar button { border:0; border-radius:7px; padding:8px 14px; font:inherit; font-size:13px; background:#f3f6f4; color:#738278; cursor:pointer; }
+.trend-chart__toolbar button.active { background:#e6f0e9; color:#39776d; }
+.trend-chart__toolbar button:focus-visible { outline:2px solid #39776d; outline-offset:2px; }
 </style>

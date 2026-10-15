@@ -11,6 +11,11 @@ import java.util.List;
 /** 学习记录数据访问。所有查询都排除软删除记录。 */
 @Mapper
 public interface StudyRecordMapper {
+    @org.apache.ibatis.annotations.Select("SELECT COUNT(*) FROM study_record WHERE task_id=#{taskId} AND record_date=#{date} AND deleted_at IS NULL AND activity_completed=TRUE")
+    int completedActivities(@Param("taskId") Long taskId,@Param("date") LocalDate date);
+
+    @org.apache.ibatis.annotations.Select("SELECT CONCAT(COUNT(*),':',COALESCE(MAX(id),0),':',COALESCE(SUM(version),0)) FROM study_record WHERE task_id=#{taskId} AND record_date=#{date}")
+    String confirmationHistory(@Param("taskId") Long taskId,@Param("date") LocalDate date);
 
     List<StudyRecordView> findAll(@Param("from") LocalDate from,
                                   @Param("to") LocalDate to,
@@ -18,6 +23,9 @@ public interface StudyRecordMapper {
                                   @Param("subjectId") Long subjectId);
 
     StudyRecord findById(@Param("id") Long id);
+
+    @org.apache.ibatis.annotations.Select("SELECT id FROM study_record WHERE id=#{id} AND deleted_at IS NULL FOR UPDATE")
+    Long lockRecord(@Param("id") Long id);
 
     StudyRecord findByClientToken(@Param("clientToken") String clientToken);
 

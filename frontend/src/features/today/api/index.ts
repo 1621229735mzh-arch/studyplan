@@ -17,9 +17,14 @@ export interface DayProgressPayload {
   completionPercent: number
   durationMinutes: number
   clientToken: string
+  actualAmount?: number | null
+  note?: string | null
 }
 export function saveLearningProgress(taskId: number, revision: string, payload: DayProgressPayload): Promise<unknown> {
   return post('/learning/records/day-progress', { ...payload, taskId, revision })
+}
+export function saveDayConfirmation(taskId: number, date: string, completed: boolean, revision: string, clientToken: string): Promise<unknown> {
+  return post('/learning/records/day-confirmation', {taskId, date, completed, revision, clientToken})
 }
 export function saveReviewProgress(reviewItemId: number, version: number, result: string | null, payload: DayProgressPayload): Promise<unknown> {
   return post('/review/records/day-progress', { ...payload, reviewItemId, version, result })

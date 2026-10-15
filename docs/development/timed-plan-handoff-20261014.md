@@ -1,0 +1,100 @@
+# 高数逐日计划导入接续（2026-10-14）
+
+## 用户目标及授权
+
+将 `个人资料/学习计划/张宇2027高数-数学一-完整基础一轮-20261015-20270217.md` 完整导入 `https://onlystudy.loc.cc`。2026-10-14 22:48（Asia/Shanghai）必要功能、V18线上发布、126天478项导入及数据库／真实页面核对均已完成。发布详情见 [正式发布记录](../operations/timed-plan-release-20261014.md)。本轮未提交／推送 Git；不要重跑发布或导入。
+
+保留原今日／计划视觉和层级；不重置 dirty 工作区，不改已应用 V1–V17，不修改 LeetCode 原计划及其进度课程，不伪造题号、页码、章题数。
+
+## 已实现
+
+- V18 新增 `task_activity`，日安排数量可为空，学习记录新增 `activity_completed`。完成量仍只来自有效学习记录。
+- 导入 v3 任务 `activity={mode:TIMED_STUDY|RECAP,description,flexibleMinutes}`，时间型任务及其每日数量留空，基本用时为正数。原 v1／v2 的数量和防重兼容性保持。
+- 时间型今日任务显示基本用时与弹性上限，“记一笔”保存实际量、用时和位置备注；“结束本次”标记当天收工，不等于整讲完成。
+- RECAP 在普通记录新建／修改和 day-progress 各入口均禁止增加首次完成量，只记用时。
+- 时间型日安排可通过原编辑入口调整基本用时，不要求虚构计划量；日历和月份对未知数量显示“按时间安排”。
+- 删除结束记录后当天任务重新开放，重试、revision、任务行锁与事务沿用原机制。
+
+具体文件包括 `TaskActivityService/Mapper`、`TimedActivityIntegrationTest`、V18、现有 PlanImport/DailyPlan/StudyRecord/Today 服务与 DTO，以及今日表单／计划预览及类型。PLAN、README、STRUCTURE、导入规划书、Schema、API 和数据库说明已同步。
+
+## 原计划转换
+
+生成文件为 `个人资料/学习计划/张宇2027高数-数学一-完整基础一轮-20261015-20270217.json`：
+
+- schemaVersion=3，planId=`zhangyu-2027-math1-calculus-20261015-20270217`。
+- 2026-10-15 至 2027-02-17，126 天，478 时段／任务，5 个月，19 个按周一组织的周纲要（原计划18个周四至周三学习周）。
+- 每天基本用时120分钟；弹性最多30分钟只放在该日一项中，不计入基本预算。基本用时总计15120分钟。
+- 新学／练习日按原四段拆分，收口／复盘按三段拆分；260 项为只计用时的 RECAP。
+- 讲与题分开据实记录。保留原文每日学习重点、配套练习、数学一范围、实书顺序及10月28日校准说明。未生成未经核实的题号、页码和题量。
+
+## 验证
+
+证据均位于 ignored `release/timed-plan-tools/`：
+
+- `backend-final.log`：真实 MySQL8.0.45，77项相关测试通过，package BUILD SUCCESS。
+- 首次新测试失败因测试单位名称超过32字，已缩短测试UUID；`backend-retest.log` 五项通过，随后完整77项通过。
+- `frontend-tests.log`：81项／10文件通过；最终两处语义标签和空数量调整修改后，`frontend-final-retest.log` 21项通过。
+- `frontend-final-build.log`：类型检查和生产构建通过，更新后的规划书已包含在最后产物。
+- `full-plan-local-final.log`：正常HTTP登录+CSRF导入整份126天计划，首次4题、复盘不增量、防重、删除后重开与会话验证通过。
+- 首次整份HTTP脚本曾因把 `studyMinutes` 写成不存在的 `durationMinutes` 断言键失败，已修正；最终使用新的隔离库通过，不要把失败日志当作最终结果。
+- 本机真实浏览器实际保存4题／35分钟／教材位置；“本次已结束”文案及空数量的分钟调整表单核对通过。截图 `local-timed-today.jpg`。
+- `git diff --check` 通过。未做本次手机尺寸浏览器验收。
+
+## 本轮本机隔离进程
+
+重启后不要复用旧PID，先检查完整命令行。
+
+- MySQL专用实例启动PID47672（可能有子进程），仅127.0.0.1:33312；数据目录 `release/retrospective-20261012/mysql-data`。
+- 测试库 `timed_plan_test_20261014`；网页库 `timed_preview_20261014` 和最终 `timed_preview_final_20261014`。只属于本机验收，不是生产。
+- 首个Java wrapper43140／日志子PID19736，18086；最终Java wrapper13800，18088；Vite46596，15178，代理18088。关闭前核对这些是本轮进程，不能停止其他任务。
+- 最终隔离测试账号为 timed-preview-1014；只用于本机，真实用户口令未读取或保存到仓库。
+
+## 发布包及上传历史（已发布完成）
+
+本轮自动上传 `setFiles` 阻塞约308秒，最终报 `No node found for given backend id`，未成功。不要重复自动上传大包；此前同接口已有相同故障，用户手工上传曾成功。浏览器整体控制和服务器免密连接正常，故障位于文件选择器接口，不是服务器认证。
+
+- 本机包：`release/timed-plan-20261014.tar.gz`，37,075,624 字节。
+- SHA256：`7a80f861173d48f26210b69610deb709a3ce61a9c58fb348f19f7af8be79c96d`。
+- JAR SHA256：`2806cd2421bf787df866a3a80d429e93cd73a5effb2d552b6306aa8ab80e3f99`。
+- 上传目录 `/root`，解包目录 `/root/timed-plan-20261014`。
+- 包含产物、指定个人JSON、`timed-release.py`、`timed_smoke.py`、VALIDATION、SHA256SUMS；不包含生产凭据或数据库备份。
+
+## 发布前生产读取历史
+
+2026-10-14约22:16：Flyway17:1；task=1，有效study_record=0，progress_course=1；本次包在/root尚不存在。生产应用、迁移和高数计划均未被本轮写入。
+
+固定部署为 `/srv/408doing/study-20260928-150827`，服务器8.217.241.16。已有LeetCode计划及进度课程必须保留。
+
+新私有状态ROOT=`/srv/408doing/private/timed-plan-20261014`，隔离schema=`timed_upgrade_20261014`，候选容器=`timed-upgrade-20261014`。首次prepare前须确认ROOT不存在，不盲目重跑。
+
+## 原发布顺序（仅历史，不再执行）
+
+先重新检查实际状态，确认包哈希，再逐步运行，不一口气盲跑：
+
+```bash
+cd /root
+echo '7a80f861173d48f26210b69610deb709a3ce61a9c58fb348f19f7af8be79c96d  timed-plan-20261014.tar.gz' | sha256sum -c -
+tar -xzf timed-plan-20261014.tar.gz
+cd timed-plan-20261014
+python3 timed-release.py prepare
+python3 timed-release.py candidate
+python3 timed-release.py publish
+```
+
+- prepare保留旧JAR／前端、生产备份并在MySQL8.4副本恢复，核对旧业务表计数。
+- candidate先验证V17→V18及旧数据保留，再在隔离副本通过正常接口测试478项导入、实际量与复盘。失败保持生产不变，检查日志后修复，不跳过。
+- publish需candidate标记及JAR哈希一致；停止后端前测Nginx配置，保存最终备份，升级后核对V18与业务计数，再发布前端。
+- 成功后通过真实网站更新PWA，再在计划页粘贴原始JSON，校验预览478任务／126天／478安排及预算规则，确认追加。已授权，不再询问。
+- 生产不生成测试学习记录。核对明天10月15日Math四时段共120分钟／弹性30，LeetCode31题保留；数学计划全部日期覆盖、未知题量不为0或固定题数，旧进度课程保持。
+- 最后数据库/API/页面验证、截图及正式发布记录。不得擅自Git提交／推送。
+
+## 当前浏览器工具句柄（仅为恢复线索）
+
+Chrome当前ID2，`timedWb` tab1458832260，免密连接已建立，文件管理已进入/root，文件选择器上传失败，已标记保留。旧线上`productionTab` tab1458832241当前已不存在，继续时重新检查网站标签和登录状态，不复用句柄；本机验收标签1458832257已关闭。
+浏览器重启后ID会漂移，先getState再选真实Chrome；旧标签曾Debugger unattached，打开同一官方Workbench地址的新标签并使用已有免密登录可恢复。终端命令用 `paste(null,command)` + `pressKey(null,'Return')`；结果需截图核对，AX不含终端输出。多行粘贴有确认弹窗，确认后需检查待执行文本再按回车。
+
+## 完成后的接续边界
+
+以上等待上传和发布命令均为历史。发布、网页导入及数据库核对已完成，详情以正式发布记录为准。首轮候选空统计键错误通过独立恢复脚本处理，没有修改已应用迁移、重跑导入或跳过验收。生产学习记录仍为0；原LeetCode任务、31条安排、题目及进度课程内容已核对保留。
+
+后续若继续工作，先读取正式发布记录；不要重跑已完成脚本。个人计划未自动归入数学课程目录，需后续明确归属和完整总量后按目录预览确认流程维护。未做手机尺寸验收；本机隔离服务仍按上文所列端口保留，关闭前应重新核验完整进程命令，不能复用旧PID或停止其他任务。

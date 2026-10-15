@@ -6,6 +6,8 @@
     <resultMap id="studyRecordResultMap" type="com.kaoyan.study.learning.entity.StudyRecord">
         <id property="id" column="id"/>
         <result property="taskId" column="task_id"/>
+        <result property="sequenceItemId" column="sequence_item_id"/>
+        <result property="activityCompleted" column="activity_completed"/>
         <result property="subjectId" column="subject_id"/>
         <result property="unitId" column="unit_id"/>
         <result property="recordDate" column="record_date"/>
@@ -35,13 +37,18 @@
             <arg column="content" name="content" javaType="java.lang.String"/>
             <arg column="note" name="note" javaType="java.lang.String"/>
             <arg column="version" name="version" javaType="java.lang.Long"/>
+            <arg column="sequence_item_id" name="sequenceItemId" javaType="java.lang.Long"/>
+            <arg column="sequence_title" name="sequenceTitle" javaType="java.lang.String"/>
+            <arg column="sequence_url" name="sequenceUrl" javaType="java.lang.String"/>
+            <arg column="activity_mode" name="activityMode" javaType="java.lang.String"/>
         </constructor>
     </resultMap>
 
     <sql id="viewColumns">
         r.id, r.task_id, t.title AS task_title, r.subject_id, s.name AS subject_name,
         r.unit_id, u.name AS unit_name, r.record_date, r.amount, r.duration_minutes,
-        r.content, r.note, r.version
+        r.content, r.note, r.version, r.sequence_item_id, si.title AS sequence_title, si.url AS sequence_url,
+        a.mode AS activity_mode
     </sql>
 
     <!-- 科目与单位在“只记时长”的记录上为空，因此用 LEFT JOIN 保证列表不会漏掉这些记录 -->
@@ -50,6 +57,8 @@
                  LEFT JOIN subject s ON s.id = r.subject_id
                  LEFT JOIN study_unit u ON u.id = r.unit_id
                  LEFT JOIN task t ON t.id = r.task_id
+                 LEFT JOIN task_sequence_item si ON si.id = r.sequence_item_id
+                 LEFT JOIN task_activity a ON a.task_id = r.task_id
     </sql>
 
     <select id="findAll" resultMap="studyRecordViewMap">
@@ -71,16 +80,16 @@
         WHERE r.id = #{id} AND r.deleted_at IS NULL
     </select>
 
-    <select id="findById" resultMap="studyRecordResultMap">
-        SELECT id, task_id, subject_id, unit_id, record_date, amount, duration_minutes,
+    <select id="findById" resultMap="studyRecordResultMap" flushCache="true" useCache="false">
+        SELECT id, activity_completed, sequence_item_id, task_id, subject_id, unit_id, record_date, amount, duration_minutes,
                content, note, client_token, version, created_at, updated_at, deleted_at
         FROM study_record
         WHERE id = #{id} AND deleted_at IS NULL
     </select>
 
     <!-- 重复提交防重：同一 client_token 只保留一条记录 -->
-    <select id="findByClientToken" resultMap="studyRecordResultMap">
-        SELECT id, task_id, subject_id, unit_id, record_date, amount, duration_minutes,
+    <select id="findByClientToken" resultMap="studyRecordResultMap" flushCache="true" useCache="false">
+        SELECT id, activity_completed, sequence_item_id, task_id, subject_id, unit_id, record_date, amount, duration_minutes,
                content, note, client_token, version, created_at, updated_at, deleted_at
         FROM study_record
         WHERE client_token = #{clientToken} AND deleted_at IS NULL
@@ -89,14 +98,16 @@
     <insert id="insert" parameterType="com.kaoyan.study.learning.entity.StudyRecord"
             useGeneratedKeys="true" keyProperty="id">
         INSERT INTO study_record (task_id, subject_id, unit_id, record_date, amount, duration_minutes,
-                                  content, note, client_token, version)
+                                  content, note, client_token, version, sequence_item_id, activity_completed)
         VALUES (#{taskId}, #{subjectId}, #{unitId}, #{recordDate}, #{amount}, #{durationMinutes},
-                #{content}, #{note}, #{clientToken}, 0)
+                #{content}, #{note}, #{clientToken}, 0, #{sequenceItemId}, #{activityCompleted})
     </insert>
 
     <update id="update" parameterType="com.kaoyan.study.learning.entity.StudyRecord">
         UPDATE study_record
         SET task_id = #{taskId},
+            sequence_item_id = #{sequenceItemId},
+            activity_completed = #{activityCompleted},
             subject_id = #{subjectId},
             unit_id = #{unitId},
             record_date = #{recordDate},

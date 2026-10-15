@@ -1,13 +1,14 @@
 /** 时间视图只组织服务端数据，不在浏览器计算学习统计。 */
 export type PlanViewMode = 'overall' | 'month' | 'week' | 'day'
 export interface ScheduleEntry {
+  activityMode?: string | null
   date: string; taskId: number; taskTitle: string; subjectId: number; unitId: number; unitName: string
-  plannedAmount: number; completedAmount: number; source: string; estimatedMinutes?: number | null; sortOrder: number
+  plannedAmount: number | null; completedAmount: number; source: string; estimatedMinutes?: number | null; sortOrder: number
 }
 export interface PlanAmount {
-  subjectId: number; unitId: number; unitName: string; plannedAmount: number; completedAmount: number
+  subjectId: number; unitId: number; unitName: string; plannedAmount: number | null; completedAmount: number
 }
-export interface PlanMonth { month: string; scheduledDays: number; taskCount: number; amounts: PlanAmount[] }
+export interface PlanMonth { month: string; scheduledDays: number; taskCount: number; amounts: PlanAmount[]; confirmationCount?: number }
 export interface PlanOutline { periodType: 'MONTH' | 'WEEK'; startDate: string; title: string; description?: string }
 export interface PlanWorkspace {
   revision: number; months: PlanMonth[]; entries: ScheduleEntry[]; outlines: PlanOutline[]
@@ -18,8 +19,8 @@ export interface ImportDocument {
   goals: { key: string; subject: string; title: string; description?: string; startDate: string; endDate: string }[]
   months: { month: string; title: string; description?: string }[]
   weeks: { startDate: string; title: string; description?: string }[]
-  tasks: { key: string; subject: string; unit: string; title: string; goalKey?: string; plannedAmount: number }[]
-  days: { date: string; items: { taskKey: string; amount: number; estimatedMinutes?: number | null }[] }[]
+  tasks: { key: string; subject: string; unit: string; title: string; goalKey?: string; plannedAmount: number | null; activity?: {mode:'TIMED_STUDY'|'RECAP'|'CHECK_ONLY'; description?:string|null; flexibleMinutes:number}; sequence?: { mode: 'COMPLETE_THEN_ADVANCE'; items: { key: string; title: string; url: string }[] } }[]
+  days: { date: string; items: { taskKey: string; amount: number | null; estimatedMinutes?: number | null }[] }[]
 }
 export interface ImportPreview {
   previewToken: string; revision: number; document: ImportDocument

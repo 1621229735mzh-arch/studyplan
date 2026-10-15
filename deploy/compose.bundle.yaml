@@ -1,0 +1,128 @@
+# 手动发布：本地构建产物直接挂载，不在小内存服务器编译。
+# 仅配合 docs/operations/manual-deploy.md；不能与原 compose.yaml 同时运行。
+name: study-workbench
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '3'
+
+services:
+  mysql:
+    # 8.4.11，2026-09-28 核验的官方镜像索引摘要。
+    image: mysql@sha256:0744ee5ef89ce6ccfa13de3e579fe6b9e27f93dd70da9c06d2c908b1b193fb8d
+    restart: unless-stopped
+    mem_limit: 512m
+    memswap_limit: 768m
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --innodb-buffer-pool-size=134217728
+      - --max-connections=25
+      - --performance-schema=OFF
+      - --mysqlx=OFF
+      - --temptable-max-ram=16777216
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Run bundle-init.sh first}
+      MYSQL_DATABASE: kaoyan_study
+      MYSQL_USER: kaoyan
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Run bundle-init.sh first}
+      TZ: Asia/Shanghai
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: [CMD-SHELL, 'MYSQL_PWD="$$MYSQL_PASSWORD" mysql --protocol=TCP -h 127.0.0.1 -u"$$MYSQL_USER" "$$MYSQL_DATABASE" -Nse "SELECT 1" >/dev/null']
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    logging: *logging
+
+  backend:
+    # Temurin 21.0.12.1_1，Alpine JRE。
+    image: eclipse-temurin@sha256:51ab5e3302e7141ce665ca3ea85e8b5cd648eafbc3c0c90dd79d6537684e4555
+    restart: unless-stopped
+    user: '10001:10001'
+    read_only: true
+    working_dir: /app
+    mem_limit: 768m
+    memswap_limit: 1024m
+    tmpfs:
+      - /tmp:size=67108864,mode=1777
+    entrypoint: [java]
+    command: [-Xms128m, -Xmx384m, -XX:+ExitOnOutOfMemoryError, -Duser.timezone=Asia/Shanghai, -jar, /app/app.jar]
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_HOST: mysql
+      DB_NAME: kaoyan_study
+      DB_USERNAME: kaoyan
+      DB_PASSWORD: ${DB_PASSWORD:?Run bundle-init.sh first}
+      DB_POOL_SIZE: '5'
+      DB_POOL_MIN_IDLE: '1'
+      SERVER_TOMCAT_THREADS_MAX: '30'
+      SERVER_TOMCAT_THREADS_MIN_SPARE: '2'
+      PRESET_ACCOUNT_USERNAME: ${PRESET_ACCOUNT_USERNAME:?Set existing application username}
+      PRESET_ACCOUNT_PASSWORD: ${PRESET_ACCOUNT_PASSWORD:?Run bundle-init.sh first}
+      SESSION_COOKIE_SECURE: 'true'
+      LOG_FILE: /tmp/logs/study-backend.log
+      LOGGING_LOGBACK_ROLLINGPOLICY_MAX_FILE_SIZE: 5MB
+      LOGGING_LOGBACK_ROLLINGPOLICY_MAX_HISTORY: '1'
+      LOGGING_LOGBACK_ROLLINGPOLICY_TOTAL_SIZE_CAP: 10MB
+    volumes:
+      - type: bind
+        source: ./artifacts/app.jar
+        target: /app/app.jar
+        read_only: true
+        bind:
+          create_host_path: false
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, wget, -qO-, 'http://127.0.0.1:8080/actuator/health']
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 90s
+    logging: *logging
+
+  frontend:
+    # Nginx 1.30.5 Alpine。
+    image: nginx@sha256:0985e772fb9f729e6fa0980da05fca5d9c468e870eed43071545afa9d2e27d94
+    restart: unless-stopped
+    mem_limit: 96m
+    environment:
+      DOMAIN: ${DOMAIN:?Run bundle-init.sh first}
+      NGINX_ENVSUBST_FILTER: '^DOMAIN$$'
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./artifacts/frontend:/usr/share/nginx/html:ro
+      - ./nginx/bundle.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - certificates:/etc/letsencrypt:ro
+      - acme:/var/www/acme:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, wget, -qO-, 'http://127.0.0.1/healthz']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    logging: *logging
+
+  certbot:
+    image: certbot/certbot@sha256:f70ad0adbb7e117f0fe42a63c553f28ea451edabc0148757b6efcd9735acaa20
+    profiles: [tools]
+    mem_limit: 256m
+    volumes:
+      - certificates:/etc/letsencrypt
+      - acme:/var/www/acme
+    logging: *logging
+
+volumes:
+  mysql_data:
+  certificates:
+  acme:

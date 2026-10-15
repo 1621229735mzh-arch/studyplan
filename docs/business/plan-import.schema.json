@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "408doing 外部计划合同 v1",
+  "title": "408doing 外部计划合同 v1 / v2 / v3 / v4",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -17,8 +17,13 @@
   ],
   "properties": {
     "schemaVersion": {
-      "const": 1,
-      "type": "integer"
+      "type": "integer",
+      "enum": [
+        1,
+        2,
+        3,
+        4
+      ]
     },
     "planId": {
       "type": "string",
@@ -199,12 +204,134 @@
             "maxLength": 64
           },
           "plannedAmount": {
-            "type": "number",
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": 0.01,
             "maximum": 99999999.99,
             "multipleOf": 0.01
+          },
+          "sequence": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": false,
+            "required": [
+              "mode",
+              "items"
+            ],
+            "properties": {
+              "mode": {
+                "const": "COMPLETE_THEN_ADVANCE"
+              },
+              "items": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 5000,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "key",
+                    "title",
+                    "url"
+                  ],
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9_-]{1,64}$"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "url": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 1000,
+                      "format": "uri",
+                      "pattern": "^https://"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "activity": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": false,
+            "required": [
+              "mode",
+              "flexibleMinutes"
+            ],
+            "properties": {
+              "mode": {
+                "enum": [
+                  "TIMED_STUDY",
+                  "RECAP",
+                  "CHECK_ONLY"
+                ]
+              },
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 1000
+              },
+              "flexibleMinutes": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1440
+              }
+            }
           }
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "activity"
+              ],
+              "properties": {
+                "activity": {
+                  "type": "object",
+                  "required": [
+                    "mode"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "CHECK_ONLY"
+                    }
+                  }
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "plannedAmount": {
+                  "type": "null"
+                },
+                "sequence": {
+                  "type": "null"
+                },
+                "activity": {
+                  "properties": {
+                    "flexibleMinutes": {
+                      "const": 0
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
       },
       "maxItems": 20000,
       "minItems": 1
@@ -240,7 +367,10 @@
                   "maxLength": 64
                 },
                 "amount": {
-                  "type": "number",
+                  "type": [
+                    "number",
+                    "null"
+                  ],
                   "minimum": 0.01,
                   "maximum": 99999999.99,
                   "multipleOf": 0.01
@@ -263,5 +393,105 @@
       "maxItems": 5000,
       "minItems": 1
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "const": 1
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "tasks": {
+            "items": {
+              "properties": {
+                "sequence": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "enum": [
+              1,
+              2
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "tasks": {
+            "items": {
+              "properties": {
+                "plannedAmount": {
+                  "type": "number"
+                },
+                "activity": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          "days": {
+            "items": {
+              "properties": {
+                "items": {
+                  "items": {
+                    "properties": {
+                      "amount": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "enum": [
+              1,
+              2,
+              3
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "tasks": {
+            "items": {
+              "properties": {
+                "activity": {
+                  "properties": {
+                    "mode": {
+                      "enum": [
+                        "TIMED_STUDY",
+                        "RECAP"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

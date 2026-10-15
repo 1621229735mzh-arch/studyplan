@@ -17,5 +17,5 @@ public record DailyPlanItemView(
         Long reviewItemId,
         Long version,
         BigDecimal completedAmount,
-        Integer estimatedMinutes) {
+        Integer estimatedMinutes, String activityMode) {
 }

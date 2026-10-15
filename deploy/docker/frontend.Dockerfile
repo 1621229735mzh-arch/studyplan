@@ -13,6 +13,7 @@ RUN pnpm install --frozen-lockfile
 COPY frontend/ ./
 # 导入窗口打包仓库中的规划书；当前 /build 对应仓库的 frontend/。
 COPY docs/business/plan-import* /docs/business/
+COPY docs/business/progress-catalog* /docs/business/
 RUN pnpm run build
 
 

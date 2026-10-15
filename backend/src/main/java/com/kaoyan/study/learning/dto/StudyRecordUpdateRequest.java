@@ -36,5 +36,10 @@ public record StudyRecordUpdateRequest(
         String note,
 
         @NotNull(message = "缺少数据版本，无法安全修改")
-        Long version) {
+        Long version,
+        Long sequenceItemId) {
+    public StudyRecordUpdateRequest(Long taskId, Long subjectId, Long unitId, LocalDate recordDate,
+            BigDecimal amount, Integer durationMinutes, String content, String note, Long version) {
+        this(taskId,subjectId,unitId,recordDate,amount,durationMinutes,content,note,version,null);
+    }
 }

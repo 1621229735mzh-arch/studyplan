@@ -7,7 +7,7 @@
  * 计划量未设置（后端返回 null）时该科目不画“计划量”柱，而不是当作 0。
  */
 import { computed, ref } from 'vue'
-import { ElAlert, ElEmpty, ElOption, ElSelect } from 'element-plus'
+import { ElEmpty, ElOption, ElSelect } from 'element-plus'
 import type { EChartsOption } from 'echarts'
 
 import EChart from './EChart.vue'
@@ -49,9 +49,10 @@ const hasMissingPlan = computed(() =>
 )
 
 const option = computed<EChartsOption>(() => ({
+  color: ['#d4e2d9', '#39776d'],
   tooltip: { trigger: 'axis' },
   legend: { data: ['计划量', '完成量'] },
-  grid: { left: 48, right: 24, top: 48, bottom: 40 },
+  grid: { left: 12, right: 12, top: 48, bottom: 20, containLabel: true },
   xAxis: {
     type: 'category',
     data: currentItems.value.map((item) => item.subjectName)
@@ -64,6 +65,7 @@ const option = computed<EChartsOption>(() => ({
     {
       name: '计划量',
       type: 'bar',
+      barMaxWidth: 36,
       // 未设置计划量的科目用 ECharts 的空值占位符 '-'（留空），不补 0
       // （补 0 会被误读成“计划为 0”）
       data: currentItems.value.map((item) => item.plannedAmount ?? '-')
@@ -71,6 +73,7 @@ const option = computed<EChartsOption>(() => ({
     {
       name: '完成量',
       type: 'bar',
+      barMaxWidth: 36,
       data: currentItems.value.map((item) => item.completedAmount ?? '-')
     }
   ]
@@ -93,24 +96,13 @@ function onUnitChange(value: unknown): void {
       >
         <ElOption v-for="unit in units" :key="unit.unitId" :label="unit.unitName" :value="unit.unitId" />
       </ElSelect>
-      <span class="hint-text">只展示同一种单位的科目对比，不同单位不混在同一张图里。</span>
     </div>
 
     <ElEmpty v-if="units.length === 0" description="暂无进度数据" />
 
     <template v-else>
       <EChart :option="option" height="340px" />
-      <ElAlert
-        type="info"
-        show-icon
-        :closable="false"
-        :title="`当前单位：${currentUnitName}`"
-        :description="
-          hasMissingPlan
-            ? '计划量与完成量由后端统计；部分科目尚未设置计划量，图上留空（未设置不等于 0）。'
-            : '计划量与完成量由后端统计；修改或删除学习记录后图表会随之变化。'
-        "
-      />
+      <p v-if="hasMissingPlan" class="hint-text">部分科目在这段时间没有日安排，计划量留空。</p>
     </template>
   </div>
 </template>

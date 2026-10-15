@@ -8,13 +8,14 @@
                          WHERE r.task_id=t.id AND r.record_date=d.plan_date AND r.deleted_at IS NULL),0) AS completed_amount,
                CASE WHEN COUNT(DISTINCT d.source)=1 THEN MIN(d.source) ELSE 'MIXED' END AS source,
                CASE WHEN COUNT(d.estimated_minutes)=COUNT(*) THEN SUM(d.estimated_minutes) ELSE NULL END AS estimated_minutes,
-               MIN(d.sort_order) AS sort_order
+               MIN(d.sort_order) AS sort_order, a.mode AS activity_mode
         FROM daily_plan_item d JOIN task t ON t.id=d.task_id JOIN study_unit u ON u.id=t.unit_id
+        LEFT JOIN task_activity a ON a.task_id=t.id
         WHERE d.source &lt;&gt; 'REVIEW'
         <if test="start != null">AND d.plan_date &gt;= #{start}</if>
         <if test="end != null">AND d.plan_date &lt;= #{end}</if>
         <if test="subjectId != null">AND t.subject_id=#{subjectId}</if>
-        GROUP BY d.plan_date,t.id,t.title,t.subject_id,t.unit_id,u.name
+        GROUP BY d.plan_date,t.id,t.title,t.subject_id,t.unit_id,u.name,a.mode
         ORDER BY d.plan_date,sort_order,t.id
     </select>
 </mapper>

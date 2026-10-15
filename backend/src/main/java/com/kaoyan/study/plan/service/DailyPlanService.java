@@ -27,15 +27,35 @@ import java.util.List;
 public class DailyPlanService {
 
     private final PlanMapper planMapper;
+    private final TaskSequenceService sequences;
+    private final TaskActivityService activities;
     private final TaskService taskService;
     private final com.kaoyan.study.plan.mapper.WorkspaceMapper workspace;
 
-    public DailyPlanService(PlanMapper planMapper, TaskService taskService, com.kaoyan.study.plan.mapper.WorkspaceMapper workspace) {
+    public DailyPlanService(PlanMapper planMapper, TaskService taskService, com.kaoyan.study.plan.mapper.WorkspaceMapper workspace,TaskSequenceService sequences,TaskActivityService activities) {
+        this.activities=activities;
+        this.sequences=sequences;
         this.planMapper = planMapper;
         this.taskService = taskService;
         this.workspace = workspace;
     }
 
+    private void validateSequence(Long taskId,LocalDate date,BigDecimal amount) {
+        var definition=sequences.definition(taskId);
+        if (definition!=null && (date.isBefore(definition.startDate()) || date.isAfter(definition.endDate())
+                || amount==null || (amount.compareTo(BigDecimal.ZERO)!=0 && amount.compareTo(BigDecimal.ONE)!=0)))
+            throw new ConflictException("SEQUENCE_DAILY_SLOT","接续任务只在原日期范围每天安排 1 个名额，取消可设为 0");
+    }
+    private void validateActivity(Long taskId,BigDecimal amount,Integer minutes) {
+        var activity=activities.get(taskId);
+        if (activity!=null && "CHECK_ONLY".equals(activity.mode())) {
+            if (amount!=null || minutes!=null)
+                throw new ConflictException("CONFIRMATION_MEASUREMENT","完成确认型只勾选状态，不填写数量或用时");
+            return;
+        }
+        if (activity!=null ? amount!=null || minutes==null || minutes<1 || minutes>1440 : amount==null)
+            throw new ConflictException("INVALID_SCHEDULE_MEASUREMENT","时间型安排只填写基本用时；数量型安排必须填写计划量");
+    }
     public List<DailyPlanItemView> list(LocalDate date) {
         return planMapper.findDailyItems(date);
     }
@@ -59,6 +79,10 @@ public class DailyPlanService {
     private void writeItem(LocalDate date, DailyItemCreateRequest request) {
         workspace.lock();
         taskService.requireExistingForUpdate(request.taskId());
+        validateSequence(request.taskId(),date,request.plannedAmount());
+        validateActivity(request.taskId(),request.plannedAmount(),request.estimatedMinutes());
+        if (sequences.definition(request.taskId())!=null && list(date).stream().anyMatch(i -> i.taskId().equals(request.taskId())))
+            throw new ConflictException("SEQUENCE_DAILY_SLOT","接续任务当天只能有一个名额");
         PlanSource source = request.sourceOrDefault();
         DailyPlanItem existing = planMapper.findDailyItem(date, request.taskId(), source.name());
         if (existing == null) {
@@ -90,6 +114,8 @@ public class DailyPlanService {
         if (item == null || !item.getVersion().equals(request.version())) {
             throw new ConflictException("DAILY_ITEM_STALE", "当天安排已在其他设备上修改，请刷新后重试");
         }
+        validateSequence(item.getTaskId(),date,request.plannedAmount());
+        validateActivity(item.getTaskId(),request.plannedAmount(),request.estimatedMinutes());
         BigDecimal before = item.getPlannedAmount();
         if (item.getSource() == PlanSource.REVIEW) {
             throw new ConflictException("REVIEW_MANAGED_SEPARATELY", "请在复习页面调整复习安排");
