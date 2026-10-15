@@ -104,17 +104,19 @@ class PlanWorkspaceIntegrationTest {
     }
     @Test
     void databaseFailureRollsBackBatchTasksAndGoals() {
-        var p=imports.preview(source);
+        String failingTitle="回滚故障-"+UUID.randomUUID();
+        String failingSource=source.replace("极限配套练习",failingTitle);
+        var p=imports.preview(failingSource);
         long taskBefore=count("task"), goalBefore=count("stage_goal"), importBefore=count("plan_import");
-        // 真正 MySQL 故障：第二个任务插入失败，应回滚此前的批次、目标和第一个任务。
-        jdbc.execute("CREATE TRIGGER planning_test_failure BEFORE INSERT ON task FOR EACH ROW BEGIN IF NEW.subject_id="+subjectId+" AND NEW.title='极限配套练习' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='test failure'; END IF; END");
+        // 第二个任务触发真实约束故障；无需 SUPER 或放宽二进制日志安全设置。
+        jdbc.execute("ALTER TABLE task ADD CONSTRAINT planning_test_failure CHECK (title <> '"+failingTitle+"')");
         try {
-            assertThatThrownBy(()->imports.confirm(new PlanImportRequest(source,p.previewToken()))).isInstanceOf(RuntimeException.class);
+            assertThatThrownBy(()->imports.confirm(new PlanImportRequest(failingSource,p.previewToken()))).isInstanceOf(RuntimeException.class);
             assertThat(count("task")).isEqualTo(taskBefore);
             assertThat(count("stage_goal")).isEqualTo(goalBefore);
             assertThat(count("plan_import")).isEqualTo(importBefore);
-        } finally { jdbc.execute("DROP TRIGGER planning_test_failure"); }
-        imports.confirm(new PlanImportRequest(source,p.previewToken()));
+        } finally { jdbc.execute("ALTER TABLE task DROP CHECK planning_test_failure"); }
+        imports.confirm(new PlanImportRequest(failingSource,p.previewToken()));
     }
     @Test
     void concurrentConfirmationsCommitOnlyOnce() throws Exception {

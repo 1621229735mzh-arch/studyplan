@@ -59,7 +59,7 @@ class SessionTableCaseMigrationTest {
                     .isInstanceOf(org.springframework.jdbc.BadSqlGrammarException.class);
         }
 
-        var flyway = Flyway.configure().dataSource(dataSource).load();
+        var flyway = Flyway.configure().dataSource(dataSource).target("13").load();
         assertThat(flyway.migrate().migrationsExecuted).isEqualTo(1);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM task", Long.class))

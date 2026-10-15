@@ -20,7 +20,8 @@ import java.util.UUID;
 import java.util.concurrent.*;
 import static org.assertj.core.api.Assertions.*;
 
-@SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT, properties="app.preset-account.password=confirmation-test-only")
+@SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT, properties={
+        "app.preset-account.username=kaoyan", "app.preset-account.password=test-only-password"})
 class ConfirmationActivityIntegrationTest {
     @DynamicPropertySource static void db(DynamicPropertyRegistry r) {MySqlTestSupport.registerDataSource(r);}
     @Autowired PlanImportService imports;
