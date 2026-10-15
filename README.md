@@ -6,7 +6,7 @@
 
 需求与技术栈依据见 [PLAN.md](PLAN.md)；工程约束见 [AGENTS.md](AGENTS.md)；目录职责见 [docs/STRUCTURE.md](docs/STRUCTURE.md)。
 
-## 当前状态
+## 当前状态（更新于 2026-10-15）
 
 张宇数学计划的当前摘要见 [当前确认版](docs/business/zhangyu-math-plan.md)：按两本书独立接续，保留详细学习内容，不安排复习和订正。仓库文件更新与线上计划导入分别记录，当前部署保持暂停。
 
@@ -15,6 +15,8 @@
 - 后端：Spring Boot 4.1.1 模块化单体，8 个业务模块全部实现。
 - 本地清理复核（2026-10-15）：前端 84 项测试、类型检查及 PWA 构建，后端 13 项单元测试、干净编译及打包通过；本轮未运行数据库集成测试和 Docker 构建。见 [清理记录](docs/development/cleanup-20261009.md)。
 - 数据库：Flyway 迁移 V1–V20，随应用启动执行；V12 导入数学一轮计划，V15 支持计划工作区，V16–V19 支持课程目录、接续练习、时间型安排与每日确认。
+- 最新开发：V20 与导入 v5 支持按书独立接续，既有验证为后端 136 项、前端 87 项、类型检查和构建通过；验证环境与限制见 [验证记录](docs/testing/continued-study-20261015.md)。本次进展同步仅更新文档，未重跑业务测试。
+- 线上记录：V19 英语每日确认与两份计划已发布导入，随后完成 38 任务／118 天／236 日安排的简化高数替换，保留学习记录及其他计划；见 [英语发布](docs/operations/english-plan-release-20261015.md)、[高数替换](docs/operations/math-simple-replacement-20261015.md)。V20 两书接续尚未发布，完整方案尚未转换导入，继续 [暂停交接](docs/development/continued-study-deploy-handoff-20261015.md)；本次未重新核验生产状态。
 - 登录：预设账号 + Spring Security + Spring Session JDBC（会话存 MySQL）+ CSRF 防护。
 - 历史验证（2026-10-08）：后端 92 项在隔离 MySQL 8.0.45 上通过并打包；前端 49 项测试、类型检查和生产构建通过。浏览器验证四视图、导入确认、日编辑/排序及离线本周；生产 MySQL 8.4.11 的隔离恢复、V14 → V15、会话及接口验收通过。未运行本地 Docker 专用会话迁移测试或重建 Docker 镜像，详见 [计划页验收](docs/testing/planning-workspace-20261008.md)。
 - 历史验证（2026-10-01）：后端 72 项在隔离 MySQL 9.7.0 上通过；前端 38 项测试与构建通过。服务器 MySQL 8.4.11 隔离库验证 V13 → V14、登录与 JDBC 会话，今日清单已发布。见 [今日清单验证](docs/testing/today-checklist-20261001.md)和 [早期验收记录](docs/testing/acceptance.md)。
