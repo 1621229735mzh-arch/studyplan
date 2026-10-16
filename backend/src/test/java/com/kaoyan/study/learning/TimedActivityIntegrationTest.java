@@ -28,6 +28,7 @@ class TimedActivityIntegrationTest {
     @Autowired PlanWorkspaceService workspace;
     @Autowired SubjectService subjects;
     @Autowired StudyUnitService units;
+    @Autowired com.kaoyan.study.today.service.TodayService today;
     Long study,recap,subjectId;
     String source;
     LocalDate date=LocalDate.of(2026,10,15);
@@ -60,7 +61,11 @@ class TimedActivityIntegrationTest {
         return new DayProgressRequest(date,task,percent,minutes,snapshot(task).revision(),token,amount,"教材p12；基础篇第5题；卡在条件");
     }
     @Test void actualQuantityIsIndependentOfTimeAndDeletingReopensActivity() {
+        var initialCounts=today.today(date).taskCounts();
         var first=records.recordDayProgress(request(study,0,40,new BigDecimal("3"),UUID.randomUUID().toString()));
+        var startedCounts=new com.kaoyan.study.today.dto.TodayTaskCounts(
+                initialCounts.completed(),initialCounts.inProgress()+1,initialCounts.remaining()-1);
+        assertThat(today.today(date).taskCounts()).isEqualTo(startedCounts);
         assertThat(first.amount()).isEqualByComparingTo("3");
         assertThat(snapshot(study).plannedAmount()).isNull();
         assertThat(snapshot(study).completionPercent()).isEqualByComparingTo("0");
@@ -68,10 +73,13 @@ class TimedActivityIntegrationTest {
         var req=request(study,100,50,new BigDecimal("2"),UUID.randomUUID().toString());
         var done=records.recordDayProgress(req);
         assertThat(records.recordDayProgress(req).id()).isEqualTo(done.id());
+        assertThat(today.today(date).taskCounts()).isEqualTo(new com.kaoyan.study.today.dto.TodayTaskCounts(
+                initialCounts.completed()+1,initialCounts.inProgress(),initialCounts.remaining()-1));
         assertThat(snapshot(study).completionPercent()).isEqualByComparingTo("100");
         assertThat(snapshot(study).remainingMinutes()).isEqualByComparingTo("0");
         assertThat(tasks.progress(study).completedAmount()).isEqualByComparingTo("5");
         records.delete(done.id(),done.version());
+        assertThat(today.today(date).taskCounts()).isEqualTo(startedCounts);
         assertThat(snapshot(study).completionPercent()).isEqualByComparingTo("0");
         assertThat(tasks.progress(study).completedAmount()).isEqualByComparingTo("3");
     }
@@ -88,7 +96,7 @@ class TimedActivityIntegrationTest {
         records.recordDayProgress(request(study,0,10,null,UUID.randomUUID().toString()));
         assertThatThrownBy(()->records.recordDayProgress(stale)).isInstanceOf(BusinessException.class);
         assertThatThrownBy(()->records.recordDayProgress(request(study,50,20,null,UUID.randomUUID().toString()))).isInstanceOf(BusinessException.class);
-        assertThatThrownBy(()->records.recordDayProgress(request(study,100,0,null,UUID.randomUUID().toString()))).isInstanceOf(BusinessException.class);
+        assertThat(records.recordDayProgress(request(study,100,0,null,UUID.randomUUID().toString())).durationMinutes()).isZero();
     }
     @Test void timeOnlyWorkspaceDoesNotInventQuantityAndAllowsBudgetEdit() {
         var result=workspace.read(date,date,subjectId);
@@ -108,4 +116,30 @@ class TimedActivityIntegrationTest {
                 source.replace("TIMED_STUDY","OTHER")})
             assertThatThrownBy(()->imports.preview(invalid)).isInstanceOf(BusinessException.class);
     }
+
+    @Test void canEndStudyAndRecapWithoutRecordingTime() {
+        for (var id:java.util.List.of(study,recap)) {
+            var req=new DayProgressRequest(date,id,100,null,snapshot(id).revision(),UUID.randomUUID().toString(),null,null);
+            var saved=records.recordDayProgress(req);
+            assertThat(saved.durationMinutes()).isNull();
+            assertThat(saved.amount()).isNull();
+            assertThat(records.recordDayProgress(req).id()).isEqualTo(saved.id());
+            assertThat(snapshot(id).completionPercent()).isEqualByComparingTo("100");
+            records.delete(saved.id(),saved.version());
+            assertThat(snapshot(id).completionPercent()).isEqualByComparingTo("0");
+        }
+    }
+    @Test void importedActivitiesDoNotRequireEstimates() {
+        var withoutTime=source.replaceAll("\"estimatedMinutes\":(100|20)","\"estimatedMinutes\":null")
+                .replaceAll("\"flexibleMinutes\":(30|0)","\"flexibleMinutes\":null");
+        withoutTime=withoutTime.replaceFirst("\"planId\":\"[^\"]+\"", "\"planId\":\""+UUID.randomUUID()+"\"");
+        var preview=imports.preview(withoutTime);
+        assertThat(preview).isNotNull();
+        imports.confirm(new PlanImportRequest(withoutTime,preview.previewToken()));
+        assertThat(daily.list(date).stream().filter(p->p.subjectId().equals(subjectId)).filter(p->!p.taskId().equals(study) && !p.taskId().equals(recap)).toList()).hasSize(2).allSatisfy(p->assertThat(p.estimatedMinutes()).isNull());
+        var item=daily.list(date).stream().filter(p->p.taskId().equals(study)).findFirst().orElseThrow();
+        daily.adjust(date,item.id(),new DailyItemAdjustRequest(null,item.version(),"无需计时",null));
+        assertThat(snapshot(study).estimatedMinutes()).isNull();
+    }
+
 }

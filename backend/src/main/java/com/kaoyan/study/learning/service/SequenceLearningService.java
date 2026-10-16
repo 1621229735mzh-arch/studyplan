@@ -65,9 +65,7 @@ public class SequenceLearningService {
             throw new BusinessException("SEQUENCE_DATE_RANGE","记录日期须在接续计划起止范围内，不会自动延长计划");
         var amount=record.getAmount();
         if (amount!=null && amount.compareTo(BigDecimal.ONE)!=0)
-            throw new BusinessException("SEQUENCE_WHOLE_ITEM","完成整题记 1；尚未完成请只记用时，不记录部分题量");
-        if (amount==null && (record.getDurationMinutes()==null || record.getDurationMinutes()<=0))
-            throw new BusinessException("SEQUENCE_ATTEMPT_TIME","未完成的尝试请填写实际用时");
+            throw new BusinessException("SEQUENCE_WHOLE_ITEM","完成整题记 1；尚未完成请留空完成量，不记录部分题量");
         var rows=records.findAll(null,null,record.getTaskId(),null);
         var others=rows.stream().filter(r -> !r.id().equals(record.getId())).toList();
         if (amount!=null) {

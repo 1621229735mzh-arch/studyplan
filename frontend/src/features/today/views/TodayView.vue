@@ -14,7 +14,6 @@ import type { MasteryLevel } from '@/types/domain'
 import { fetchToday, saveLearningProgress, saveReviewProgress, saveDayConfirmation } from '../api'
 import ChecklistTask from '../components/ChecklistTask.vue'
 import ContinuationBook from '../components/ContinuationBook.vue'
-import { compactMinutes } from '../time'
 import type { TodayChecklistTask, TodayResponse } from '../types'
 const session = useSessionStore()
 const catalog = useCatalogStore()
@@ -92,7 +91,6 @@ const timedAction = computed(() => !!selected.value?.activity && !selected.value
 const dialogVisible = ref(false)
 const isComplete = ref(false)
 const percent = ref<number | undefined>(0)
-const duration = ref<number | undefined>()
 const actualAmount = ref<number | undefined>()
 const activityNote = ref('')
 const mastery = ref<MasteryLevel | undefined>()
@@ -120,7 +118,6 @@ function openAction(task: TodayChecklistTask, complete: boolean): void {
   actionDate = date.value
   isComplete.value = complete
   percent.value = complete ? 100 : Math.ceil(task.completionPercent)
-  duration.value = undefined
   actualAmount.value = undefined
   activityNote.value = ''
   mastery.value = undefined
@@ -135,13 +132,11 @@ async function saveAction(): Promise<void> {
   if (percent.value == null || percent.value < task.completionPercent || percent.value > 100) {
     saveError.value = '请填写不低于当前进度、且不超过 100 的累计完成百分比。'; return
   }
-  if (duration.value == null || duration.value < 0) { saveError.value = '请填写本次学习用时（分钟）。'; return }
-  if (task.activity && !task.continuation && duration.value < 1) { saveError.value = '时间型安排请填写至少 1 分钟实际用时。'; return }
   if (task.activity && actualAmount.value != null && actualAmount.value <= 0) { saveError.value = '新增完成量请填写正数，尚未完成可留空。'; return }
   if (task.kind === 'REVIEW' && percent.value === 100 && !mastery.value) { saveError.value = '请选择本次复习的掌握情况。'; return }
-  const signature = JSON.stringify([percent.value, duration.value, mastery.value, actualAmount.value, activityNote.value])
+  const signature = JSON.stringify([percent.value, mastery.value, actualAmount.value, activityNote.value])
   if (attempt?.signature !== signature) attempt = { signature, token: crypto.randomUUID() }
-  const payload = { date: actionDate, completionPercent: percent.value, durationMinutes: duration.value, clientToken: attempt!.token,
+  const payload = { date: actionDate, completionPercent: percent.value, durationMinutes: null, clientToken: attempt!.token,
     ...(task.activity && !task.continuation ? {actualAmount: task.activity.mode === 'RECAP' ? null : actualAmount.value ?? null, note: activityNote.value || null} : {}) }
   saving.value = true
   saveError.value = null
@@ -149,7 +144,7 @@ async function saveAction(): Promise<void> {
     if (task.kind === 'LEARNING') await saveLearningProgress(task.id, task.revision!, payload)
     else await saveReviewProgress(task.id, task.version!, mastery.value ?? null, payload)
     dialogVisible.value = false
-    ElMessage.success(percent.value === 100 ? '已完成，用时已保存' : '进度与用时已保存')
+    ElMessage.success(percent.value === 100 ? '已完成' : '进度已保存')
     await loadToday()
   } catch (caught) {
     const error = toApiError(caught)
@@ -169,7 +164,7 @@ async function saveExtraRecord(payload: LearningRecordFormSubmission): Promise<v
   try {
     await createLearningRecord({ ...payload.model, note: payload.model.note || null, clientToken: payload.clientToken })
     recordFormRef.value?.reset()
-    ElMessage.success('用时与学习记录已保存')
+    ElMessage.success('学习记录已保存')
     await loadToday()
   } catch (caught) {
     const error = toApiError(caught)
@@ -191,24 +186,20 @@ onMounted(() => { void catalog.load(); void loadToday() })
     <ElAlert v-if="errorMessage" type="error" :closable="false" :title="errorMessage" />
     <ElAlert v-if="today && !today.sections" type="info" :closable="false" title="当前数据是旧版快照，请联网更新今日清单。" />
     <template v-if="today?.sections">
-      <section class="today-summary" aria-label="今日时间概览">
-        <div class="summary-metric"><span>已学习</span><strong>{{ compactMinutes(today.actualMinutes ?? 0) }}</strong>
-          <small v-if="today.missingDurations">{{ today.missingDurations }} 条记录未填用时</small></div>
-        <div class="summary-metric"><span>预计剩余</span><strong>{{ today.missingEstimates ? '至少 ' : '' }}{{ compactMinutes(today.remainingMinutes ?? 0) }}</strong>
-          <small v-if="today.missingEstimates">{{ today.missingEstimates }} 项未填预计用时</small></div>
+      <section v-if="today.taskCounts" class="today-summary" aria-label="今日任务概览">
+        <div class="summary-metric"><span>已完成</span><strong>{{ today.taskCounts.completed }} 项</strong></div>
+        <div class="summary-metric"><span>进行中</span><strong>{{ today.taskCounts.inProgress }} 项</strong></div>
+        <div class="summary-metric"><span>还剩</span><strong>{{ today.taskCounts.remaining }} 项</strong></div>
       </section>
+      <ElAlert v-else type="info" :closable="false" title="当前数据尚无任务项数统计，请联网刷新今日清单。" />
       <section v-for="section in today.sections" :key="section.name" class="section-card subject-section">
         <div class="subject-heading">
           <h2>{{ section.name }}</h2>
-          <div class="subject-times"><span>已学习 <b>{{ compactMinutes(section.actualMinutes) }}</b></span>
-            <span>预计剩余 <b>{{ section.missingEstimates ? '至少 ' : '' }}{{ compactMinutes(section.remainingMinutes) }}</b></span></div>
         </div>
-        <p v-if="section.missingEstimates" class="section-note">{{ section.missingEstimates }} 项预计用时待补充，可在计划的每日安排中填写。</p>
-        <p v-if="section.missingDurations" class="section-note">{{ section.missingDurations }} 条学习记录尚未填写用时。</p>
         <ul class="checklist">
           <ChecklistTask v-for="task in section.tasks.filter(t => !t.continuation && t.completionPercent < 100)" :key="`${task.kind}-${task.id}`"
-            :task="task" :readonly="readonly || saving" @action="openAction" />
-          <ContinuationBook v-for="book in bookGroups(section.tasks)" :key="`book-${book.id}`" :title="book.title" :tasks="book.tasks" :readonly="readonly || saving" @action="openAction" />
+            :task="task" :readonly="readonly || saving" :show-estimate="section.name === '数学一'" @action="openAction" />
+          <ContinuationBook v-for="book in bookGroups(section.tasks)" :key="`book-${book.id}`" :title="book.title" :tasks="book.tasks" :readonly="readonly || saving" :show-estimate="section.name === '数学一'" @action="openAction" />
         </ul>
         <p v-if="!section.tasks.some(t => t.completionPercent < 100)" class="empty-subject">
           {{ section.tasks.length ? '今日任务已完成' : '今天暂无任务' }}
@@ -226,14 +217,12 @@ onMounted(() => { void catalog.load(); void loadToday() })
       :close-on-click-modal="!saving" :close-on-press-escape="!saving" :show-close="!saving"
       :before-close="(done: () => void) => { if (!saving) done() }">
       <p class="dialog-task">{{ selected?.title }}</p>
-      <p v-if="timedAction && selected?.activity" class="section-note">结束本次安排只表示今天收工，不表示整讲或整章已经学完。{{ selected.activity.mode === 'RECAP' ? '复做与订正只计用时。' : '只填写本次首次完成的数量；已做过的题不重复计数。' }}</p>
-      <p v-if="selected?.sequence?.dayItem">{{ selected.sequence.dayItem.title }} · {{ isComplete ? '完成整题后推进' : '本次只计用时，题目继续保留' }}</p>
+      <p v-if="timedAction && selected?.activity" class="section-note">结束本次安排只表示今天收工，不表示整讲或整章已经学完。{{ selected.activity.mode === 'RECAP' ? '复做与订正不增加首次完成量。' : '只填写本次首次完成的数量；已做过的题不重复计数。' }}</p>
+      <p v-if="selected?.sequence?.dayItem">{{ selected.sequence.dayItem.title }} · {{ isComplete ? '完成整题后推进' : '记录本次尝试，题目继续保留' }}</p>
       <label v-if="!isComplete && !selected?.sequence && !timedAction" class="field-label">累计已完成 (%)</label>
       <ElInputNumber v-if="!isComplete && !selected?.sequence && !timedAction" v-model="percent" :min="Math.ceil(selected?.completionPercent ?? 0)" :max="100" :precision="0" :disabled="saving" aria-label="累计已完成百分比" />
       <p v-if="!isComplete && !selected?.sequence && !timedAction" class="section-note">填写 30 表示已完成 30%，剩余 70%。</p>
       <template v-if="selected?.activity?.mode === 'TIMED_STUDY'"><label class="field-label">本次新增完成量（{{ selected.unitName }}，可留空）</label><ElInputNumber v-model="actualAmount" :min="0.000001" :precision="6" :controls="false" :disabled="saving" aria-label="本次新增完成量" /></template>
-      <label class="field-label">本次用时（分钟）</label>
-      <ElInputNumber v-model="duration" :min="0" :precision="0" :disabled="saving" placeholder="填写本次用时" aria-label="本次用时（分钟）" />
       <template v-if="timedAction"><label class="field-label">进度位置与卡点</label><ElInput v-model="activityNote" type="textarea" :rows="3" maxlength="500" :disabled="saving" aria-label="进度位置与卡点" placeholder="教材页码、1000题最后题号、未完成内容及一个卡点" /></template>
       <template v-if="selected?.kind === 'REVIEW' && percent === 100">
         <label class="field-label">掌握情况</label>
@@ -246,8 +235,8 @@ onMounted(() => { void catalog.load(); void loadToday() })
 </template>
 <style scoped>
 .extra-record-fields{border:0;margin:0;padding:0}.today-page{max-width:1000px;margin:0 auto}.page__header{justify-content:flex-end}
-.today-summary{display:grid;grid-template-columns:1fr 1fr;gap:24px;padding:25px 30px;background:var(--kaoyan-card,#fff);border:1px solid var(--kaoyan-border);border-radius:14px;margin-bottom:20px}
-.summary-metric{display:flex;flex-direction:column;gap:8px}.summary-metric>span{font-size:13px;color:var(--kaoyan-text-secondary)}.summary-metric strong{font-size:26px;font-weight:600;letter-spacing:-.5px}.summary-metric small{font-size:12px;color:var(--kaoyan-text-secondary)}
+.today-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;padding:25px 30px;background:var(--kaoyan-card,#fff);border:1px solid var(--kaoyan-border);border-radius:14px;margin-bottom:20px}
+.summary-metric{display:flex;flex-direction:column;gap:8px}.summary-metric>span{font-size:13px;color:var(--kaoyan-text-secondary)}.summary-metric strong{font-size:26px;font-weight:600;letter-spacing:-.5px}
 .subject-section{margin-bottom:16px}.subject-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:12px}.subject-heading h2{font-size:18px;font-weight:600;margin:0}.subject-times{display:flex;gap:22px;font-size:12px;color:var(--kaoyan-text-secondary)}.subject-times b{font-weight:500;color:var(--kaoyan-text)}
 .checklist{list-style:none;padding:0;margin:0}.empty-subject{font-size:13px;color:var(--kaoyan-text-secondary);margin:14px 0 4px}.section-note{font-size:12px;color:var(--kaoyan-text-secondary);line-height:1.6}
 .completed{margin-top:8px}.completed summary,.extra-record summary{font-size:13px;color:var(--kaoyan-text-secondary);cursor:pointer;padding:10px 0}.extra-record :deep(form){margin-top:16px}.dialog-task{font-size:15px;margin:0 0 20px}.field-label{display:block;margin:18px 0 8px;font-size:13px}.save-error{margin-top:20px}

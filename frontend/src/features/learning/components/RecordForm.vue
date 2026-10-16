@@ -3,7 +3,7 @@
  * 学习记录表单（新建 / 修改共用）。
  *
  * 设计要点：
- * - 3—5 分钟即可填完：默认今天、常用用时一键选择、复盘可选；
+ * - 3—5 分钟即可填完：默认今天、无需计时、复盘可选；
  * - 完成数量必须带单位，单位跟随所选任务展示，不允许手工输入单位；
  * - 离线（第一版只读）时不允许提交，但保留已填内容供联网后重试；
  * - 提交失败不清空表单，由父组件决定何时调用 reset()；
@@ -62,8 +62,6 @@ const emit = defineEmits<{
 
 const { online } = useOnlineStatus()
 
-/** 常用用时快捷项（分钟），减少输入步骤。 */
-const QUICK_MINUTES = [15, 30, 45, 60, 90]
 
 function createEmptyModel(): LearningRecordFormModel {
   return {
@@ -74,6 +72,7 @@ function createEmptyModel(): LearningRecordFormModel {
     unitId: null,
     amount: null,
     durationMinutes: null,
+    content: '',
     note: ''
   }
 }
@@ -103,11 +102,6 @@ const subjectName = computed(() => selectedTask.value?.subjectName ?? null)
 
 const submitLabel = computed(() => (props.mode === 'edit' ? '保存修改' : '记一笔'))
 
-function clearFieldError(field: keyof LearningRecordFormModel): void {
-  const next = { ...fieldErrors.value }
-  delete next[field]
-  fieldErrors.value = next
-}
 
 // 选择任务后自动带出科目与单位（单位不可手填，避免不同单位混用）
 watch(selectedTask, (task) => {
@@ -138,14 +132,7 @@ function onAmountChange(value: unknown): void {
   form.amount = typeof value === 'number' ? value : null
 }
 
-function onDurationMinutesChange(value: unknown): void {
-  form.durationMinutes = typeof value === 'number' ? value : null
-}
 
-function applyQuickMinutes(minutes: number): void {
-  form.durationMinutes = minutes
-  clearFieldError('durationMinutes')
-}
 
 /** 提交：先本地校验（同步、可测），再判断离线，最后把载荷交给父组件。 */
 function submit(): void {
@@ -230,6 +217,8 @@ defineExpose({ form, submit, reset, fillFrom, setServerError })
         </ElSelect>
       </ElFormItem>
 
+      <ElFormItem label="学习内容"><ElInput v-model="form.content" maxlength="500" placeholder="学了什么（未关联任务时填写）" /></ElFormItem>
+
       <ElFormItem label="完成量" :error="fieldErrors.amount">
         <div class="record-form__inline">
           <ElInputNumber
@@ -244,28 +233,6 @@ defineExpose({ form, submit, reset, fillFrom, setServerError })
         </div>
       </ElFormItem>
 
-      <ElFormItem label="用时" :error="fieldErrors.durationMinutes">
-        <div class="record-form__inline">
-          <ElInputNumber
-            :model-value="form.durationMinutes ?? undefined"
-            :min="1"
-            :step="5"
-            controls-position="right"
-            @update:model-value="onDurationMinutesChange"
-          />
-          <span class="hint-text">分钟</span>
-          <ElButton
-            v-for="minutes in QUICK_MINUTES"
-            :key="minutes"
-            size="small"
-            text
-            type="primary"
-            @click="applyQuickMinutes(minutes)"
-          >
-            {{ minutes }}
-          </ElButton>
-        </div>
-      </ElFormItem>
 
       <ElFormItem label="复盘" :error="fieldErrors.note">
         <ElInput

@@ -23,5 +23,6 @@ public record TodayResponse(
         int studyMinutes,
         List<String> warnings,
         int actualMinutes, java.math.BigDecimal remainingMinutes, int missingEstimates, int missingDurations,
-        List<TodaySubjectSection> sections) {
+        List<TodaySubjectSection> sections,
+        TodayTaskCounts taskCounts) {
 }

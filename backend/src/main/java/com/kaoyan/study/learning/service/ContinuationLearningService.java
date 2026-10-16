@@ -58,7 +58,8 @@ public class ContinuationLearningService {
             var before=percent(own.stream().filter(r->r.recordDate().isBefore(date)).toList());
             var completed=percent(own);
             if (before.compareTo(BigDecimal.valueOf(100))>=0 && own.stream().noneMatch(r->r.recordDate().equals(date))) continue;
-            var remaining=BigDecimal.valueOf(definition.estimatedMinutes()).multiply(BigDecimal.ONE.subtract(completed.movePointLeft(2)))
+            var remaining=completed.compareTo(BigDecimal.valueOf(100))>=0 ? BigDecimal.ZERO
+                    : definition.estimatedMinutes()==null ? null : BigDecimal.valueOf(definition.estimatedMinutes()).multiply(BigDecimal.ONE.subtract(completed.movePointLeft(2)))
                     .setScale(1,RoundingMode.HALF_UP);
             var activity=new TaskActivityService.Activity("CONTINUED_STUDY",definition.description(),0);
             result.add(new DayLearningTaskView(definition.taskId(),definition.subjectId(),definition.title(),null,null,completed,

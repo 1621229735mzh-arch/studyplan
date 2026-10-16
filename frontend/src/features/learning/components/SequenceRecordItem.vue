@@ -32,7 +32,7 @@ watch(() => [props.taskId, props.date], load, { immediate: true })
     <template v-else-if="state">
       <a v-if="item" :href="item.url" target="_blank" rel="noopener noreferrer">{{ item.title }} ↗</a>
       <span v-else>题目清单已全部完成</span>
-      <p>完成整题填写 1；尝试未完成请留空完成量、填写用时。每天最多完成 1 题。</p>
+      <p>完成整题填写 1；尝试未完成请留空完成量，无需计时。每天最多完成 1 题。</p>
     </template>
   </div>
 </template>

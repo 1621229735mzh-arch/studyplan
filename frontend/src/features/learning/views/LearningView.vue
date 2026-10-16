@@ -4,7 +4,6 @@ import { RouterLink } from 'vue-router'
 import { ElAlert, ElButton, ElDialog, ElMessage, ElMessageBox, ElOption, ElSelect } from 'element-plus'
 import { toApiError } from '@/api/http'
 import PeriodFilter from '@/components/PeriodFilter.vue'
-import { formatMinutes } from '@/composables/useFormat'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import { listPlanTasks } from '@/features/plan/api'
 import type { PlanTask } from '@/features/plan/types'
@@ -115,7 +114,7 @@ onBeforeUnmount(() => { request++ })
     </div>
     <ElAlert v-if="error" :title="error" type="error" :closable="false"><ElButton text @click="loadRecords">重新加载</ElButton></ElAlert>
     <ElAlert v-if="taskError || catalog.error" :title="taskError || catalog.error?.message || ''" type="warning" :closable="false"><ElButton text @click="loadTasks">重试</ElButton></ElAlert>
-    <div class="section-heading"><div><h2>月份足迹</h2><p>{{ rangeLabel }}</p></div><span v-if="archive && !loading && !error && online" class="workspace-note">{{ archive.stats.learningDays }} 天 · {{ archive.stats.recordCount }} 次学习 · {{ formatMinutes(archive.stats.studyMinutes) }}<template v-if="archive.stats.missingDurationRecords">（{{ archive.stats.missingDurationRecords }} 次未填用时）</template></span></div>
+    <div class="section-heading"><div><h2>月份足迹</h2><p>{{ rangeLabel }}</p></div><span v-if="archive && !loading && !error && online" class="workspace-note">{{ archive.stats.learningDays }} 天 · {{ archive.stats.recordCount }} 次学习</span></div>
     <div v-if="!online" class="workspace-empty"><h3>联网后查看完整记录</h3><p>离线时可以查看已同步的今日、本周计划和进度概览。</p><RouterLink to="/progress">查看进度快照 ↗</RouterLink></div>
     <div v-else-if="loading" class="workspace-loading" role="status">正在整理学习记录…</div>
     <RecordArchiveTree v-else-if="archive?.months.length" :months="archive.months" :readonly="submitting || !online" @edit="openEdit" @delete="remove" @classify="classifying = $event" />

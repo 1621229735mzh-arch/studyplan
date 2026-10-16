@@ -19,7 +19,8 @@ import java.time.LocalDate;
 import java.util.*;
 import static org.assertj.core.api.Assertions.*;
 
-@SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT, properties={
+        "app.preset-account.username=kaoyan", "app.preset-account.password=test-only-password"})
 class ContinuedStudyIntegrationTest {
     @DynamicPropertySource static void db(DynamicPropertyRegistry r) { MySqlTestSupport.registerDataSource(r); }
     @Autowired PlanImportService imports;
@@ -65,6 +66,22 @@ class ContinuedStudyIntegrationTest {
     DayProgressRequest request(String title,LocalDate date,int percent,int minutes) {
         var task=snapshot(title,date);
         return new DayProgressRequest(date,task.id(),percent,minutes,task.revision(),UUID.randomUUID().toString());
+    }
+    @Test void taskCountsUseConcreteContentsAndCarriedPartialProgress() {
+        var baseline=today.today(start).taskCounts();
+        var tomorrow=today.today(start.plusDays(1)).taskCounts();
+        records.recordDayProgress(request("教材1",start,40,10));
+        assertThat(today.today(start).taskCounts()).isEqualTo(new com.kaoyan.study.today.dto.TodayTaskCounts(
+                baseline.completed(),baseline.inProgress()+1,baseline.remaining()-1));
+        // One carried partial content and one newly admitted content, rather than one book group.
+        assertThat(today.today(start.plusDays(1)).taskCounts()).isEqualTo(new com.kaoyan.study.today.dto.TodayTaskCounts(
+                tomorrow.completed(),tomorrow.inProgress()+1,tomorrow.remaining()));
+        var done=records.recordDayProgress(request("教材1",start.plusDays(1),100,10));
+        assertThat(today.today(start.plusDays(1)).taskCounts()).isEqualTo(new com.kaoyan.study.today.dto.TodayTaskCounts(
+                tomorrow.completed()+1,tomorrow.inProgress(),tomorrow.remaining()));
+        records.delete(done.id(),done.version());
+        assertThat(today.today(start.plusDays(1)).taskCounts()).isEqualTo(new com.kaoyan.study.today.dto.TodayTaskCounts(
+                tomorrow.completed(),tomorrow.inProgress()+1,tomorrow.remaining()));
     }
     @Test void zeroDaysDoNotAccumulateAndEndDateIsOnlyAReference() {
         assertThat(snapshots(start.plusDays(40))).extracting(DayLearningTaskView::title).containsExactly("教材1","练习1");
@@ -165,6 +182,21 @@ class ContinuedStudyIntegrationTest {
         imports.validate(doc);
         assertThat(doc.tasks()).hasSize(14).allSatisfy(t->assertThat(t.continuation()).isNotNull());
         assertThat(doc.days()).allSatisfy(d->assertThat(d.items().stream().mapToInt(PlanImportDocument.Item::estimatedMinutes).sum()).isEqualTo(120));
+    }
+
+
+    @Test void percentWithoutTimeAdvancesAndDeletionRestoresContent() {
+        var dayItem=daily.list(start).stream().filter(p->p.taskId().equals(ids.get("教材1"))).findFirst().orElseThrow();
+        daily.adjust(start,dayItem.id(),new DailyItemAdjustRequest(null,dayItem.version(),"无需计时",null));
+        assertThat(snapshot("教材1",start).remainingMinutes()).isNull();
+        var req=new DayProgressRequest(start,ids.get("教材1"),100,null,snapshot("教材1",start).revision(),UUID.randomUUID().toString());
+        var record=records.recordDayProgress(req);
+        assertThat(record.durationMinutes()).isNull();
+        assertThat(record.continuationDelta()).isEqualByComparingTo("100");
+        assertThat(records.recordDayProgress(req).id()).isEqualTo(record.id());
+        assertThat(snapshots(start.plusDays(1))).extracting(DayLearningTaskView::title).contains("教材2").doesNotContain("教材1");
+        records.delete(record.id(),record.version());
+        assertThat(snapshots(start.plusDays(1))).extracting(DayLearningTaskView::title).contains("教材1").doesNotContain("教材2");
     }
 
 }

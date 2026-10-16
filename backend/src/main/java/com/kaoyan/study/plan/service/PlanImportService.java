@@ -217,8 +217,8 @@ public class PlanImportService {
                     if ("CHECK_ONLY".equals(t.activity().mode())) {
                         if (item.amount()!=null || item.estimatedMinutes()!=null)
                             invalid("days."+d.date(),"完成确认型不填写数量或预计用时");
-                    } else if (item.amount()!=null || item.estimatedMinutes()==null || item.estimatedMinutes()<=0 || item.estimatedMinutes()>1440)
-                        invalid("days."+d.date(),"时间型安排须将数量留空并填写 1—1440 分钟基本用时");
+                    } else if (item.amount()!=null || item.estimatedMinutes()!=null && (item.estimatedMinutes()<=0 || item.estimatedMinutes()>1440))
+                        invalid("days."+d.date(),"活动安排数量须留空；预计用时可省略，提供时须为 1—1440 分钟");
                 } else if (item.amount()==null) invalid("days."+d.date()+".amount","数量型任务必须填写日计划量");
                 if (t.sequence()!=null && item.amount().compareTo(BigDecimal.ONE)!=0) invalid("days.items.amount","接续任务每天只能安排 1 个名额");
                 if (!dayKeys.add(item.taskKey())) invalid("days."+d.date(),"同一任务同一天只能出现一次");

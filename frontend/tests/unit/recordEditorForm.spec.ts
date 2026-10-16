@@ -40,10 +40,10 @@ function mountRecordForm() {
 }
 
 describe('学习记录表单校验（纯函数）', () => {
-  it('缺少用时且未关联任务时校验不通过，并给出中文提示', () => {
+  it('无单位的数量不能提交，未填写用时不报错', () => {
     const result = validateLearningRecordForm(invalidRecordFormFixture)
     expect(result.valid).toBe(false)
-    expect(result.errors.durationMinutes).toBeTruthy()
+    expect(result.errors.durationMinutes).toBeUndefined()
     expect(result.errors.taskId).toBeTruthy()
     expect(result.summary).toContain('请先补全学习记录')
   })
@@ -64,11 +64,7 @@ describe('学习记录表单校验（纯函数）', () => {
     expect(result.summary).toBeNull()
   })
 
-  it('用时超过一天或复盘过长时给出提示', () => {
-    const tooLong = validateLearningRecordForm({ ...validRecordFormFixture, durationMinutes: 2000 })
-    expect(tooLong.valid).toBe(false)
-    expect(tooLong.errors.durationMinutes).toBeTruthy()
-
+  it('复盘过长时给出提示', () => {
     const longNote = validateLearningRecordForm({ ...validRecordFormFixture, note: 'x'.repeat(1001) })
     expect(longNote.valid).toBe(false)
     expect(longNote.errors.note).toBeTruthy()
@@ -76,6 +72,15 @@ describe('学习记录表单校验（纯函数）', () => {
 })
 
 describe('学习记录表单组件', () => {
+  it('无需用时即可提交，界面没有用时输入', async () => {
+    const { wrapper, exposed } = mountRecordForm()
+    exposed.fillFrom({ ...validRecordFormFixture, durationMinutes: null })
+    exposed.submit()
+    await wrapper.vm.$nextTick()
+    expect(wrapper.text()).not.toContain('用时')
+    expect(wrapper.emitted('submit')).toHaveLength(1)
+    expect((wrapper.emitted('submit')![0][0] as {model: LearningRecordFormModel}).model.durationMinutes).toBeNull()
+  })
   it('相同提交重试复用令牌，修改内容后生成新令牌', async () => {
     const { wrapper, exposed } = mountRecordForm()
     exposed.fillFrom(validRecordFormFixture)

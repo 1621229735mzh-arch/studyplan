@@ -268,8 +268,7 @@
             ],
             "additionalProperties": false,
             "required": [
-              "mode",
-              "flexibleMinutes"
+              "mode"
             ],
             "properties": {
               "mode": {
@@ -288,7 +287,10 @@
                 "maxLength": 1000
               },
               "flexibleMinutes": {
-                "type": "integer",
+                "type": [
+                  "integer",
+                  "null"
+                ],
                 "minimum": 0,
                 "maximum": 1440
               }
@@ -354,7 +356,10 @@
                 "activity": {
                   "properties": {
                     "flexibleMinutes": {
-                      "const": 0
+                      "enum": [
+                        0,
+                        null
+                      ]
                     }
                   }
                 }
@@ -397,7 +402,10 @@
                 "activity": {
                   "properties": {
                     "flexibleMinutes": {
-                      "const": 0
+                      "enum": [
+                        0,
+                        null
+                      ]
                     }
                   }
                 }

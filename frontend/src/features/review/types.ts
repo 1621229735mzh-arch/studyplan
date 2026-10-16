@@ -111,11 +111,12 @@ export interface ReviewSuggestionResponse {
 /** 确认时逐条补充的预计用时（后端 ReviewConfirmRequest.Item）。 */
 export interface ReviewConfirmItemRequest {
   reviewItemId: number
-  estimatedMinutes: number
+  estimatedMinutes?: number | null
 }
 
 /** 确认把建议排入某一天（后端 ReviewConfirmRequest）。 */
 export interface ReviewConfirmRequest {
+  manualSelection?: boolean
   date: string
   items: ReviewConfirmItemRequest[]
 }

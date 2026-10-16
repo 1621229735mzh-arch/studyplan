@@ -1,5 +1,15 @@
 # 张宇按书学习接续：开发与验证（2026-10-15）
 
+## Windows 审查与修复补充
+
+- 后续已在生产MySQL8.4备份副本通过V19→V20迁移、旧38任务方案清理演练、完整126天／252内容导入、两书独立接续、漏做不积压、重复提交、删除重算及登录／CSRF／会话验收。V20正式发布后原业务行按迁移前列清单逐表哈希一致，原4条学习记录保留；详见 [发布记录](../operations/continued-math-release-20261015.md)。
+- 2026-10-16按用户明确确认执行正式替换：先核对旧范围和备份基线一致，事务清理旧38任务／236安排，正式网页重新预览、确认导入252任务／252安排／126天／2序列。最终脚本逐项核对内容、顺序、日期、数量NULL、用时、24纲要，非目标全站业务行哈希一致，三个服务healthy；原4条学习记录及英语／LeetCode／目录保留。真实计划页和今日页验收通过，今日两书继续各自第一段，90＋30分钟，未写生产测试记录。未运行独立Linux Docker会话大小写专测。
+
+- 审查 `main...develop` 后发现接续集成测试未显式配置初始账号，空库且无 `PRESET_ACCOUNT_PASSWORD` 时，单独运行8项均在启动阶段失败。现为本测试配置固定的测试专用账号，未改变生产账号初始化规则。
+- 本机 Java 21.0.6、MySQL 8.0.45 隔离实例中，移除初始账号环境变量，在全新库 `review_continued_fixed_20261015` 单独运行 `./mvnw.cmd -o -B '-Dmaven.repo.local=../.m2repo' '-Dtest=ContinuedStudyIntegrationTest' test`，结果8项通过、0失败、0错误。
+- 修复前本轮完整回归：显式提供测试账号后，`./mvnw.cmd -o -B '-Dmaven.repo.local=../.m2repo' '-Dtest=*,!SessionTableCaseMigrationTest' verify` 136项通过并打包成功；前端 `pnpm test` 87项通过，`pnpm build` 类型检查及构建通过。首次完整回归因本次临时数据库连接上限25导致10项启动报错，调至200后通过，非业务缺陷。
+- 上述不是生产 MySQL 8.4、Linux Docker 或真实页面验收。日志位于忽略目录 `release/code-review-20261015/`。
+
 ## 本轮交付
 
 - 新增显式 CONTINUED_STUDY 接续类型及导入 v5，保持普通任务、每日一题、时间型和每日勾选的旧规则。

@@ -307,8 +307,8 @@ public class StudyRecordService {
             if (delta.signum()<0) throw new BusinessException("PROGRESS_DECREASE","累计完成比例不能降低；请修改或删除原学习记录");
             if (continuedLearning.total(request.taskId()).add(delta).compareTo(BigDecimal.valueOf(100))>0)
                 throw new BusinessException("CONTINUATION_FUTURE_PROGRESS","该内容已有后续日期进度，请先修改或删除后续记录再补记");
-            if (delta.signum()==0 && request.durationMinutes()==0)
-                throw new BusinessException("EMPTY_PROGRESS","请增加完成比例或填写本次用时");
+            if (delta.signum()==0 && (request.durationMinutes()==null || request.durationMinutes()==0))
+                throw new BusinessException("EMPTY_PROGRESS","请增加完成比例");
             return createEntry(new StudyRecordCreateRequest(request.taskId(),null,null,request.date(),null,
                     request.durationMinutes(),null,request.note(),request.clientToken()),false,delta.signum()>0 ? delta:null);
         }
@@ -319,20 +319,19 @@ public class StudyRecordService {
                 throw new BusinessException("ACTIVITY_COMPLETION","时间型安排请选择继续记录或结束本次安排；不填写虚构百分比");
             if (snapshot.completionPercent().intValue()==100)
                 throw new ConflictException("ACTIVITY_ALREADY_COMPLETED","本次安排已结束，请在学习记录中补记或修改");
-            if (request.durationMinutes()<=0) throw new BusinessException("ACTIVITY_DURATION","请据实填写本次用时，至少 1 分钟");
             return createEntry(new StudyRecordCreateRequest(request.taskId(),null,null,request.date(),request.actualAmount(),request.durationMinutes(),
                     null,request.note(),request.clientToken()),request.completionPercent()==100);
         }
         if (request.actualAmount()!=null) throw new BusinessException("QUANTITY_PROGRESS","数量型任务请使用原有完成比例或学习记录入口");
         if (snapshot.sequence()!=null && request.completionPercent()!=0 && request.completionPercent()!=100)
-            throw new BusinessException("SEQUENCE_WHOLE_ITEM","接续任务只在整题完成后推进；尝试请选择未完成并记录用时");
+            throw new BusinessException("SEQUENCE_WHOLE_ITEM","接续任务只在整题完成后推进；尝试请选择未完成");
         var target = snapshot.plannedAmount().multiply(BigDecimal.valueOf(request.completionPercent()))
                 .movePointLeft(2).setScale(6, RoundingMode.HALF_UP);
         var delta = target.subtract(snapshot.completedAmount());
         if (delta.signum() < 0)
             throw new BusinessException("PROGRESS_DECREASE", "累计完成比例不能降低；请在学习记录中修改或删除原记录");
-        if (delta.signum() == 0 && request.durationMinutes() == 0)
-            throw new BusinessException("EMPTY_PROGRESS", "请增加完成比例或填写本次用时");
+        if (delta.signum() == 0 && snapshot.sequence()==null && (request.durationMinutes()==null || request.durationMinutes() == 0))
+            throw new BusinessException("EMPTY_PROGRESS", "请增加完成比例");
         return create(new StudyRecordCreateRequest(request.taskId(), null, null, request.date(),
                 delta.signum() == 0 ? null : delta, request.durationMinutes(), null, null, request.clientToken(),
                 snapshot.sequence()==null || snapshot.sequence().dayItem()==null ? null : snapshot.sequence().dayItem().id()));
@@ -356,7 +355,7 @@ public class StudyRecordService {
                     && (!record.isActivityCompleted() || hasAmount || record.getDurationMinutes()!=null))
                 throw new BusinessException("CONFIRMATION_ENTRY","完成确认只能通过当日勾选保存，不能填写数量或时长");
             if (activity!=null && "RECAP".equals(activity.mode()) && hasAmount)
-                throw new BusinessException("RECAP_QUANTITY","复盘与订正只计用时，不增加首次完成量；新学内容请单独记录");
+                throw new BusinessException("RECAP_QUANTITY","复盘与订正不增加首次完成量；新学内容请单独记录");
             if (unitId != null && !unitId.equals(task.getUnitId())) {
                 throw new BusinessException("UNIT_MISMATCH", "记录的计量单位必须与任务的计量单位一致");
             }
@@ -370,9 +369,11 @@ public class StudyRecordService {
         }
         record.setTaskId(null);
         if (!hasAmount) {
-            // 只记时长：不要求科目与单位，避免为了记 35 分钟而被迫编造一个单位
-            record.setSubjectId(null);
-            record.setUnitId(null);
+            // 内容记录允许没有数量；保留用户选择的归属，不编造计量单位。
+            if (subjectId != null) subjectService.requireExisting(subjectId);
+            if (unitId != null) studyUnitService.get(unitId);
+            record.setSubjectId(subjectId);
+            record.setUnitId(unitId);
             return;
         }
         if (subjectId == null || unitId == null) {

@@ -13,6 +13,7 @@ import com.kaoyan.study.settings.service.SubjectService;
 import com.kaoyan.study.today.dto.TodayChecklistTask;
 import com.kaoyan.study.today.dto.TodayResponse;
 import com.kaoyan.study.today.dto.TodaySubjectSection;
+import com.kaoyan.study.today.dto.TodayTaskCounts;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +23,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
@@ -84,6 +86,9 @@ public class TodayService {
         for (String name : java.util.List.of("数学一", "英语一", "政治", "408")) groups.put(name, new ArrayList<>());
         var actual = new HashMap<String, Integer>();
         var missingDurations = new HashMap<String, Integer>();
+        var recordedLearningTaskIds = records.stream().map(StudyRecordView::taskId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        var startedReviewTaskIds = new HashSet<Long>();
         for (var task : studyRecordService.dayTasks(planDate)) {
             String group = sectionName(subjectNames.get(task.subjectId()));
             groups.computeIfAbsent(group, x -> new ArrayList<>()).add(new TodayChecklistTask(
@@ -97,6 +102,8 @@ public class TodayService {
             if (record.durationMinutes() == null && !"CHECK_ONLY".equals(record.activityMode())) missingDurations.merge(group, 1, Integer::sum);
         }
         for (var task : reviewService.dayTasks(planDate)) {
+            if (task.actualMinutes() > 0 || task.missingDurations() > 0)
+                startedReviewTaskIds.add(task.id());
             String group = sectionName(subjectNames.get(task.subjectId()));
             var remaining = task.completionPercent().compareTo(new BigDecimal("100")) >= 0
                     ? BigDecimal.ZERO : task.estimatedMinutes() == null ? null
@@ -118,13 +125,29 @@ public class TodayService {
             return new TodaySubjectSection(entry.getKey(), actual.getOrDefault(entry.getKey(), 0),
                     remaining, missing, missingDurations.getOrDefault(entry.getKey(), 0), entry.getValue());
         }).toList();
+        int completed = 0;
+        int inProgress = 0;
+        int remaining = 0;
+        for (var section : sections) {
+            for (var task : section.tasks()) {
+                if (task.completionPercent().compareTo(BigDecimal.valueOf(100)) >= 0) {
+                    completed++;
+                } else if (task.completionPercent().signum() > 0
+                        || ("LEARNING".equals(task.kind()) ? recordedLearningTaskIds : startedReviewTaskIds).contains(task.id())) {
+                    inProgress++;
+                } else {
+                    remaining++;
+                }
+            }
+        }
         return new TodayResponse(planDate, plannedTasks, records, reviewTasks,
                 settings.getDailyStudyMinutes(), settings.getDailyReviewMinutes(), studyMinutes, warnings,
                 sections.stream().mapToInt(TodaySubjectSection::actualMinutes).sum(),
                 sections.stream().map(TodaySubjectSection::remainingMinutes)
                         .reduce(BigDecimal.ZERO, BigDecimal::add),
                 sections.stream().mapToInt(TodaySubjectSection::missingEstimates).sum(),
-                sections.stream().mapToInt(TodaySubjectSection::missingDurations).sum(), sections);
+                sections.stream().mapToInt(TodaySubjectSection::missingDurations).sum(), sections,
+                new TodayTaskCounts(completed, inProgress, remaining));
     }
     private String sectionName(String subject) {
         if (subject == null) return "未分类";

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
- * 学习设置：考试日期、每日学习预算、每日复习额度、复习阶段与复习间隔。
+ * 学习设置：考试日期、复习阶段与复习间隔。
  *
- * 预算、额度与复习间隔都是待定项：允许留空（后端存 null），界面必须显示“未设置”，
+ * 复习间隔按需设置：允许留空（后端存 null），界面必须显示“未设置”，
  * 不能当作 0，也不能据此宣称满足额度。复习间隔由本人配置，应用不提供默认值；
  * 间隔未配置时后端不会推导下次复习日期。
  * 更新必须回传当前 version。
@@ -22,7 +22,7 @@ import {
 } from 'element-plus'
 
 import { toApiError } from '@/api/http'
-import { formatBudget, formatIntervalDays, reviewPhaseLabel } from '@/composables/useFormat'
+import { formatIntervalDays, reviewPhaseLabel } from '@/composables/useFormat'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import type { ReviewPhase } from '@/types/domain'
 import { getStudySettings, updateStudySettings } from '../api'
@@ -93,13 +93,7 @@ function onExamDateChange(value: unknown): void {
   form.examDate = typeof value === 'string' ? value : ''
 }
 
-function onStudyMinutesChange(value: unknown): void {
-  form.dailyStudyMinutes = typeof value === 'number' ? value : null
-}
 
-function onReviewMinutesChange(value: unknown): void {
-  form.dailyReviewMinutes = typeof value === 'number' ? value : null
-}
 
 function onPhaseChange(value: unknown): void {
   form.reviewPhase = value === 'INTENSIVE' ? 'INTENSIVE' : 'MAIN'
@@ -111,13 +105,7 @@ function onIntervalChange(field: IntervalField, value: unknown): void {
 }
 
 /** 清空为“未设置”，而不是填 0。 */
-function clearStudyMinutes(): void {
-  form.dailyStudyMinutes = null
-}
 
-function clearReviewMinutes(): void {
-  form.dailyReviewMinutes = null
-}
 
 function clearInterval(field: IntervalField): void {
   form[field] = null
@@ -132,14 +120,6 @@ const INTERVAL_LABELS: Record<IntervalField, string> = {
 async function handleSave(): Promise<void> {
   if (version.value === null) {
     ElMessage.warning('还没有读到设置版本，请先刷新')
-    return
-  }
-  if (form.dailyStudyMinutes !== null && form.dailyStudyMinutes < 0) {
-    errorMessage.value = '每日学习预算不能为负数'
-    return
-  }
-  if (form.dailyReviewMinutes !== null && form.dailyReviewMinutes < 0) {
-    errorMessage.value = '每日复习额度不能为负数'
     return
   }
   const negativeInterval = INTERVAL_FIELDS.find(
@@ -201,8 +181,8 @@ onMounted(() => {
       type="info"
       show-icon
       :closable="false"
-      title="预算、额度与复习间隔都是待定项"
-      description="第一版不擅自固定具体数值；留空表示“未设置”，计划与复习校验会按未设置处理，不会被当作 0。"
+      title="复习间隔按需设置"
+      description="无需填写学习时长或时间预算；复习间隔留空时不自动推导下次日期。"
     />
 
     <ElForm label-width="150px" @submit.prevent>
@@ -217,44 +197,14 @@ onMounted(() => {
         <span class="hint-text">用于显示备考剩余时间，不参与进度计算。</span>
       </ElFormItem>
 
-      <ElFormItem label="每日学习预算">
-        <ElInputNumber
-          :model-value="form.dailyStudyMinutes ?? undefined"
-          :min="0"
-          :step="10"
-          controls-position="right"
-          placeholder="未设置"
-          @update:model-value="onStudyMinutesChange"
-        />
-        <span class="hint-text">分钟</span>
-        <ElButton size="small" text type="primary" @click="clearStudyMinutes">清除（未设置）</ElButton>
-        <ElTag size="small" :type="form.dailyStudyMinutes === null ? 'warning' : 'success'" effect="plain">
-          {{ form.dailyStudyMinutes === null ? '当前：未设置' : `当前：${formatBudget(form.dailyStudyMinutes)}` }}
-        </ElTag>
-      </ElFormItem>
 
-      <ElFormItem label="每日复习额度">
-        <ElInputNumber
-          :model-value="form.dailyReviewMinutes ?? undefined"
-          :min="0"
-          :step="10"
-          controls-position="right"
-          placeholder="未设置"
-          @update:model-value="onReviewMinutesChange"
-        />
-        <span class="hint-text">分钟</span>
-        <ElButton size="small" text type="primary" @click="clearReviewMinutes">清除（未设置）</ElButton>
-        <ElTag size="small" :type="form.dailyReviewMinutes === null ? 'warning' : 'success'" effect="plain">
-          {{ form.dailyReviewMinutes === null ? '当前：未设置' : `当前：${formatBudget(form.dailyReviewMinutes)}` }}
-        </ElTag>
-      </ElFormItem>
 
       <ElFormItem label="复习阶段">
         <ElSelect :model-value="form.reviewPhase" class="study-settings__select" @update:model-value="onPhaseChange">
           <ElOption v-for="phase in PHASE_OPTIONS" :key="phase" :label="reviewPhaseLabel(phase)" :value="phase" />
         </ElSelect>
         <span class="hint-text">
-          当前：{{ reviewPhaseLabel(form.reviewPhase) }}。阶段由本人主动切换，集中复习阶段需要重新设置额度。
+          当前：{{ reviewPhaseLabel(form.reviewPhase) }}。阶段由本人主动切换，按实际需要选择复习内容。
         </span>
       </ElFormItem>
 

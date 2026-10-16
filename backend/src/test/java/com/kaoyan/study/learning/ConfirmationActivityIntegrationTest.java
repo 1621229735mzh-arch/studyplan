@@ -56,15 +56,19 @@ class ConfirmationActivityIntegrationTest {
     DayLearningTaskView snapshot() {return records.dayTasks(date).stream().filter(t->t.id().equals(task)).findFirst().orElseThrow();}
     DayConfirmationRequest request(boolean complete) {return new DayConfirmationRequest(date,task,complete,snapshot().revision(),UUID.randomUUID().toString());}
     @Test void confirmCancelRetryAndNextDayAreIndependent() {
+        var initialCounts=today.today(date).taskCounts();
         var initial=request(true);
         var done=records.confirmDay(initial);
         assertThat(done.completionPercent()).isEqualByComparingTo("100");
         records.confirmDay(initial);
+        assertThat(today.today(date).taskCounts()).isEqualTo(new com.kaoyan.study.today.dto.TodayTaskCounts(
+                initialCounts.completed()+1,initialCounts.inProgress(),initialCounts.remaining()-1));
         assertThat(records.list(date,date,task,null)).singleElement().satisfies(r->{assertThat(r.amount()).isNull();assertThat(r.durationMinutes()).isNull();assertThat(r.activityMode()).isEqualTo("CHECK_ONLY");});
         assertThat(tasks.progress(task).completedAmount()).isEqualByComparingTo("0");
         assertThat(records.dayTasks(date.plusDays(1)).stream().filter(t->t.id().equals(task)).findFirst().orElseThrow().completionPercent()).isEqualByComparingTo("0");
         var cancel=request(false);
         records.confirmDay(cancel);records.confirmDay(cancel);
+        assertThat(today.today(date).taskCounts()).isEqualTo(initialCounts);
         assertThat(records.list(date,date,task,null)).isEmpty();
         assertThat(snapshot().completionPercent()).isEqualByComparingTo("0");
         assertThat(snapshot().revision()).isNotEqualTo(initial.revision());

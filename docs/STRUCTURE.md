@@ -154,7 +154,7 @@ Docker 构建上下文取仓库根目录（`deploy/compose.yaml` 中 `context: .
 
 `.gitkeep` 占位文件在对应目录已有真实文件后即失去作用，可按需删除，不影响构建。
 
-今日清单的完成量与并发校验归 `learning/service/StudyRecordService`，每日预计用时归计划模块，部分复习与完成反馈归 `review/service/ReviewService`。`today/service/TodayService` 只组合这些业务服务并汇总分区与时间，不写独立任务表。接口与规则见 [今日清单](business/today-checklist.md)。前端使用 `ChecklistTask`，已移除旧 `PlannedTaskTable` 与 `ReviewedTaskList`。
+今日清单的完成量与并发校验归 `learning/service/StudyRecordService`，每日预计用时归计划模块，部分复习与完成反馈归 `review/service/ReviewService`。`today/service/TodayService` 只组合这些业务服务并汇总分区、时间与任务项数，不写独立任务表；`today/dto/TodayTaskCounts` 返回顶部已完成、进行中、尚未开始的互斥统计。接口与规则见 [今日清单](business/today-checklist.md)。前端使用 `ChecklistTask`，已移除旧 `PlannedTaskTable` 与 `ReviewedTaskList`。
 
 计划工作区由 `plan/service/PlanWorkspaceService` 汇总日安排，`PlanImportService` 校验外部 JSON 并调用任务、目标、日安排业务服务事务追加。`WorkspaceMapper` 的关联查询同日同任务只计算一次学习量，排除复习。旧周表/API 保留兼容，新页面不重复编辑周排期。旧 `WeekPlanPanel`、`DayPlanPanel` 已移除；日编辑统一使用 `DayScheduleEditor`。
 
@@ -167,3 +167,5 @@ V18 增加 `task_activity` 时间型安排元数据，允许日计划量为空�
 V19 为 `task_activity` 增加 `CHECK_ONLY` 模式，v4 合同支持无数量、无用时的每日确认。`DayConfirmationRequest` 与 `StudyRecordService.confirmDay` 管理勾选／取消，任务行锁防止并发重复确认；revision 包含软删除历史以防完成／取消后旧设备重放。`StudyRecordView.activityMode` 区分有意不计时的确认，记录、今日和计划统计均不把确认当作新学数量或缺失用时。仍使用原学习记录及软删除机制，没有新增完成事实表。
 
 V20 新增学习接续规划表与原学习记录的 `continuation_delta`。`TaskContinuationService` / `TaskContinuationMapper` 属于计划模块，仅维护书籍、内容顺序与参考日安排；`ContinuationLearningService` / `ContinuationProgressMapper` 属于学习模块，依据有效学习记录派生累计百分比和日期执行内容。今日使用 `ContinuationBook.vue` 按书收纳各段；不另存完成游标，不改变普通任务和原每日一题规则。导入 v5、Schema 与可下载首周样例仍放在原 `docs/business/plan-import*`，详见导入规划书。
+
+2026-10-16 不计时记录：表单移除实际／预计用时和预算输入，保留历史字段兼容；不增加迁移或第二套完成事实。`ReviewConfirmRequest.manualSelection` 区分当前手动确认与旧额度模式。`DayProgressRequest` 和 `ReviewDayProgressRequest` 的用时允许为空；接续进度计算处理空估算。导入仍使用 v1—v5，时间字段可省略。

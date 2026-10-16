@@ -9,24 +9,17 @@
 import type { LearningRecordFormModel, LearningRecordValidationResult } from './types'
 
 const MAX_NOTE_LENGTH = 1000
-const MAX_MINUTES_PER_RECORD = 24 * 60
 
 function hasValue(value: number | null | undefined): value is number {
   return value !== null && value !== undefined && Number.isFinite(value)
 }
 
 /** 校验记录表单；返回字段级错误与表单级提示。 */
-export function validateLearningRecordForm(model: LearningRecordFormModel, mode: 'create' | 'edit' = 'create'): LearningRecordValidationResult {
+export function validateLearningRecordForm(model: LearningRecordFormModel, _mode: 'create' | 'edit' = 'create'): LearningRecordValidationResult {
   const errors: Partial<Record<keyof LearningRecordFormModel, string>> = {}
 
   if (!model.recordDate) {
     errors.recordDate = '请选择记录日期'
-  }
-
-  if (mode === 'create' && (!hasValue(model.durationMinutes) || model.durationMinutes <= 0)) {
-    errors.durationMinutes = '请填写本次用时（分钟，需大于 0）'
-  } else if (hasValue(model.durationMinutes) && (model.durationMinutes < 0 || model.durationMinutes > MAX_MINUTES_PER_RECORD)) {
-    errors.durationMinutes = `单次用时不能超过 ${MAX_MINUTES_PER_RECORD} 分钟，请检查是否填错`
   }
 
   const amount = model.amount
@@ -37,7 +30,7 @@ export function validateLearningRecordForm(model: LearningRecordFormModel, mode:
   // 后端 StudyRecordCreateRequest 的规则：
   // - 关联任务时科目与单位以任务为准；
   // - 计划外且填了完成量时，必须同时给出科目与单位（否则无法计入任何单位的进度）；
-  // - 不填完成量时只记时长，不再要求科目与单位。
+  // - 不填完成量时记录学习内容，不增加数量进度。
   if (hasValue(amount) && amount <= 0) {
     errors.amount = '完成数量需大于 0'
   }
@@ -51,6 +44,10 @@ export function validateLearningRecordForm(model: LearningRecordFormModel, mode:
     errors.note = `复盘内容请控制在 ${MAX_NOTE_LENGTH} 字以内`
   }
   if ((model.content?.length ?? 0) > 500) errors.content = '学习内容请控制在 500 字以内'
+
+  if (!model.taskId && !hasValue(model.amount) && !(model.durationMinutes != null && model.durationMinutes > 0) && !model.content?.trim() && !model.note.trim()) {
+    errors.content = '请填写学习内容或选择任务'
+  }
 
   const valid = Object.keys(errors).length === 0
   return {

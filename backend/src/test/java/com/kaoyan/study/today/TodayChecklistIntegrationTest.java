@@ -49,6 +49,27 @@ class TodayChecklistIntegrationTest {
  DayLearningTaskView snapshot() { return learning.dayTasks(date).stream().filter(x -> x.id().equals(task.getId())).findFirst().orElseThrow(); }
  StudyRecordView save(int percent, int minutes) { return learning.recordDayProgress(new DayProgressRequest(date, task.getId(), percent, minutes, snapshot().revision(), UUID.randomUUID().toString())); }
  TodaySubjectSection section() { return today.today(date).sections().stream().filter(x -> x.name().startsWith("今日测试-")).findFirst().orElseThrow(); }
+ @Test void taskCountsFollowRecordsWithoutCountingDuplicatePlansOrUnplannedRecords() {
+  var initial=today.today(date).taskCounts();
+  var started=new TodayTaskCounts(initial.completed(),initial.inProgress()+1,initial.remaining()-1);
+  var completed=new TodayTaskCounts(initial.completed()+1,initial.inProgress(),initial.remaining()-1);
+  plans.addItem(date,new DailyItemCreateRequest(task.getId(),BigDecimal.TEN,PlanSource.WEEKLY,100));
+  learning.create(new StudyRecordCreateRequest(null,task.getSubjectId(),null,date,null,5,null,null,UUID.randomUUID().toString()));
+  assertThat(today.today(date).taskCounts()).isEqualTo(initial);
+  var attempt=save(0,10);
+  assertThat(snapshot().completionPercent()).isEqualByComparingTo("0");
+  assertThat(today.today(date).taskCounts()).isEqualTo(started);
+  var partial=save(30,10);
+  var done=save(100,20);
+  assertThat(today.today(date).taskCounts()).isEqualTo(completed);
+  learning.delete(done.id(),done.version());
+  assertThat(today.today(date).taskCounts()).isEqualTo(started);
+  learning.delete(partial.id(),partial.version());
+  assertThat(today.today(date).taskCounts()).isEqualTo(started);
+  learning.delete(attempt.id(),attempt.version());
+  assertThat(today.today(date).taskCounts()).isEqualTo(initial);
+  assertThat(today.today(LocalDate.of(1900,1,1)).taskCounts()).isEqualTo(new TodayTaskCounts(0,0,0));
+ }
  @Test void cumulativePercentCreatesOnlyDeltaAndRetainsTime() {
   assertThat(save(30,25).amount()).isEqualByComparingTo("3");
   assertThat(save(50,15).amount()).isEqualByComparingTo("2");
@@ -111,6 +132,9 @@ class TodayChecklistIntegrationTest {
   var item=reviews.addToReview(new ReviewItemCreateRequest(task.getId(),null,null,40,null));
   var config=settings.get();settings.update(new StudySettingsRequest(null,120,60,ReviewPhase.MAIN,1,3,7,config.getVersion()));
   reviews.confirm(new ReviewConfirmRequest(date,List.of(new ReviewConfirmRequest.Item(item.getId(),40))));
+  var initial=today.today(date).taskCounts();
+  reviews.recordDayProgress(new ReviewDayProgressRequest(item.getId(),date,0,5,reviews.get(item.getId()).getVersion(),null,UUID.randomUUID().toString()));
+  assertThat(today.today(date).taskCounts()).isEqualTo(new TodayTaskCounts(initial.completed(),initial.inProgress()+1,initial.remaining()-1));
   var req=new ReviewDayProgressRequest(item.getId(),date,30,12,reviews.get(item.getId()).getVersion(),null,UUID.randomUUID().toString());
   var partial=reviews.recordDayProgress(req);
   assertThat(reviews.recordDayProgress(req).id()).isEqualTo(partial.id());
@@ -122,9 +146,46 @@ class TodayChecklistIntegrationTest {
   assertThat(reviews.get(item.getId()).getScheduledDate()).isNull();
   assertThat(reviews.get(item.getId()).getNextReviewDate()).isEqualTo(date.plusDays(7));
   var day=reviews.dayTasks(date).stream().filter(x->x.id().equals(item.getId())).findFirst().orElseThrow();
-  assertThat(day.completionPercent()).isEqualByComparingTo("100");assertThat(day.actualMinutes()).isEqualTo(40);
-  assertThat(section().actualMinutes()).isEqualTo(40);assertThat(section().tasks()).hasSize(2);
+  assertThat(day.completionPercent()).isEqualByComparingTo("100");assertThat(day.actualMinutes()).isEqualTo(45);
+  assertThat(section().actualMinutes()).isEqualTo(45);assertThat(section().tasks()).hasSize(2);
+  assertThat(today.today(date).taskCounts()).isEqualTo(new TodayTaskCounts(initial.completed()+1,initial.inProgress(),initial.remaining()-1));
   assertThat(tasks.progress(task.getId()).completedAmount()).isEqualByComparingTo("1");
   assertThat(today.today(date).actualMinutes()).isEqualTo(today.today(date).sections().stream().mapToInt(TodaySubjectSection::actualMinutes).sum());
  }
+
+ @Test void progressWithoutTimeIsValidatedIdempotentAndRecomputedOnDelete() {
+  var before=snapshot();
+  var request=new DayProgressRequest(date,task.getId(),40,null,before.revision(),UUID.randomUUID().toString());
+  try (var factory=jakarta.validation.Validation.buildDefaultValidatorFactory()) {
+   assertThat(factory.getValidator().validate(request)).isEmpty();
+  }
+  var record=learning.recordDayProgress(request);
+  assertThat(record.durationMinutes()).isNull();
+  assertThat(record.amount()).isEqualByComparingTo("4");
+  assertThat(learning.recordDayProgress(request).id()).isEqualTo(record.id());
+  assertThat(snapshot().completionPercent()).isEqualByComparingTo("40");
+  assertThatThrownBy(()->learning.recordDayProgress(new DayProgressRequest(date,task.getId(),70,null,before.revision(),UUID.randomUUID().toString()))).isInstanceOf(ConflictException.class);
+  learning.delete(record.id(),record.version());
+  assertThat(snapshot().completionPercent()).isEqualByComparingTo("0");
+ }
+ @Test void manualReviewWithoutBudgetOrTimeStillRequiresMasteryAndDoesNotAddLearningQuantity() {
+  learning.create(new StudyRecordCreateRequest(task.getId(),null,null,LocalDate.now(),BigDecimal.ONE,null,null,null,null));
+  var item=reviews.addToReview(new ReviewItemCreateRequest(task.getId(),null,null,null,null));
+  var config=settings.get();settings.update(new StudySettingsRequest(null,null,null,ReviewPhase.MAIN,1,3,7,config.getVersion()));
+  var confirmation=new ReviewConfirmRequest(date,List.of(new ReviewConfirmRequest.Item(item.getId(),null)),true);
+  assertThat(reviews.confirm(confirmation).scheduled()).hasSize(1);
+  assertThat(reviews.confirm(confirmation).scheduled()).hasSize(1);
+  assertThat(reviews.get(item.getId()).getEstimatedMinutes()).isNull();
+  var partial=new ReviewDayProgressRequest(item.getId(),date,40,null,reviews.get(item.getId()).getVersion(),null,UUID.randomUUID().toString());
+  try (var factory=jakarta.validation.Validation.buildDefaultValidatorFactory()) {
+   assertThat(factory.getValidator().validate(partial)).isEmpty();
+  }
+  var record=reviews.recordDayProgress(partial);
+  assertThat(record.durationMinutes()).isNull();
+  assertThat(reviews.recordDayProgress(partial).id()).isEqualTo(record.id());
+  assertThatThrownBy(()->reviews.recordDayProgress(new ReviewDayProgressRequest(item.getId(),date,100,null,reviews.get(item.getId()).getVersion(),null,UUID.randomUUID().toString()))).hasMessageContaining("掌握");
+  reviews.recordDayProgress(new ReviewDayProgressRequest(item.getId(),date,100,null,reviews.get(item.getId()).getVersion(),MasteryResult.MASTERED,UUID.randomUUID().toString()));
+  assertThat(tasks.progress(task.getId()).completedAmount()).isEqualByComparingTo("1");
+ }
+
 }

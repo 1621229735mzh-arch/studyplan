@@ -43,7 +43,7 @@ import java.util.List;
  * <ul>
  *   <li>只有已学过并主动加入复习的内容才会被建议；</li>
  *   <li>建议必须经确认才进入某一天，超额内容留在待安排列表并保留到期信息；</li>
- *   <li>缺少复习额度或预计用时时不宣称符合额度，而是要求补充；</li>
+ *   <li>手动选择模式无需用时或预算，也不宣称满足时间额度；</li>
  *   <li>间隔参数来自设置，未设置时不给具体日期建议。</li>
  * </ul>
  */
@@ -215,8 +215,8 @@ public class ReviewService {
         var delta = target.subtract(snapshot.completionPercent());
         if (delta.signum() < 0)
             throw new BusinessException("PROGRESS_DECREASE", "累计完成比例不能降低");
-        if (delta.signum() == 0 && request.durationMinutes() == 0)
-            throw new BusinessException("EMPTY_PROGRESS", "请增加完成比例或填写本次用时");
+        if (delta.signum() == 0 && (request.durationMinutes()==null || request.durationMinutes() == 0))
+            throw new BusinessException("EMPTY_PROGRESS", "请增加完成比例");
         if (request.completionPercent() == 100) {
             if (request.result() == null) throw new BusinessException("MASTERY_REQUIRED", "完成复习时请选择掌握情况");
             return recordReview(new ReviewRecordCreateRequest(item.getId(), request.date(), request.result(),
@@ -277,7 +277,7 @@ public class ReviewService {
     public ReviewConfirmResponse confirm(ReviewConfirmRequest request) {
         StudySettings settings = studySettingsService.lockForReviewScheduling();
         Integer quota = settings.getDailyReviewMinutes();
-        if (quota == null) {
+        if (!request.manualSelection() && quota == null) {
             throw new BusinessException("REVIEW_QUOTA_REQUIRED", "请先在设置中填写每日复习额度，再确认复习安排");
         }
 
@@ -305,12 +305,12 @@ public class ReviewService {
             Integer estimated = requestItem.estimatedMinutes() != null
                     ? requestItem.estimatedMinutes()
                     : item.getEstimatedMinutes();
-            if (estimated == null) {
+            if (!request.manualSelection() && estimated == null) {
                 rejected.add(new ReviewConfirmResponse.Rejected(item.getId(), item.getTitle(),
                         "缺少预计用时，请补充后再安排"));
                 continue;
             }
-            if (usedMinutes + estimated > quota) {
+            if (!request.manualSelection() && usedMinutes + estimated > quota) {
                 rejected.add(new ReviewConfirmResponse.Rejected(item.getId(), item.getTitle(),
                         "超出当日复习额度，剩余 " + Math.max(0, quota - usedMinutes) + " 分钟"));
                 continue;
@@ -322,7 +322,7 @@ public class ReviewService {
                         "该内容已在其他设备上修改，请刷新后重试"));
                 continue;
             }
-            usedMinutes += estimated;
+            usedMinutes += estimated == null ? 0 : estimated;
             scheduled.add(ReviewItemResponse.from(get(item.getId())));
         }
 
@@ -349,7 +349,11 @@ public class ReviewService {
     private boolean hasStudyEvidence(StudyRecordView record) {
         return !record.recordDate().isAfter(LocalDate.now())
                 && ((record.amount() != null && record.amount().signum() > 0)
-                || (record.durationMinutes() != null && record.durationMinutes() > 0));
+                || (record.durationMinutes() != null && record.durationMinutes() > 0)
+                || (record.continuationDelta() != null && record.continuationDelta().signum() > 0)
+                || (record.content() != null && !record.content().isBlank())
+                || (record.note() != null && !record.note().isBlank())
+                || "TIMED_STUDY".equals(record.activityMode()) || "RECAP".equals(record.activityMode()));
     }
 
     private Integer intervalFor(StudySettings settings, MasteryResult result) {

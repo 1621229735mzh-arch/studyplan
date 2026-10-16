@@ -144,4 +144,18 @@ class SequenceLearningIntegrationTest {
                 source.replace("\"key\":\"32\"","\"key\":\"31\""),source.replace("\"plannedAmount\":3","\"plannedAmount\":4")))
             assertThatThrownBy(()->imports.preview(invalid)).isInstanceOf(BusinessException.class);
     }
+
+    @Test void untimedAttemptDoesNotAdvanceAndUntimedCompletionDoes() {
+        var snapshot=records.dayTasks(date).stream().filter(t->t.id().equals(taskId)).findFirst().orElseThrow();
+        var attempt=new DayProgressRequest(date,taskId,0,null,snapshot.revision(),UUID.randomUUID().toString());
+        var saved=records.recordDayProgress(attempt);
+        assertThat(saved.durationMinutes()).isNull();
+        assertThat(saved.amount()).isNull();
+        assertThat(records.recordDayProgress(attempt).id()).isEqualTo(saved.id());
+        assertThat(sequences.state(taskId,date).current().key()).isEqualTo("31");
+        snapshot=records.dayTasks(date).stream().filter(t->t.id().equals(taskId)).findFirst().orElseThrow();
+        records.recordDayProgress(new DayProgressRequest(date,taskId,100,null,snapshot.revision(),UUID.randomUUID().toString()));
+        assertThat(sequences.state(taskId,date.plusDays(1)).current().key()).isEqualTo("32");
+    }
+
 }

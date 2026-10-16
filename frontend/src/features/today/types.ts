@@ -34,6 +34,8 @@ export interface TodayResponse {
   missingEstimates?: number
   missingDurations?: number
   sections?: TodaySubjectSection[]
+  /** 后端按当天清单统计，三类互斥；旧离线快照可能没有。 */
+  taskCounts?: { completed: number; inProgress: number; remaining: number }
 }
 
 export interface TodayChecklistTask {

@@ -55,8 +55,8 @@ public class DailyPlanService {
                 throw new ConflictException("CONFIRMATION_MEASUREMENT","完成确认型只勾选状态，不填写数量或用时");
             return;
         }
-        if (activity!=null ? amount!=null || minutes==null || minutes<1 || minutes>1440 : amount==null)
-            throw new ConflictException("INVALID_SCHEDULE_MEASUREMENT","时间型安排只填写基本用时；数量型安排必须填写计划量");
+        if (activity!=null ? amount!=null || minutes!=null && (minutes<1 || minutes>1440) : amount==null)
+            throw new ConflictException("INVALID_SCHEDULE_MEASUREMENT","活动安排的数量须留空；数量型安排必须填写计划量");
     }
     public List<DailyPlanItemView> list(LocalDate date) {
         return planMapper.findDailyItems(date);

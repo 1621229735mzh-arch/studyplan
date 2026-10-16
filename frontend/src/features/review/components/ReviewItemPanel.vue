@@ -20,7 +20,6 @@ import {
   ElForm,
   ElFormItem,
   ElInput,
-  ElInputNumber,
   ElMessage,
   ElOption,
   ElRadioButton,
@@ -33,7 +32,7 @@ import {
 
 import { toApiError } from '@/api/http'
 import EmptyState from '@/components/EmptyState.vue'
-import { formatIntervalDays, formatIsoDate, formatMinutesOr, masteryLabel, reviewStatusLabel, todayIso } from '@/composables/useFormat'
+import { formatIntervalDays, formatIsoDate, masteryLabel, reviewStatusLabel, todayIso } from '@/composables/useFormat'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import { listPlanTasks } from '@/features/plan/api'
 import type { PlanTask } from '@/features/plan/types'
@@ -111,7 +110,7 @@ async function load(): Promise<void> {
       listReviewItems(), listPlanTasks(), listLearningRecords({ to: todayIso() })
     ])
     items.value = reviewItems
-    const studied = records.filter((record) => (record.amount ?? 0) > 0 || (record.durationMinutes ?? 0) > 0)
+    const studied = records.filter((record) => (record.amount ?? 0) > 0 || (record.durationMinutes ?? 0) > 0 || (record.continuationDelta ?? 0) > 0 || !!record.content?.trim() || !!record.note?.trim() || record.activityMode === 'TIMED_STUDY' || record.activityMode === 'RECAP')
     const studiedTaskIds = new Set(studied.map((record) => record.taskId))
     tasks.value = taskList.filter((task) => studiedTaskIds.has(task.id))
     sourceRecords.value = studied.filter((record) => record.taskId == null && record.subjectId != null)
@@ -133,9 +132,6 @@ function onTaskChange(value: unknown): void {
   form.sourceRecordId = null
 }
 
-function onEstimatedMinutesChange(value: unknown): void {
-  form.estimatedMinutes = typeof value === 'number' ? value : null
-}
 
 function onResultChange(value: unknown): void {
   const matched = MASTERY_OPTIONS.find((option) => option.value === value)
@@ -150,9 +146,6 @@ function onNextReviewDateChange(value: unknown): void {
   feedback.nextReviewDate = typeof value === 'string' ? value : ''
 }
 
-function onDurationMinutesChange(value: unknown): void {
-  feedback.durationMinutes = typeof value === 'number' ? value : null
-}
 
 async function handleCreate(): Promise<void> {
   const errors: { sourceRecordId?: string; title?: string } = {}
@@ -307,21 +300,13 @@ onMounted(() => {
         :disabled="form.taskId !== null"
         placeholder="要复习的内容，例如：操作系统第 3 讲要点"
       />
-      <ElInputNumber
-        :model-value="form.estimatedMinutes ?? undefined"
-        :min="1"
-        :step="5"
-        controls-position="right"
-        placeholder="预计用时（分钟，可留空）"
-        @update:model-value="onEstimatedMinutesChange"
-      />
       <ElButton type="primary" :loading="submitting" :disabled="!online" @click="handleCreate">加入复习</ElButton>
     </div>
     <p v-if="fieldErrors.sourceRecordId || fieldErrors.title" class="warning-text">
       {{ fieldErrors.sourceRecordId ?? fieldErrors.title }}
     </p>
     <p class="hint-text">
-      选择已学任务，或选择已有的计划外学习记录并填写复习内容。预计用时留空时，后端无法判断额度。
+      选择已学任务，或选择已有的计划外学习记录并填写复习内容。无需填写用时。
     </p>
 
     <EmptyState
@@ -350,9 +335,6 @@ onMounted(() => {
       </ElTableColumn>
       <ElTableColumn label="间隔" width="110">
         <template #default="{ row }">{{ formatIntervalDays(row.intervalDays) }}</template>
-      </ElTableColumn>
-      <ElTableColumn label="预计用时" width="120">
-        <template #default="{ row }">{{ formatMinutesOr(row.estimatedMinutes, '未提供') }}</template>
       </ElTableColumn>
       <ElTableColumn label="上次反馈" width="110">
         <template #default="{ row }">{{ masteryLabel(row.lastResult ?? null) }}</template>
@@ -385,16 +367,6 @@ onMounted(() => {
             placeholder="复习日期"
             @update:model-value="onReviewDateChange"
           />
-        </ElFormItem>
-        <ElFormItem label="用时">
-          <ElInputNumber
-            :model-value="feedback.durationMinutes ?? undefined"
-            :min="1"
-            :step="5"
-            controls-position="right"
-            @update:model-value="onDurationMinutesChange"
-          />
-          <span class="hint-text">分钟（可留空）</span>
         </ElFormItem>
         <ElFormItem label="下次复习日期">
           <ElDatePicker

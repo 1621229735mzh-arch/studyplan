@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import ChecklistTask from './ChecklistTask.vue'
 import type { TodayChecklistTask } from '../types'
-defineProps<{ title: string; tasks: TodayChecklistTask[]; readonly: boolean }>()
+defineProps<{ title: string; tasks: TodayChecklistTask[]; readonly: boolean; showEstimate?: boolean }>()
 defineEmits<{ action: [task: TodayChecklistTask, complete: boolean] }>()
 </script>
 <template>
@@ -10,7 +10,7 @@ defineEmits<{ action: [task: TodayChecklistTask, complete: boolean] }>()
     <ul>
       <li v-for="task in tasks.filter(t => t.completionPercent < 100)" :key="task.id" class="book-content">
         <span class="content-origin">{{ task.continuation?.carried ? '剩余内容' : '新内容' }}</span>
-        <ul><ChecklistTask :task="task" :readonly="readonly" @action="(item,complete) => $emit('action',item,complete)" /></ul>
+        <ul><ChecklistTask :task="task" :readonly="readonly" :show-estimate="showEstimate" @action="(item,complete) => $emit('action',item,complete)" /></ul>
       </li>
     </ul>
     <details v-if="tasks.some(t => t.completionPercent >= 100)">

@@ -49,7 +49,9 @@ public record PlanImportDocument(
             @NotBlank @Size(max=200) String title,@NotNull @Min(1) Integer position) {}
     public record Activity(@NotBlank @Pattern(regexp="TIMED_STUDY|RECAP|CHECK_ONLY|CONTINUED_STUDY") String mode,
                            @Size(max=1000) String description,
-                           @NotNull @Min(0) @Max(1440) Integer flexibleMinutes) {}
+                           @Min(0) @Max(1440) Integer flexibleMinutes) {
+        public Activity { if (flexibleMinutes == null) flexibleMinutes = 0; }
+    }
     public record Sequence(@NotBlank @Pattern(regexp="COMPLETE_THEN_ADVANCE") String mode,
             @NotNull @Size(min=1,max=5000) List<@NotNull @Valid SequenceItem> items) {}
     public record SequenceItem(@NotBlank @Pattern(regexp="[A-Za-z0-9_-]{1,64}") String key,

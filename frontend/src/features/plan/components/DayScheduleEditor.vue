@@ -32,7 +32,6 @@ watch(form, () => { token.value = crypto.randomUUID() })
 async function save() {
   if (busy.value || !online.value) return
   if (!form.date || (!timed.value && (!Number.isFinite(form.amount) || form.amount < (editing.value ? 0 : 0.01)))) { error.value = '请填写日期和有效的计划量'; return }
-  if (timed.value && !confirmationOnly.value && (!form.minutes || form.minutes < 1 || form.minutes > 1440)) { error.value = '时间型安排请填写 1—1440 分钟基本用时'; return }
   if (!editing.value && (form.mode === 'new' ? (!form.title.trim() || !form.subjectId || !form.unitId) : !form.existingTaskId)) {
     error.value = form.mode === 'new' ? '请填写学习内容、科目和单位' : '请选择已有任务'; return
   }
@@ -63,8 +62,7 @@ async function save() {
       </template>
       <ElFormItem v-else label="已有任务"><ElSelect v-model="form.existingTaskId" filterable placeholder="搜索学习任务" :disabled="busy"><ElOption v-for="task in tasks.filter(t => t.status === 'ACTIVE')" :key="task.id" :label="`${catalog.subjectNameOf(task.subjectId)} · ${task.title}（${catalog.unitNameOf(task.unitId)}）`" :value="task.id" /></ElSelect></ElFormItem>
       <div class="editor-columns">
-        <ElFormItem label="当日计划量"><span v-if="confirmationOnly">只确认完成，不设置数量</span><span v-else-if="continued">按内容记录百分比，日期为参考安排</span><span v-else-if="timed">按时间安排，完成量据实记录</span><ElInputNumber v-else v-model="form.amount" :min="editing ? 0 : 0.01" :max="99999999.99" :precision="2" :disabled="busy" /></ElFormItem>
-        <ElFormItem v-if="!confirmationOnly" label="预计用时（分钟，可留空）"><ElInputNumber v-model="form.minutes" :min="0" :max="2147483647" :precision="0" :disabled="busy" /></ElFormItem>
+        <ElFormItem label="当日计划量"><span v-if="confirmationOnly">只确认完成，不设置数量</span><span v-else-if="continued">按内容记录百分比，日期为参考安排</span><span v-else-if="timed">按内容执行，完成量据实记录</span><ElInputNumber v-else v-model="form.amount" :min="editing ? 0 : 0.01" :max="99999999.99" :precision="2" :disabled="busy" /></ElFormItem>
       </div>
     </ElForm>
     <template #footer><ElButton :disabled="busy" @click="emit('update:modelValue', false)">取消</ElButton><ElButton type="primary" :disabled="!online" :loading="busy" @click="save">保存安排</ElButton></template>

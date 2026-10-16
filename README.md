@@ -6,25 +6,31 @@
 
 需求与技术栈依据见 [PLAN.md](PLAN.md)；工程约束见 [AGENTS.md](AGENTS.md)；目录职责见 [docs/STRUCTURE.md](docs/STRUCTURE.md)。
 
-## 当前状态（更新于 2026-10-15）
+## 当前状态（更新于 2026-10-16）
 
-张宇数学计划的当前摘要见 [当前确认版](docs/business/zhangyu-math-plan.md)：按两本书独立接续，保留详细学习内容，不安排复习和订正。仓库文件更新与线上计划导入分别记录，当前部署保持暂停。
+张宇数学计划的当前摘要见 [当前确认版](docs/business/zhangyu-math-plan.md)：按两本书独立接续，保留详细学习内容，不安排复习和订正。V20 与完整两书方案已发布导入；今日顶部任务项数已于 2026-10-16 正式发布，见 [发布验收](docs/operations/today-task-counts-release-20261016.md)。
 
 已实现并验证：工程基础、核心闭环、信息反馈、复习机制。智能升级（Spring AI）按计划留到后续阶段，当前未安装相关依赖。
 
 - 后端：Spring Boot 4.1.1 模块化单体，8 个业务模块全部实现。
 - 本地清理复核（2026-10-15）：前端 84 项测试、类型检查及 PWA 构建，后端 13 项单元测试、干净编译及打包通过；本轮未运行数据库集成测试和 Docker 构建。见 [清理记录](docs/development/cleanup-20261009.md)。
 - 数据库：Flyway 迁移 V1–V20，随应用启动执行；V12 导入数学一轮计划，V15 支持计划工作区，V16–V19 支持课程目录、接续练习、时间型安排与每日确认。
-- 最新开发：V20 与导入 v5 支持按书独立接续，既有验证为后端 136 项、前端 87 项、类型检查和构建通过；验证环境与限制见 [验证记录](docs/testing/continued-study-20261015.md)。本次进展同步仅更新文档，未重跑业务测试。
-- 线上记录：V19 英语每日确认与两份计划已发布导入，随后完成 38 任务／118 天／236 日安排的简化高数替换，保留学习记录及其他计划；见 [英语发布](docs/operations/english-plan-release-20261015.md)、[高数替换](docs/operations/math-simple-replacement-20261015.md)。V20 两书接续尚未发布，完整方案尚未转换导入，继续 [暂停交接](docs/development/continued-study-deploy-handoff-20261015.md)；本次未重新核验生产状态。
+- 最新验证：今日项数优化在隔离 MySQL8.0.45 上后端 138 项及打包、前端 89 项及类型检查／构建通过；生产 MySQL8.4 隔离恢复与候选验收通过。2 项依赖 Linux Docker 的会话表专测未运行，边界见 [验证记录](docs/testing/today-task-counts-20261016.md)。
+- 线上记录：V19 英语每日确认与两份计划已发布导入，随后完成旧简化高数替换；见 [英语发布](docs/operations/english-plan-release-20261015.md)、[高数替换](docs/operations/math-simple-replacement-20261015.md)。V20 两书接续与完整 126 天方案已发布导入，见 [两书发布及替换](docs/operations/continued-math-release-20261015.md)。本次今日项数发布后，31 张业务表逐表行哈希一致，三个服务 healthy，正式页已验证。
 - 登录：预设账号 + Spring Security + Spring Session JDBC（会话存 MySQL）+ CSRF 防护。
 - 历史验证（2026-10-08）：后端 92 项在隔离 MySQL 8.0.45 上通过并打包；前端 49 项测试、类型检查和生产构建通过。浏览器验证四视图、导入确认、日编辑/排序及离线本周；生产 MySQL 8.4.11 的隔离恢复、V14 → V15、会话及接口验收通过。未运行本地 Docker 专用会话迁移测试或重建 Docker 镜像，详见 [计划页验收](docs/testing/planning-workspace-20261008.md)。
 - 历史验证（2026-10-01）：后端 72 项在隔离 MySQL 9.7.0 上通过；前端 38 项测试与构建通过。服务器 MySQL 8.4.11 隔离库验证 V13 → V14、登录与 JDBC 会话，今日清单已发布。见 [今日清单验证](docs/testing/today-checklist-20261001.md)和 [早期验收记录](docs/testing/acceptance.md)。
-- 今日页：四科学习/复习清单、累计百分比与本次用时、后端时间合计；规则见 [今日清单](docs/business/today-checklist.md)。
+- 今日页：顶部显示“已完成 / 进行中 / 还剩”的任务项数，后端按有效记录统计，部分完成或只记用时的未完成任务计入进行中；四科学习/复习清单显示任务进度，历史用时保留在记录详情。规则见 [今日清单](docs/business/today-checklist.md)，启动命令保持不变。
 - 计划页：默认整体时间轴、月历、周历和日安排，手动按日期规划；外部 JSON 方案校验、预览、确认追加。内置 AI 当前封锁。使用说明见 [导入规划书](docs/business/plan-import-guide.md)；已于 2026-10-08 发布，数据核对与线上验收见 [发布记录](docs/operations/planning-workspace-release-20261008.md)。
 - 首次部署与会话修复的历史记录见 [首次部署全过程](docs/operations/deployment-journal-2026-09.md)。
 - 前端：Vue 3 + TypeScript + Vite + Element Plus，含离线只读快照；当前课程完成比例使用 SVG，不安装无使用入口的图表库。
 - 部署：Docker Compose + Nginx，CI 自动检查、生产发布手动触发。
+
+## 不计时记录（2026-10-16）
+
+数学任务保留“预计剩余”只读展示，主教材与题册使用计划已有估算；记录时仍无需填写实际用时。该补充于 19:11 正式发布，95 项前端测试和构建通过，见 [数学估算发布](docs/operations/math-estimate-display-release-20261016.md)。
+
+当前工作区已移除实际用时、预计用时和时间预算输入，按完成量／百分比记录，复习手动选择确认。历史时间值保留，日期与复习间隔照常使用；本地启动命令不变。已于 2026-10-16 16:18 正式发布，MySQL 8.4 候选、31 张业务表数据保留及 PWA 真网页验收通过；见 [发布记录](docs/operations/no-time-recording-release-20261016.md) 和 [本地验证](docs/testing/no-time-recording-20261016.md)。
 
 ## 环境要求
 

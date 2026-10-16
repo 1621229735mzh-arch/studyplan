@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 设置页：学习设置（考试时间、预算、额度、复习阶段）+ 科目 + 计量单位。
+ * 设置页：学习设置（考试日期、复习阶段、复习间隔）+ 科目 + 计量单位。
  */
 import { ref } from 'vue'
 import { ElTabPane, ElTabs } from 'element-plus'
@@ -19,7 +19,7 @@ const activeTab = ref<string | number>('study')
       <div>
         <h2 class="page__title">设置</h2>
         <p class="page__subtitle">
-          考试时间、每日学习预算、每日复习额度、复习阶段，以及科目与计量单位的维护。
+          考试日期、复习阶段与复习间隔，以及科目与计量单位的维护。
         </p>
       </div>
     </div>

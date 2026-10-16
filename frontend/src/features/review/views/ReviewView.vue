@@ -30,7 +30,7 @@ const activeTab = ref<string | number>('items')
       show-icon
       :closable="false"
       title="不预先生成整套复习任务，也不擅自提高强度"
-      description="超额内容进入待安排列表，保留到期信息；缺少预计用时或未设置额度时，界面不会宣称建议符合额度。"
+      description="按实际需要勾选到期内容，确认后进入当天安排；未选择的内容保留到期信息。"
     />
 
     <section class="section-card">
