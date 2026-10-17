@@ -13,6 +13,7 @@
         <result property="unitId" column="unit_id"/>
         <result property="recordDate" column="record_date"/>
         <result property="amount" column="amount"/>
+        <result property="reviewAmount" column="review_amount"/>
         <result property="durationMinutes" column="duration_minutes"/>
         <result property="content" column="content"/>
         <result property="note" column="note"/>
@@ -43,6 +44,7 @@
             <arg column="sequence_url" name="sequenceUrl" javaType="java.lang.String"/>
             <arg column="activity_mode" name="activityMode" javaType="java.lang.String"/>
             <arg column="continuation_delta" name="continuationDelta" javaType="java.math.BigDecimal"/>
+            <arg column="review_amount" name="reviewAmount" javaType="java.math.BigDecimal"/>
         </constructor>
     </resultMap>
 
@@ -50,7 +52,7 @@
         r.id, r.task_id, t.title AS task_title, r.subject_id, s.name AS subject_name,
         r.unit_id, u.name AS unit_name, r.record_date, r.amount, r.duration_minutes,
         r.content, r.note, r.version, r.sequence_item_id, si.title AS sequence_title, si.url AS sequence_url,
-        a.mode AS activity_mode, r.continuation_delta
+        a.mode AS activity_mode, r.continuation_delta, r.review_amount
     </sql>
 
     <!-- 科目与单位在“只记时长”的记录上为空，因此用 LEFT JOIN 保证列表不会漏掉这些记录 -->
@@ -83,7 +85,7 @@
     </select>
 
     <select id="findById" resultMap="studyRecordResultMap" flushCache="true" useCache="false">
-        SELECT id, continuation_delta, activity_completed, sequence_item_id, task_id, subject_id, unit_id, record_date, amount, duration_minutes,
+        SELECT id, review_amount, continuation_delta, activity_completed, sequence_item_id, task_id, subject_id, unit_id, record_date, amount, duration_minutes,
                content, note, client_token, version, created_at, updated_at, deleted_at
         FROM study_record
         WHERE id = #{id} AND deleted_at IS NULL
@@ -91,7 +93,7 @@
 
     <!-- 重复提交防重：同一 client_token 只保留一条记录 -->
     <select id="findByClientToken" resultMap="studyRecordResultMap" flushCache="true" useCache="false">
-        SELECT id, continuation_delta, activity_completed, sequence_item_id, task_id, subject_id, unit_id, record_date, amount, duration_minutes,
+        SELECT id, review_amount, continuation_delta, activity_completed, sequence_item_id, task_id, subject_id, unit_id, record_date, amount, duration_minutes,
                content, note, client_token, version, created_at, updated_at, deleted_at
         FROM study_record
         WHERE client_token = #{clientToken} AND deleted_at IS NULL
@@ -100,9 +102,9 @@
     <insert id="insert" parameterType="com.kaoyan.study.learning.entity.StudyRecord"
             useGeneratedKeys="true" keyProperty="id">
         INSERT INTO study_record (task_id, subject_id, unit_id, record_date, amount, duration_minutes,
-                                  content, note, client_token, version, sequence_item_id, activity_completed, continuation_delta)
+                                  content, note, client_token, version, sequence_item_id, activity_completed, continuation_delta, review_amount)
         VALUES (#{taskId}, #{subjectId}, #{unitId}, #{recordDate}, #{amount}, #{durationMinutes},
-                #{content}, #{note}, #{clientToken}, 0, #{sequenceItemId}, #{activityCompleted}, #{continuationDelta})
+                #{content}, #{note}, #{clientToken}, 0, #{sequenceItemId}, #{activityCompleted}, #{continuationDelta}, #{reviewAmount})
     </insert>
 
     <update id="update" parameterType="com.kaoyan.study.learning.entity.StudyRecord">
@@ -114,6 +116,7 @@
             unit_id = #{unitId},
             record_date = #{recordDate},
             amount = #{amount},
+            review_amount = #{reviewAmount},
             duration_minutes = #{durationMinutes},
             content = #{content},
             note = #{note},

@@ -29,6 +29,8 @@ import {
 
 import { toApiError } from '@/api/http'
 import AmountUnit from '@/components/AmountUnit.vue'
+import QuantityModeDialog from './QuantityModeDialog.vue'
+import ProblemNumberModeDialog from './ProblemNumberModeDialog.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import { useCatalogStore } from '@/stores/catalog'
@@ -47,6 +49,8 @@ const catalog = useCatalogStore()
 const { online } = useOnlineStatus()
 
 const tasks = ref<PlanTask[]>([])
+const problemTaskId = ref<number | null>(null)
+const quantityTaskId = ref<number | null>(null)
 const goals = ref<StageGoal[]>([])
 const loading = ref(false)
 const submitting = ref(false)
@@ -288,10 +292,12 @@ onMounted(() => {
       <ElTableColumn label="状态" width="100">
         <template #default="{ row }">{{ taskStatusLabel(row.status) }}</template>
       </ElTableColumn>
-      <ElTableColumn label="操作" width="200" fixed="right">
+      <ElTableColumn label="操作" width="280" fixed="right">
         <template #default="{ row }">
           <ElButton size="small" text type="primary" @click="openProgress(row)">进度</ElButton>
           <ElButton size="small" text type="primary" @click="openEdit(row)">编辑</ElButton>
+          <ElButton v-if="row.sequential" size="small" text :disabled="!online" @click="problemTaskId=row.id">自填题号</ElButton>
+          <ElButton v-if="!row.sequential && (!row.activityMode || ['TIMED_STUDY','RECAP','CHECK_ONLY'].includes(row.activityMode))" size="small" text :disabled="!online" @click="quantityTaskId=row.id">按实际量</ElButton>
           <ElButton size="small" text type="danger" @click="handleDelete(row)">删除</ElButton>
         </template>
       </ElTableColumn>
@@ -329,7 +335,7 @@ onMounted(() => {
           </ElSelect>
           <span class="hint-text">单位维护在“设置”页面。</span>
         </ElFormItem>
-        <ElFormItem label="计划量">
+        <ElFormItem v-if="!editing?.activityMode" label="计划量">
           <ElInputNumber
             :model-value="form.plannedAmount ?? undefined"
             :min="0"
@@ -369,6 +375,8 @@ onMounted(() => {
       </template>
     </ElDialog>
 
+    <ProblemNumberModeDialog :task-id="problemTaskId" @close="problemTaskId=null" @saved="load" />
+    <QuantityModeDialog :task-id="quantityTaskId" @close="quantityTaskId=null" @saved="load" />
     <ElDialog v-model="progressVisible" title="任务进度" width="min(640px, 92vw)">
       <div v-if="progressLoading" class="hint-text">加载中……</div>
       <div v-else-if="progress">

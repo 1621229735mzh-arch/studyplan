@@ -42,6 +42,22 @@ beforeEach(() => { vi.clearAllMocks(); vi.mocked(listPlanTasks).mockResolvedValu
 afterEach(() => { wrappers.splice(0).forEach(w => w.unmount()) })
 
 describe('月周日学习记录与目录进度', () => {
+  it('复习数量单独展示，修改时回填实际词数并保留原任务与版本', async () => {
+    const record: LearningRecord = { ...learningRecordFixture, activityMode: 'COUNT_REVIEW', taskTitle: '每日单词复习', unitName: '词', amount: null, reviewAmount: 120, durationMinutes: null }
+    const value = archiveFixture(record)
+    const group = value.months[0].weeks[0].days[0].groups[0]
+    group.courseId = null; group.title = '每日单词复习'; group.reviewAmount = 120; group.unitName = '词'
+    mocks.archive.mockResolvedValue(value)
+    const w = await render(LearningView)
+    expect(w.text()).toContain('复习 120 词'); expect(w.text()).toContain('不增加新词量')
+    await button(w,'修改').trigger('click'); await flushPromises()
+    const form = w.findComponent(RecordForm).vm as unknown as { form: { amount: number }; submit: () => void }
+    expect(form.form.amount).toBe(120)
+    expect(w.findComponent(RecordForm).text()).toContain('实际复习量（不增加新词量）')
+    expect(w.findComponent(RecordForm).findAllComponents(ElSelect).find(s => s.props('modelValue') === record.taskId)?.props('disabled')).toBe(true)
+    form.form.amount = 80; form.submit(); await flushPromises()
+    expect(mocks.update).toHaveBeenCalledWith(record.id,expect.objectContaining({ amount: 80, taskId: record.taskId, version: record.version, durationMinutes: null }))
+  })
   it('记录默认读取全部月份，仅本月、本周展开，日内先合并再看单次明细', async () => {
     const value = archiveFixture(); value.months.push({ month: '2000-01', stats: value.stats, weeks: [] }); mocks.archive.mockResolvedValue(value)
     const w = await render(LearningView)
@@ -98,6 +114,29 @@ describe('月周日学习记录与目录进度', () => {
     const w = await render(DirectionView,'/progress/CS408?branch=操作系统&course=1')
     expect(w.find('.course-ring').exists()).toBe(true); expect(w.text()).toContain('2 / 3 讲'); expect(w.text()).toContain('第一讲'); expect(w.text()).not.toContain(learningRecordFixture.recordDate)
     expect(mocks.save).toHaveBeenCalledWith(expect.objectContaining({ progress: expect.objectContaining({ planningBasis: 'catalog', trend: [], catalog: expect.objectContaining({ courses: [expect.not.objectContaining({ nodes: expect.anything() })] }) }) }))
+  })
+  it('英语直接展示背词与复习的独立进度，没有总目标或完成百分比', async () => {
+    const activities = [
+      { taskId:510,title:'每日背诵新词',direction:'ENGLISH',mode:'COUNT_STUDY',subjectId:5,subjectName:'英语一',unitId:4,unitName:'词',recordedAmount:100,recordCount:2,learningDays:2,unknownQuantityRecords:0 },
+      { taskId:511,title:'每日单词复习',direction:'ENGLISH',mode:'COUNT_REVIEW',subjectId:5,subjectName:'英语一',unitId:4,unitName:'词',recordCount:2,learningDays:2,unknownQuantityRecords:2 }
+    ]
+    mocks.get.mockResolvedValue({ ...library,courses:[],cumulative:[{direction:'ENGLISH',subjectId:5,subjectName:'英语一',unitId:4,unitName:'词',amount:100}],activities })
+    const w=await render(DirectionView,'/progress/ENGLISH')
+    const cards=w.findAll('.activity-card'); expect(cards).toHaveLength(2)
+    expect(cards[0].text()).toContain('累计新学 100 词'); expect(cards[0].text()).toContain('2 天 · 2 次记录')
+    expect(cards[1].text()).toContain('复习数量未记录'); expect(cards[1].text()).toContain('2 次历史记录未填写数量'); expect(cards[1].text()).toContain('不增加新词量')
+    expect(w.find('.course-ring').exists()).toBe(false); expect(w.text()).not.toContain('还没有课程或资料目录'); expect(w.text()).not.toContain('6150')
+    expect(mocks.save.mock.calls[0][0].progress.catalog.activities).toEqual(activities)
+    const other=await render(DirectionView,'/progress/CS408'); expect(other.findAll('.activity-card')).toHaveLength(0)
+  })
+  it('离线只读显示已同步的词数进度，兼容没有数量进度的旧快照', async () => {
+    mocks.online=false
+    mocks.cache={planningBasis:'catalog',syncedAt:'2026-10-17T04:00:00Z',catalog:{revision:3,courses:[],cumulative:[],activities:[{taskId:511,title:'每日单词复习',direction:'ENGLISH',mode:'COUNT_REVIEW',subjectId:5,subjectName:'英语一',unitId:4,unitName:'词',recordedAmount:120,recordCount:3,learningDays:2,unknownQuantityRecords:1}]}}
+    const w=await render(DirectionView,'/progress/ENGLISH')
+    expect(mocks.get).not.toHaveBeenCalled(); expect(w.text()).toContain('已记录复习 120 词'); expect(w.text()).toContain('1 次历史记录未填写数量'); expect(w.text()).toContain('概览同步时间')
+    expect(button(w,'整理课程／资料').attributes('disabled')).toBeDefined()
+    mocks.cache={planningBasis:'catalog',catalog:{revision:2,courses:[],cumulative:[]}}
+    const old=await render(DirectionView,'/progress/ENGLISH'); expect(old.findAll('.activity-card')).toHaveLength(0)
   })
   it('身份错误不回退快照', async () => {
     mocks.cache = { planningBasis:'catalog',catalog:library }; mocks.get.mockRejectedValue(new HttpApiError({ code:'UNAUTHORIZED',status:401,message:'请重新登录' }))

@@ -26,6 +26,9 @@ public class StudyRecord {
     private Long unitId;
     private LocalDate recordDate;
     private BigDecimal amount;
+    private BigDecimal reviewAmount;
+    public BigDecimal getReviewAmount() { return reviewAmount; }
+    public void setReviewAmount(BigDecimal value) { reviewAmount = value; }
     private Integer durationMinutes;
     private String content;
     private String note;

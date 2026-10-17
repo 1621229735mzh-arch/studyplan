@@ -61,6 +61,21 @@ describe('今日清单操作',()=>{
 
 
 describe('有序题目执行', () => {
+ it('自行输入清单外题号，空值拒绝，失败保留题号和令牌', async () => {
+  const data=fixture()
+  Object.assign(data.sections![0].tasks[0],{title:'LeetCode每日一题',completionPercent:0,sequence:{mode:'SELECT_BY_NUMBER',items:[],current:null,dayItem:null,revision:'',actionable:true}})
+  mocks.fetch.mockResolvedValue(data)
+  const w=await page()
+  expect(w.text()).toContain('自选题号');expect(w.text()).not.toContain('题目清单已全部完成')
+  await button(w,'填写题号').trigger('click');await flushPromises()
+  await button(w,'保存').trigger('click');await flushPromises();expect(mocks.learning).not.toHaveBeenCalled()
+  const input=w.findComponent(ElInputNumber);input.vm.$emit('update:modelValue',3000);await flushPromises()
+  mocks.learning.mockRejectedValueOnce(new Error('保存失败'))
+  await button(w,'保存').trigger('click');await flushPromises()
+  expect(input.props('modelValue')).toBe(3000)
+  const first=mocks.learning.mock.calls[0][2];expect(first).toMatchObject({problemNumber:3000,completionPercent:100,durationMinutes:null})
+  await button(w,'保存').trigger('click');await flushPromises();expect(mocks.learning.mock.calls[1][2].clientToken).toBe(first.clientToken)
+ })
  it('尝试无需用时，提交零完成比例并保留当前题链接', async () => {
   const data = fixture()
   const item = { id: 31, key: '31', title: 'LeetCode 31 · Next Permutation', url: 'https://leetcode.cn/problems/next-permutation/', completed: false }
@@ -171,5 +186,32 @@ describe('按书接续学习',()=>{
   expect(w.findAll('.book-task')).toHaveLength(2)
   w.findAllComponents(ElButton).filter(b=>['完成','剩余'].includes(b.text())).forEach(b=>expect(b.attributes('disabled')).toBeDefined())
   expect(mocks.learning).not.toHaveBeenCalled()
+ })
+})
+
+describe('自主填写每日实际词数',()=>{
+ function countedFixture(mode: 'COUNT_STUDY' | 'COUNT_REVIEW', completed=false) {
+  const data=fixture();Object.assign(data.sections![0].tasks[0],{title:mode==='COUNT_REVIEW'?'每日单词复习':'每日背诵新词',completionPercent:completed?100:0,estimatedMinutes:null,remainingMinutes:null,unitName:'词',recordedAmount:completed?37:0,activity:{mode,description:'学习后填写实际词数',flexibleMinutes:0}});return data
+ }
+ it.each(['COUNT_STUDY','COUNT_REVIEW'] as const)('%s 不预填目标，只提交用户填写的实际数量',async(mode)=>{
+  mocks.fetch.mockResolvedValue(countedFixture(mode));const w=await page();await button(w,'填写数量').trigger('click');await flushPromises()
+  expect(w.text()).not.toContain('累计已完成 (%)');expect(w.text()).not.toContain('整讲或整章')
+  const fields=w.findAllComponents(ElInputNumber);expect(fields).toHaveLength(1);expect(fields[0].props('modelValue')).toBeUndefined()
+  await button(w,'保存').trigger('click');await flushPromises();expect(mocks.learning).not.toHaveBeenCalled();expect(w.text()).toContain('请填写本次实际词数')
+  fields[0].vm.$emit('update:modelValue',73);await flushPromises()
+  mocks.learning.mockRejectedValueOnce(new Error('保存失败'));await button(w,'保存').trigger('click');await flushPromises()
+  const first=mocks.learning.mock.calls[0][2];expect(first).toMatchObject({actualAmount:73,durationMinutes:null,completionPercent:100})
+  expect(fields[0].props('modelValue')).toBe(73)
+  await button(w,'保存').trigger('click');await flushPromises();expect(mocks.learning.mock.calls[1][2].clientToken).toBe(first.clientToken)
+  expect(mocks.confirmation).not.toHaveBeenCalled();expect(mocks.review).not.toHaveBeenCalled()
+ })
+ it('已完成后可分次补记，展示服务端当日复习合计',async()=>{
+  mocks.fetch.mockResolvedValue(countedFixture('COUNT_REVIEW',true));const w=await page()
+  expect(w.text()).toContain('今日已复习 37 词');await button(w,'再记一笔').trigger('click');await flushPromises()
+  expect(w.findComponent(ElInputNumber).props('modelValue')).toBeUndefined();expect(w.text()).toContain('复习词数单独记录，不增加新词量')
+ })
+ it('历史确认不显示虚构数量，离线无法填写数量',async()=>{
+  const data=countedFixture('COUNT_REVIEW',true);data.sections![0].tasks[0].recordedAmount=null;mocks.online.value=false;mocks.snapshot=data
+  const w=await page();expect(w.text()).toContain('数量未记录');expect(button(w,'再记一笔').attributes('disabled')).toBeDefined()
  })
 })

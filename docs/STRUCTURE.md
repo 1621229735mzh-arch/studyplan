@@ -124,7 +124,7 @@ SQL XML 放在 `backend/src/main/resources/mapper/<module>/`，与对应 Mapper 
 | `backend/` | `pom.xml`、`mvnw`、`mvnw.cmd`、`.mvn/wrapper/maven-wrapper.properties`（Maven 3.9.16） |
 | `backend/src/main/java/com/kaoyan/study/` | `StudyApplication.java`（`@MapperScan` + `@ConfigurationPropertiesScan`） |
 | `backend/src/main/resources/` | `application.yml`、`application-dev.yml`、`application-prod.yml` |
-| `backend/src/main/resources/db/migration/` | `V1`–`V20`（V13 会话大小写归一化、V14 今日用时与部分复习、V15 计划工作区与导入防重、V16 课程目录与学习归属、V17 接续题目、V18 时间型安排、V19 每日完成确认、V20 按书学习接续） |
+| `backend/src/main/resources/db/migration/` | `V1`–`V22`（V13 会话大小写归一化、V14 今日用时与部分复习、V15 计划工作区与导入防重、V16 课程目录与学习归属、V17 接续题目、V18 时间型安排、V19 每日完成确认、V20 按书学习接续、V21 实际复习数量、V22 自填题号；V22尚未上线） |
 | `backend/src/main/java/com/kaoyan/study/config/` | 安全（Spring Security 7 + JDBC 会话 + CSRF）、OpenAPI、预设账号配置 |
 | `frontend/` | `package.json`、`pnpm-lock.yaml`、`index.html`、Vite/TypeScript/Vitest 配置 |
 | `frontend/src/` | `main.ts`、`App.vue` 及各功能页面 |
@@ -169,3 +169,9 @@ V19 为 `task_activity` 增加 `CHECK_ONLY` 模式，v4 合同支持无数量、
 V20 新增学习接续规划表与原学习记录的 `continuation_delta`。`TaskContinuationService` / `TaskContinuationMapper` 属于计划模块，仅维护书籍、内容顺序与参考日安排；`ContinuationLearningService` / `ContinuationProgressMapper` 属于学习模块，依据有效学习记录派生累计百分比和日期执行内容。今日使用 `ContinuationBook.vue` 按书收纳各段；不另存完成游标，不改变普通任务和原每日一题规则。导入 v5、Schema 与可下载首周样例仍放在原 `docs/business/plan-import*`，详见导入规划书。
 
 2026-10-16 不计时记录：表单移除实际／预计用时和预算输入，保留历史字段兼容；不增加迁移或第二套完成事实。`ReviewConfirmRequest.manualSelection` 区分当前手动确认与旧额度模式。`DayProgressRequest` 和 `ReviewDayProgressRequest` 的用时允许为空；接续进度计算处理空估算。导入仍使用 v1—v5，时间字段可省略。
+
+2026-10-16 英语实际数量：V21 新增原学习记录的 `review_amount`，首次学习仍用 amount，复习量不混入进度。v6 COUNT_STUDY／COUNT_REVIEW 由原导入服务校验；今日、记录页分别展示两类实际数量。计划模块 `TaskQuantityService`／`TaskQuantityMapper` 提供已有任务的预览转换，`QuantityModeDialog.vue` 位于任务库。转换使用任务与工作区版本，事务中保留原任务、日期、学习记录，清除固定计划量；不新增完成事实表。
+
+2026-10-17 英语数量进度：`CatalogService.library` 的 activities 从原数量任务与有效学习记录生成累计数量、次数、天数及历史未知数量次数；`CountedProgressCards.vue` 在所属方向页展示，复习单列，不创建课程总量或额外事实表。概览进入原 `useCatalogWorkspace` 只读统计快照；旧快照没有 activities 时兼容读取。无表结构迁移。
+
+2026-10-17 LeetCode 自填题号：V22 为原 task_sequence 添加 mode，SELECT_BY_NUMBER 使用原题目身份与学习记录。TaskSequenceService 按实际输入解析题号；SequenceLearningService 校验每日一题、首次题量与日期；ProblemNumberModeService 在计划模块组织预览转换，通过 StudyRecordService 修改历史题号。今日和 SequenceRecordItem.vue 增加题号输入，ProblemNumberModeDialog.vue 位于任务库；导入 v7 不预设 items，不新增完成事实表。

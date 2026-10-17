@@ -22,6 +22,9 @@ public interface StudyRecordMapper {
                                   @Param("taskId") Long taskId,
                                   @Param("subjectId") Long subjectId);
 
+    @org.apache.ibatis.annotations.Select("SELECT CONCAT(COUNT(*),':',COALESCE(MAX(id),0),':',COALESCE(SUM(version),0)) FROM study_record WHERE task_id=#{taskId}")
+    String sequenceHistory(@Param("taskId") Long taskId);
+
     StudyRecord findById(@Param("id") Long id);
 
     @org.apache.ibatis.annotations.Select("SELECT id FROM study_record WHERE id=#{id} AND deleted_at IS NULL FOR UPDATE")

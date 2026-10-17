@@ -7,4 +7,6 @@ public interface TaskActivityMapper {
     Activity find(Long taskId);
     @Insert("INSERT INTO task_activity(task_id,mode,description,flexible_minutes) VALUES(#{taskId},#{activity.mode},#{activity.description},#{activity.flexibleMinutes})")
     int insert(@Param("taskId") Long taskId,@Param("activity") Activity activity);
+    @Update("UPDATE task_activity SET mode=#{activity.mode},description=#{activity.description},flexible_minutes=#{activity.flexibleMinutes} WHERE task_id=#{taskId}")
+    int update(@Param("taskId") Long taskId,@Param("activity") Activity activity);
 }

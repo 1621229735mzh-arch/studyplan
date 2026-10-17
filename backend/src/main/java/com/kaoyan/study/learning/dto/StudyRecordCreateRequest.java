@@ -44,7 +44,11 @@ public record StudyRecordCreateRequest(
 
         @Size(max = 64, message = "提交令牌过长")
         String clientToken,
-        Long sequenceItemId) {
+        Long sequenceItemId, @Min(1) Integer problemNumber) {
+    public StudyRecordCreateRequest(Long taskId, Long subjectId, Long unitId, LocalDate recordDate,
+            BigDecimal amount, Integer durationMinutes, String content, String note, String clientToken, Long sequenceItemId) {
+        this(taskId,subjectId,unitId,recordDate,amount,durationMinutes,content,note,clientToken,sequenceItemId,null);
+    }
     public StudyRecordCreateRequest(Long taskId, Long subjectId, Long unitId, LocalDate recordDate,
             BigDecimal amount, Integer durationMinutes, String content, String note, String clientToken) {
         this(taskId,subjectId,unitId,recordDate,amount,durationMinutes,content,note,clientToken,null);

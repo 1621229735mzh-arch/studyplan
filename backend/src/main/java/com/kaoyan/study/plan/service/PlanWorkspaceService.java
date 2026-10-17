@@ -36,7 +36,7 @@ public class PlanWorkspaceService {
         groups.forEach((month, rows) -> {
             var amounts=new LinkedHashMap<String,Amount>();
             for (var e:rows) {
-                if ("CHECK_ONLY".equals(e.activityMode()) || "CONTINUED_STUDY".equals(e.activityMode())) continue;
+                if ("CHECK_ONLY".equals(e.activityMode()) || "CONTINUED_STUDY".equals(e.activityMode()) || "COUNT_REVIEW".equals(e.activityMode())) continue;
                 var key=e.subjectId()+":"+e.unitId();
                 var old=amounts.getOrDefault(key,new Amount(e.subjectId(),e.unitId(),e.unitName(),BigDecimal.ZERO,BigDecimal.ZERO));
                 amounts.put(key,new Amount(e.subjectId(),e.unitId(),e.unitName(),old.plannedAmount()==null || e.plannedAmount()==null ? null : old.plannedAmount().add(e.plannedAmount()),old.completedAmount().add(e.completedAmount())));

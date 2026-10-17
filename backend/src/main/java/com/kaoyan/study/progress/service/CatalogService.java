@@ -85,7 +85,22 @@ public class CatalogService {
             cumulative.put(key,new Quantity(directionOf(r.subjectId(),s.courses()),r.subjectId(),r.subjectName(),r.unitId(),r.unitName(),
                     r.amount().add(old==null ? BigDecimal.ZERO:old.amount())));
         }
-        return new Library(mapper.revision(),views,new ArrayList<>(cumulative.values()),rows.stream().filter(r->r.amount()!=null && !assigned.containsKey(r.id())).toList());
+        return new Library(mapper.revision(),views,new ArrayList<>(cumulative.values()),rows.stream().filter(r->r.amount()!=null && !assigned.containsKey(r.id())).toList(),countedProgress(rows,s.courses()));
+    }
+    /** 无固定总量的每日数量任务直接从原记录汇总，不创建课程分母或第二份完成事实。 */
+    private List<CountedProgress> countedProgress(List<StudyRecordView> rows,List<CourseRow> courses) {
+        var byTask=rows.stream().filter(r->r.taskId()!=null).collect(Collectors.groupingBy(StudyRecordView::taskId));
+        return mapper.countedTasks().stream().map(task->{
+            var matching=byTask.getOrDefault(task.id(),List.of()).stream()
+                    .filter(r->Objects.equals(r.subjectId(),task.subjectId()) && Objects.equals(r.unitId(),task.unitId())).toList();
+            var quantities=matching.stream().map(r->"COUNT_REVIEW".equals(task.mode()) ? r.reviewAmount():r.amount()).toList();
+            long unknown=quantities.stream().filter(Objects::isNull).count();
+            BigDecimal amount=!matching.isEmpty() && unknown==matching.size() ? null:
+                    quantities.stream().filter(Objects::nonNull).reduce(BigDecimal.ZERO,BigDecimal::add);
+            return new CountedProgress(task.id(),task.title(),directionOf(task.subjectId(),courses),task.mode(),
+                    task.subjectId(),subjects.get(task.subjectId()).getName(),task.unitId(),units.get(task.unitId()).getName(),
+                    amount,matching.size(),matching.stream().map(StudyRecordView::recordDate).distinct().count(),unknown);
+        }).toList();
     }
     private BigDecimal nodeCompleted(NodeRow node,List<NodeRow> nodes,Map<Long,BigDecimal> totals) {
         if(node.totalAmount()!=null) return totals.getOrDefault(node.id(),BigDecimal.ZERO);

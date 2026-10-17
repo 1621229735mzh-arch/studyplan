@@ -9,7 +9,10 @@ public record DayProgressRequest(
     @NotBlank @Size(max=4000) String revision,
     @NotBlank @Size(max=64) String clientToken,
     @DecimalMin("0.000001") @Digits(integer=12,fraction=6) BigDecimal actualAmount,
-    @Size(max=500) String note) {
+    @Size(max=500) String note, @Min(1) Integer problemNumber) {
+    public DayProgressRequest(LocalDate date,Long taskId,Integer completionPercent,Integer durationMinutes,String revision,String clientToken,BigDecimal actualAmount,String note) {
+        this(date,taskId,completionPercent,durationMinutes,revision,clientToken,actualAmount,note,null);
+    }
     public DayProgressRequest(LocalDate date,Long taskId,Integer completionPercent,Integer durationMinutes,String revision,String clientToken) {
         this(date,taskId,completionPercent,durationMinutes,revision,clientToken,null,null);
     }

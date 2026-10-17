@@ -19,7 +19,7 @@ export interface ImportDocument {
   goals: { key: string; subject: string; title: string; description?: string; startDate: string; endDate: string }[]
   months: { month: string; title: string; description?: string }[]
   weeks: { startDate: string; title: string; description?: string }[]
-  tasks: { key: string; subject: string; unit: string; title: string; goalKey?: string; plannedAmount: number | null; activity?: {mode:'TIMED_STUDY'|'RECAP'|'CHECK_ONLY'|'CONTINUED_STUDY'; description?:string|null; flexibleMinutes:number}; continuation?: {streamKey:string; title:string; position:number}; sequence?: { mode: 'COMPLETE_THEN_ADVANCE'; items: { key: string; title: string; url: string }[] } }[]
+  tasks: { key: string; subject: string; unit: string; title: string; goalKey?: string; plannedAmount: number | null; activity?: {mode:'TIMED_STUDY'|'RECAP'|'CHECK_ONLY'|'CONTINUED_STUDY' | 'COUNT_STUDY' | 'COUNT_REVIEW'; description?:string|null; flexibleMinutes:number}; continuation?: {streamKey:string; title:string; position:number}; sequence?: { mode: 'COMPLETE_THEN_ADVANCE' | 'SELECT_BY_NUMBER'; items: { key: string; title: string; url: string }[] } }[]
   days: { date: string; items: { taskKey: string; amount: number | null; estimatedMinutes?: number | null }[] }[]
 }
 export interface ImportPreview {

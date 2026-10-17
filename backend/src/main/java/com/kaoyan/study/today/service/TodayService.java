@@ -93,7 +93,10 @@ public class TodayService {
             String group = sectionName(subjectNames.get(task.subjectId()));
             groups.computeIfAbsent(group, x -> new ArrayList<>()).add(new TodayChecklistTask(
                     "LEARNING", task.id(), task.title(), task.completionPercent(), task.estimatedMinutes(),
-                    task.remainingMinutes(), task.revision(), null, (task.activity()!=null || task.plannedAmount()!=null && task.plannedAmount().signum() > 0) && (task.sequence()==null || task.sequence().actionable()), task.sequence()==null ? null : task.sequence().summary(),task.activity(),task.unitName(),task.continuation()));
+                    task.remainingMinutes(), task.revision(), null, (task.activity()!=null || task.plannedAmount()!=null && task.plannedAmount().signum() > 0) && (task.sequence()==null || task.sequence().actionable()), task.sequence()==null ? null : task.sequence().summary(),task.activity(),task.unitName(),task.continuation(),
+                    "COUNT_REVIEW".equals(task.activity()==null ? null:task.activity().mode()) && task.completionPercent().signum()>0
+                            && records.stream().filter(r->task.id().equals(r.taskId())).allMatch(r->r.reviewAmount()==null) ? null :
+                    records.stream().filter(r->task.id().equals(r.taskId())).map(r->r.reviewAmount()!=null ? r.reviewAmount():r.amount()).filter(Objects::nonNull).reduce(BigDecimal.ZERO,BigDecimal::add)));
         }
         for (var record : records) {
             String group = sectionName(subjectNames.get(record.subjectId()));

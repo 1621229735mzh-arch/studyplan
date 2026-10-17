@@ -39,8 +39,9 @@ export interface TodayResponse {
 }
 
 export interface TodayChecklistTask {
+  recordedAmount?: number | null
   continuation?: { streamId: number; title: string; position: number; referenceDate: string; carried: boolean } | null
-  activity?: { mode: 'TIMED_STUDY' | 'RECAP' | 'CHECK_ONLY' | 'CONTINUED_STUDY'; description: string | null; flexibleMinutes: number } | null
+  activity?: { mode: 'TIMED_STUDY' | 'RECAP' | 'CHECK_ONLY' | 'CONTINUED_STUDY' | 'COUNT_STUDY' | 'COUNT_REVIEW'; description: string | null; flexibleMinutes: number } | null
   unitName?: string | null
   sequence?: import('@/features/learning/types').SequenceState | null
   kind: 'LEARNING' | 'REVIEW'

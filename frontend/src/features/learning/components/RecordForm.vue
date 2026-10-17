@@ -68,6 +68,7 @@ function createEmptyModel(): LearningRecordFormModel {
     recordDate: todayIso(),
     taskId: null,
     sequenceItemId: null,
+    problemNumber: null,
     subjectId: null,
     unitId: null,
     amount: null,
@@ -123,6 +124,7 @@ function onDateChange(value: unknown): void {
 }
 
 function onTaskChange(value: unknown): void {
+  form.problemNumber = null
   form.sequenceItemId = null
   sequenceReady.value = true
   form.taskId = typeof value === 'number' ? value : null
@@ -194,7 +196,7 @@ defineExpose({ form, submit, reset, fillFrom, setServerError })
     />
 
     <div class="record-form__grid">
-      <SequenceRecordItem v-if="selectedTask?.sequential || form.sequenceItemId" :task-id="form.taskId" :date="form.recordDate" :item-id="form.sequenceItemId" :editing="mode === 'edit'" @item="form.sequenceItemId = $event" @ready="sequenceReady = $event" />
+      <SequenceRecordItem v-if="selectedTask?.sequential || form.sequenceItemId" :task-id="form.taskId" :date="form.recordDate" :item-id="form.sequenceItemId" :editing="mode === 'edit'" :problem-number="form.problemNumber" :disabled="submitting || !online" @number="form.problemNumber = $event" @item="form.sequenceItemId = $event" @ready="sequenceReady = $event" />
       <ElFormItem label="日期" :error="fieldErrors.recordDate">
         <ElDatePicker
           :model-value="form.recordDate"

@@ -31,10 +31,10 @@ const createForm = ref<InstanceType<typeof RecordEditorForm> | null>(null)
 const editForm = ref<InstanceType<typeof RecordEditorForm> | null>(null)
 const rangeLabel = computed(() => filters.from ? `${filters.from} — ${filters.to}` : '全部日期')
 const taskOptions = computed<LearningRecordTaskOption[]>(() => {
-  const options: LearningRecordTaskOption[] = planTasks.value.filter(t=>t.activityMode!=='CHECK_ONLY' && t.activityMode!=='CONTINUED_STUDY').map(task => ({ sequential: task.sequential, id: task.id, title: task.title, subjectId: task.subjectId, subjectName: catalog.subjectNameOf(task.subjectId), unitId: task.unitId, unitName: catalog.unitNameOf(task.unitId) }))
+  const options: LearningRecordTaskOption[] = planTasks.value.filter(t=>t.activityMode!=='CHECK_ONLY' && t.activityMode!=='CONTINUED_STUDY').map(task => ({ activityMode: task.activityMode, sequential: task.sequential, id: task.id, title: task.title, subjectId: task.subjectId, subjectName: catalog.subjectNameOf(task.subjectId), unitId: task.unitId, unitName: catalog.unitNameOf(task.unitId) }))
   const current = editing.value
   // 已归档任务可能不在候选列表中，编辑时仍保留原来的关联及单位。
-  if (current?.taskId && !options.some(task => task.id === current.taskId)) options.push({ sequential: !!current.sequenceItemId, id: current.taskId, title: current.taskTitle || '原关联任务', subjectId: current.subjectId ?? null, subjectName: current.subjectName ?? null, unitId: current.unitId ?? null, unitName: current.unitName ?? null })
+  if (current?.taskId && !options.some(task => task.id === current.taskId)) options.push({ activityMode: current.activityMode, sequential: !!current.sequenceItemId, id: current.taskId, title: current.taskTitle || '原关联任务', subjectId: current.subjectId ?? null, subjectName: current.subjectName ?? null, unitId: current.unitId ?? null, unitName: current.unitName ?? null })
   return options
 })
 let request = 0
@@ -65,7 +65,7 @@ async function openEdit(record: LearningRecord) {
   editing.value = record
   editVisible.value = true
   await nextTick()
-  editForm.value?.fillFrom({ sequenceItemId: record.sequenceItemId ?? null, recordDate: record.recordDate, taskId: record.taskId ?? null, subjectId: record.subjectId ?? null, unitId: record.unitId ?? null, amount: record.amount ?? null, durationMinutes: record.durationMinutes ?? null, content: record.content ?? '', note: record.note ?? '' })
+  editForm.value?.fillFrom({ sequenceItemId: record.sequenceItemId ?? null, recordDate: record.recordDate, taskId: record.taskId ?? null, subjectId: record.subjectId ?? null, unitId: record.unitId ?? null, amount: record.reviewAmount ?? record.amount ?? null, durationMinutes: record.durationMinutes ?? null, content: record.content ?? '', note: record.note ?? '' })
 }
 async function save(payload: LearningRecordFormSubmission, edit = false) {
   if (!online.value || submitting.value) return

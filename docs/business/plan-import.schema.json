@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "408doing 外部计划合同 v1—v5",
+  "title": "408doing 外部计划合同 v1—v7",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -23,7 +23,9 @@
         2,
         3,
         4,
-        5
+        5,
+        6,
+        7
       ]
     },
     "planId": {
@@ -225,11 +227,13 @@
             ],
             "properties": {
               "mode": {
-                "const": "COMPLETE_THEN_ADVANCE"
+                "enum": [
+                  "COMPLETE_THEN_ADVANCE",
+                  "SELECT_BY_NUMBER"
+                ]
               },
               "items": {
                 "type": "array",
-                "minItems": 1,
                 "maxItems": 5000,
                 "items": {
                   "type": "object",
@@ -259,7 +263,32 @@
                   }
                 }
               }
-            }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "mode": {
+                      "const": "SELECT_BY_NUMBER"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "items": {
+                      "maxItems": 0
+                    }
+                  }
+                },
+                "else": {
+                  "properties": {
+                    "items": {
+                      "minItems": 1
+                    }
+                  }
+                }
+              }
+            ]
           },
           "activity": {
             "type": [
@@ -276,7 +305,9 @@
                   "TIMED_STUDY",
                   "RECAP",
                   "CHECK_ONLY",
-                  "CONTINUED_STUDY"
+                  "CONTINUED_STUDY",
+                  "COUNT_STUDY",
+                  "COUNT_REVIEW"
                 ]
               },
               "description": {
@@ -339,7 +370,11 @@
                   ],
                   "properties": {
                     "mode": {
-                      "const": "CHECK_ONLY"
+                      "enum": [
+                        "CHECK_ONLY",
+                        "COUNT_STUDY",
+                        "COUNT_REVIEW"
+                      ]
                     }
                   }
                 }
@@ -630,6 +665,76 @@
                         "RECAP",
                         "CHECK_ONLY"
                       ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "enum": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "tasks": {
+            "items": {
+              "properties": {
+                "activity": {
+                  "properties": {
+                    "mode": {
+                      "enum": [
+                        "TIMED_STUDY",
+                        "RECAP",
+                        "CHECK_ONLY",
+                        "CONTINUED_STUDY"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "enum": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "tasks": {
+            "items": {
+              "properties": {
+                "sequence": {
+                  "properties": {
+                    "mode": {
+                      "const": "COMPLETE_THEN_ADVANCE"
                     }
                   }
                 }

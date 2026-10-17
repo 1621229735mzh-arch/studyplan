@@ -13,6 +13,7 @@ import CourseRing from '../components/CourseRing.vue'
 import CatalogNodeTree from '../components/CatalogNodeTree.vue'
 import CatalogImportDialog from '../components/CatalogImportDialog.vue'
 import CatalogEditorDialog from '../components/CatalogEditorDialog.vue'
+import CountedProgressCards from '../components/CountedProgressCards.vue'
 
 const route = useRoute(); const catalog = useCatalogStore()
 const { library, loading, error, notice, readonly, syncedAt, online, reload, accept } = useCatalogWorkspace()
@@ -23,6 +24,7 @@ const branch = computed(() => selectedCourse.value?.branch || String(route.query
 const branches = computed(() => [...new Set(courses.value.map(c => c.branch))])
 const visibleCourses = computed(() => courses.value.filter(c => !branch.value || c.branch === branch.value))
 const cumulative = computed(() => library.value?.cumulative.filter(q => q.direction === direction.value?.key) ?? [])
+const activities = computed(() => library.value?.activities?.filter(a => a.direction === direction.value?.key) ?? [])
 const otherCumulative = computed(() => library.value?.cumulative.filter(q => q.direction === 'UNASSIGNED') ?? [])
 const pending = computed(() => library.value?.unclassified.filter(r => {
   const group = library.value?.cumulative.find(q => q.subjectId === r.subjectId)
@@ -74,13 +76,14 @@ onMounted(() => { if (online.value) void catalog.load() })
     <div v-else-if="loading" class="workspace-loading" role="status">正在读取学习进度…</div>
     <template v-else-if="library">
       <section v-if="!selectedCourse" class="cumulative-panel"><span>学科累计</span><div v-if="cumulative.length" class="cumulative-amounts"><strong v-for="q in cumulative" :key="q.subjectId + ':' + q.unitId">{{ q.subjectName }} <b>{{ amountText(q.amount,q.unitName) }}</b></strong></div><p v-else class="workspace-note">还没有该方向的学习量记录。</p></section>
+      <CountedProgressCards v-if="!selectedCourse && !branch && activities.length" :activities="activities" />
       <section v-if="selectedCourse" class="workspace-panel course-detail">
         <div class="course-overview"><CourseRing :completed="selectedCourse.completedAmount" :total="selectedCourse.totalAmount" :unit="selectedCourse.unitName" /><div><h2>{{ selectedCourse.title }}</h2><p class="course-quantity">已完成 {{ selectedCourse.completedAmount }} / {{ selectedCourse.totalAmount }} {{ selectedCourse.unitName }}</p><p v-if="selectedCourse.recordedAmount !== selectedCourse.completedAmount" class="workspace-note">实际累计 {{ amountText(selectedCourse.recordedAmount, selectedCourse.unitName) }}；每项完成度分别以目录总量为限。</p><p class="workspace-note">同一条学习记录只计一次，修改与删除后自动更新。</p></div></div>
         <h3 class="catalog-title">完整学习目录</h3><CatalogNodeTree v-if="!readonly" :nodes="selectedCourse.nodes" :unit="selectedCourse.unitName" :readonly="readonly || busy" @link="openLink" /><p v-else class="workspace-note">联网后查看完整目录与任务归属。</p>
       </section>
       <template v-else-if="!branch && branches.length"><div class="section-heading"><div><h2>按分科查看</h2><p>进入分科，再选择课程或资料。</p></div></div><nav class="branch-grid" aria-label="分科"><RouterLink v-for="b in branches" :key="b" :to="{ path: `/progress/${direction.key}`, query: { branch: b } }" class="branch-card"><h3>{{ b }}</h3><span>查看课程与资料 ↗</span></RouterLink></nav></template>
       <template v-else-if="visibleCourses.length"><div class="section-heading"><h2>课程与资料</h2></div><div class="course-grid"><RouterLink v-for="course in visibleCourses" :key="course.id" :to="{ path: `/progress/${direction.key}`, query: { branch: course.branch, course: course.id } }" class="course-card"><CourseRing :completed="course.completedAmount" :total="course.totalAmount" :unit="course.unitName" /><div><span class="workspace-note">{{ course.branch }}</span><h3>{{ course.title }}</h3><p>{{ course.completedAmount }} / {{ course.totalAmount }} {{ course.unitName }}</p><span class="course-enter">查看目录 ↗</span></div></RouterLink></div></template>
-      <div v-else class="workspace-empty"><h3>还没有课程或资料目录</h3><p>可以从已有计划整理候选，或导入包含未排期内容的完整目录。</p><ElButton type="primary" :disabled="readonly || !online || busy" @click="openEditor()">整理第一份目录</ElButton></div>
+      <div v-else-if="!activities.length || branch" class="workspace-empty"><h3>还没有课程或资料目录</h3><p>可以从已有计划整理候选，或导入包含未排期内容的完整目录。</p><ElButton type="primary" :disabled="readonly || !online || busy" @click="openEditor()">整理第一份目录</ElButton></div>
       <details v-if="pending.length && !readonly" class="workspace-panel pending-records"><summary>待归类学习成果 · {{ pending.length }} 条</summary><p class="workspace-note">已计入学科累计。选择明确归属后计入课程，不会增加第二份数量。</p><article v-for="record in pending" :key="record.id" class="pending-row"><div><span class="workspace-note">{{ record.subjectName }}</span><h4>{{ record.content || record.taskTitle || '学习记录' }}</h4><span>{{ amountText(record.amount,record.unitName) }}</span></div><div class="pending-target"><ElSelect v-model="choices[record.id]" filterable placeholder="选择课程与具体内容" :disabled="busy || !online"><ElOption v-for="o in courseOptions(record)" :key="o.id" :label="o.title" :value="o.id" /></ElSelect><ElButton :disabled="!choices[record.id] || busy || !online" @click="assign(record)">确认归类</ElButton><p v-if="!courseOptions(record).length" class="workspace-note">先建立同科目、同单位的目录。</p></div></article></details>
       <details v-if="otherCumulative.length && !selectedCourse" class="workspace-panel"><summary>尚未归入四个方向的科目累计</summary><p v-for="q in otherCumulative" :key="q.subjectId + ':' + q.unitId" class="workspace-note">{{ q.subjectName }} · {{ amountText(q.amount, q.unitName) }}</p><p class="workspace-note">整理课程时确认所属方向后，这些成果会进入对应学科。</p></details>
     </template>

@@ -25,6 +25,7 @@ class SequenceLearningIntegrationTest {
     @Autowired StudyRecordService records;
     @Autowired SequenceLearningService sequences;
     @Autowired TaskService tasks;
+    @Autowired ProblemNumberModeService numberMode;
     @Autowired DailyPlanService daily;
     @Autowired SubjectService subjects;
     @Autowired StudyUnitService units;
@@ -156,6 +157,100 @@ class SequenceLearningIntegrationTest {
         snapshot=records.dayTasks(date).stream().filter(t->t.id().equals(taskId)).findFirst().orElseThrow();
         records.recordDayProgress(new DayProgressRequest(date,taskId,100,null,snapshot.revision(),UUID.randomUUID().toString()));
         assertThat(sequences.state(taskId,date.plusDays(1)).current().key()).isEqualTo("32");
+    }
+
+    void convertNumbers(List<Integer> numbers) {
+        var preview=numberMode.preview(taskId);
+        var corrections=new ArrayList<ProblemNumberModeService.Correction>();
+        for(int i=0;i<preview.history().size();i++) {
+            var r=preview.history().get(i).record();
+            corrections.add(new ProblemNumberModeService.Correction(r.id(),r.version(),numbers.get(i)));
+        }
+        numberMode.confirm(taskId,new ProblemNumberModeService.Confirm("LeetCode每日一题：自行填写题号",preview.version(),preview.workspaceRevision(),preview.revision(),corrections));
+    }
+    StudyRecordCreateRequest numbered(int day,int number,BigDecimal amount,String token) {
+        return new StudyRecordCreateRequest(taskId,null,null,date.plusDays(day),amount,null,null,null,token,null,number);
+    }
+    @Test void convertsExistingThreeRecordsTo31_32_49InPlace() {
+        var first=complete(0,0);var second=complete(1,1);var third=complete(2,2);
+        convertNumbers(List.of(31,32,49));
+        assertThat(records.get(first.id())).usingRecursiveComparison().ignoringFields("taskTitle").isEqualTo(first);
+        assertThat(records.get(second.id())).usingRecursiveComparison().ignoringFields("taskTitle").isEqualTo(second);
+        var corrected=records.get(third.id());
+        assertThat(corrected.recordDate()).isEqualTo(third.recordDate());
+        assertThat(corrected.durationMinutes()).isEqualTo(third.durationMinutes());
+        assertThat(corrected.amount()).isEqualByComparingTo(third.amount());
+        assertThat(corrected.version()).isEqualTo(third.version()+1);
+        assertThat(corrected.sequenceTitle()).isEqualTo("LeetCode 49");
+        assertThat(tasks.progress(taskId).completedAmount()).isEqualByComparingTo("3");
+        assertThat(records.list(null,null,taskId,null)).hasSize(3);
+        assertThat(sequences.state(taskId,date).mode()).isEqualTo("SELECT_BY_NUMBER");
+        assertThat(sequences.state(taskId,date).current()).isNull();
+        assertThat(sequences.state(taskId,date.plusDays(2)).dayItem().key()).isEqualTo("49");
+    }
+    @Test void arbitraryNumbersAttemptRetryEditAndDeleteKeepProgressCorrect() {
+        convertNumbers(List.of());
+        assertThat(sequences.state(taskId,date).actionable()).isTrue();
+        var request=numbered(0,3000,null,UUID.randomUUID().toString());
+        var attempt=records.create(request);
+        assertThat(records.create(request).id()).isEqualTo(attempt.id());
+        assertThat(tasks.progress(taskId).completedAmount()).isEqualByComparingTo("0");
+        var completed=records.create(numbered(0,3000,BigDecimal.ONE,UUID.randomUUID().toString()));
+        var edited=records.update(completed.id(),new StudyRecordUpdateRequest(taskId,null,null,date,BigDecimal.ONE,null,"原内容","原复盘",completed.version(),completed.sequenceItemId(),49));
+        assertThat(edited.sequenceTitle()).isEqualTo("LeetCode 49");
+        assertThat(tasks.progress(taskId).completedAmount()).isEqualByComparingTo("1");
+        assertThat(sequences.state(taskId,date.plusDays(1)).dayItem()).isNull();
+        assertThat(sequences.state(taskId,date.plusDays(1)).actionable()).isTrue();
+        assertThatThrownBy(()->records.update(completed.id(),new StudyRecordUpdateRequest(taskId,null,null,date,BigDecimal.ONE,null,null,null,completed.version(),completed.sequenceItemId(),50))).isInstanceOf(BusinessException.class);
+        records.delete(edited.id(),edited.version());
+        assertThat(tasks.progress(taskId).completedAmount()).isEqualByComparingTo("0");
+    }
+    @Test void numberedDayProgressRejectsTokenChangesSecondCompletionAndDeletedReplay() {
+        convertNumbers(List.of());
+        var snapshot=records.dayTasks(date).stream().filter(t->t.id().equals(taskId)).findFirst().orElseThrow();
+        var request=new DayProgressRequest(date,taskId,100,null,snapshot.revision(),UUID.randomUUID().toString(),null,null,49);
+        var saved=records.recordDayProgress(request);
+        assertThat(records.recordDayProgress(request).id()).isEqualTo(saved.id());
+        assertThatThrownBy(()->records.recordDayProgress(new DayProgressRequest(date,taskId,100,null,snapshot.revision(),request.clientToken(),null,null,50))).isInstanceOf(BusinessException.class);
+        var refreshed=records.dayTasks(date).stream().filter(t->t.id().equals(taskId)).findFirst().orElseThrow();
+        assertThatThrownBy(()->records.recordDayProgress(new DayProgressRequest(date,taskId,100,null,refreshed.revision(),UUID.randomUUID().toString(),null,null,50))).isInstanceOf(BusinessException.class);
+        records.delete(saved.id(),saved.version());
+        assertThat(records.dayTasks(date).stream().filter(t->t.id().equals(taskId)).findFirst().orElseThrow().revision()).isNotEqualTo(snapshot.revision());
+        assertThatThrownBy(()->records.create(numbered(0,49,BigDecimal.ONE,request.clientToken()))).isInstanceOf(BusinessException.class);
+        assertThat(records.list(null,null,taskId,null)).isEmpty();
+    }
+    @Test void numberedModeRejectsInvalidNumberFractionDateAndDuplicateProblem() {
+        convertNumbers(List.of());
+        assertThatThrownBy(()->records.create(numbered(0,0,BigDecimal.ONE,null))).isInstanceOf(BusinessException.class);
+        assertThatThrownBy(()->records.create(numbered(0,-1,BigDecimal.ONE,null))).isInstanceOf(BusinessException.class);
+        assertThatThrownBy(()->records.create(numbered(0,49,new BigDecimal("0.5"),null))).isInstanceOf(BusinessException.class);
+        assertThatThrownBy(()->records.create(numbered(3,49,BigDecimal.ONE,null))).isInstanceOf(BusinessException.class);
+        assertThatThrownBy(()->records.create(new StudyRecordCreateRequest(taskId,null,null,date,BigDecimal.ONE,null,null,null,null,items.get(0).id()))).isInstanceOf(BusinessException.class);
+        records.create(numbered(0,49,BigDecimal.ONE,null));
+        assertThatThrownBy(()->records.create(numbered(1,49,BigDecimal.ONE,null))).isInstanceOf(BusinessException.class);
+    }
+    @Test void conversionChecksStaleVersionsAndRollsBackAllCorrectionsOnFailure() {
+        var first=complete(0,0);var second=complete(1,1);
+        var preview=numberMode.preview(taskId);
+        var invalid=List.of(new ProblemNumberModeService.Correction(first.id(),first.version(),49),new ProblemNumberModeService.Correction(second.id(),second.version()+1,50));
+        assertThatThrownBy(()->numberMode.confirm(taskId,new ProblemNumberModeService.Confirm("自填题号",preview.version(),preview.workspaceRevision(),preview.revision(),invalid))).isInstanceOf(BusinessException.class);
+        assertThat(records.get(first.id())).usingRecursiveComparison().ignoringFields("taskTitle").isEqualTo(first);
+        assertThat(sequences.state(taskId,date).mode()).isEqualTo("COMPLETE_THEN_ADVANCE");
+        complete(2,2);
+        assertThatThrownBy(()->numberMode.confirm(taskId,new ProblemNumberModeService.Confirm("自填题号",preview.version(),preview.workspaceRevision(),preview.revision(),List.of()))).isInstanceOf(BusinessException.class);
+    }
+    @Test void v7ImportsAnEmptyNumberDirectoryAndRejectsOldVersions() {
+        String flexible=source.replace("\"schemaVersion\":2","\"schemaVersion\":7").replace("COMPLETE_THEN_ADVANCE","SELECT_BY_NUMBER");
+        int start=flexible.indexOf("\"items\":[");int end=flexible.indexOf("]",start);
+        flexible=flexible.substring(0,start)+"\"items\":[]"+flexible.substring(end+1);
+        flexible=flexible.replace("\"planId\":\"", "\"planId\":\"new-");
+        var preview=imports.preview(flexible);
+        imports.confirm(new PlanImportRequest(flexible,preview.previewToken()));
+        var imported=tasks.list(subjectId,null,null).stream().filter(t->!t.getId().equals(taskId)).findFirst().orElseThrow();
+        assertThat(sequences.state(imported.getId(),date).items()).isEmpty();
+        assertThat(sequences.state(imported.getId(),date).actionable()).isTrue();
+        final String old=flexible.replace("\"schemaVersion\":7","\"schemaVersion\":6");
+        assertThatThrownBy(()->imports.preview(old)).isInstanceOf(BusinessException.class);
     }
 
 }

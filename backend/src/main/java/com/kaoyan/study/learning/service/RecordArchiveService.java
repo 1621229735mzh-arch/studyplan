@@ -36,7 +36,8 @@ public class RecordArchiveService {
                         var list=entry.getValue(); var first=list.getFirst(); var c=classified.get(first.id());
                         groups.add(new Group(entry.getKey(),first.subjectId(),first.subjectName(),c==null ? null:c.courseId(),
                                 c==null ? Objects.toString(first.taskTitle(),Objects.toString(first.content(),"自主学习")):c.courseTitle(),
-                                first.unitId(),first.unitName(),amount(list),minutes(list),missing(list),list));
+                                first.unitId(),first.unitName(),amount(list),minutes(list),missing(list),list,
+                                list.stream().allMatch(r->r.reviewAmount()==null) ? null : list.stream().map(StudyRecordView::reviewAmount).filter(Objects::nonNull).reduce(BigDecimal.ZERO,BigDecimal::add)));
                     }
                     days.add(new Day(LocalDate.parse(day.getKey()),stats(day.getValue()),groups));
                 }

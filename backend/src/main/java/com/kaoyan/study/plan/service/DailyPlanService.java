@@ -50,9 +50,9 @@ public class DailyPlanService {
     }
     private void validateActivity(Long taskId,BigDecimal amount,Integer minutes) {
         var activity=activities.get(taskId);
-        if (activity!=null && "CHECK_ONLY".equals(activity.mode())) {
+        if (activity!=null && ("CHECK_ONLY".equals(activity.mode()) || TaskActivityService.counted(activity))) {
             if (amount!=null || minutes!=null)
-                throw new ConflictException("CONFIRMATION_MEASUREMENT","完成确认型只勾选状态，不填写数量或用时");
+                throw new ConflictException("CONFIRMATION_MEASUREMENT","此安排不填写计划数量或用时，实际数量在学习后记录");
             return;
         }
         if (activity!=null ? amount!=null || minutes!=null && (minutes<1 || minutes>1440) : amount==null)

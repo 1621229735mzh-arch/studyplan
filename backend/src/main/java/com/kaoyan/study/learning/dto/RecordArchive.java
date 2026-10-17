@@ -13,5 +13,5 @@ public record RecordArchive(Stats stats, List<Month> months) {
     public record Day(LocalDate date, Stats stats, List<Group> groups) {}
     public record Group(String key, Long subjectId, String subjectName, Long courseId, String title,
                         Long unitId, String unitName, BigDecimal amount, Long studyMinutes,
-                        int missingDurationRecords, List<StudyRecordView> records) {}
+                        int missingDurationRecords, List<StudyRecordView> records, BigDecimal reviewAmount) {}
 }

@@ -161,7 +161,7 @@ public class PlanImportService {
     }
 
     public void validate(PlanImportDocument doc) {
-        if (doc.schemaVersion()<1 || doc.schemaVersion()>5) invalid("schemaVersion","仅支持版本 1—5");
+        if (doc.schemaVersion()<1 || doc.schemaVersion()>7) invalid("schemaVersion","仅支持版本 1—7");
         range(doc.startDate(),doc.endDate(),doc.startDate(),doc.endDate(),"起止日期");
         if (doc.startDate().getYear()<1000 || doc.endDate().getYear()>9999) invalid("日期","年份必须在 1000—9999 范围内");
         long days=ChronoUnit.DAYS.between(doc.startDate(),doc.endDate())+1;
@@ -176,9 +176,12 @@ public class PlanImportService {
         }
         for (var t:doc.tasks()) {
             boolean continued=t.activity()!=null && "CONTINUED_STUDY".equals(t.activity().mode());
-            if (continued != (t.continuation()!=null) || continued && (doc.schemaVersion()!=5 || t.activity().flexibleMinutes()!=0))
+            if (continued != (t.continuation()!=null) || continued && (doc.schemaVersion()<5 || t.activity().flexibleMinutes()!=0))
                 invalid("tasks."+t.key()+".continuation","学习接续须使用版本 5、CONTINUED_STUDY 与 continuation，弹性分钟为 0");
             if (t.activity()!=null) {
+                if (("COUNT_STUDY".equals(t.activity().mode()) || "COUNT_REVIEW".equals(t.activity().mode()))
+                        && (doc.schemaVersion()<6 || t.activity().flexibleMinutes()!=0))
+                    invalid("activity","实际数量安排须使用版本 6，弹性分钟为 0");
                 if (doc.schemaVersion()<3 || t.sequence()!=null || t.plannedAmount()!=null)
                     invalid("tasks."+t.key()+".activity","活动安排须使用版本 3 或 4，数量留空，不能同时声明接续题目");
                 if ("CHECK_ONLY".equals(t.activity().mode()) && (doc.schemaVersion()<4 || t.activity().flexibleMinutes()!=0))
@@ -186,7 +189,9 @@ public class PlanImportService {
             } else if (t.plannedAmount()==null) invalid("tasks."+t.key()+".plannedAmount","数量型任务必须填写总量");
             if (t.sequence()!=null) {
                 if (doc.schemaVersion()<2) invalid("sequence","接续任务须使用版本 2 或 3");
-                if (t.plannedAmount().compareTo(BigDecimal.valueOf(t.sequence().items().size()))!=0)
+                if ("SELECT_BY_NUMBER".equals(t.sequence().mode())) {
+                    if (doc.schemaVersion()<7 || !t.sequence().items().isEmpty()) invalid("sequence","自行输入题号须使用版本 7，且不预设题目清单");
+                } else if (t.sequence().items().isEmpty() || t.plannedAmount().compareTo(BigDecimal.valueOf(t.sequence().items().size()))!=0)
                     invalid("sequence.items","有序题目数须等于计划总名额，每题对应 1 单位");
                 unique(t.sequence().items(),PlanImportDocument.SequenceItem::key,"sequence.items.key");
                 for (var item:t.sequence().items()) {
@@ -214,9 +219,12 @@ public class PlanImportService {
                 var t=taskMap.get(item.taskKey());
                 if (t==null) invalid("days."+d.date(),"未知 taskKey："+item.taskKey());
                 if (t.activity()!=null) {
-                    if ("CHECK_ONLY".equals(t.activity().mode())) {
+                if (("COUNT_STUDY".equals(t.activity().mode()) || "COUNT_REVIEW".equals(t.activity().mode()))
+                        && (doc.schemaVersion()<6 || t.activity().flexibleMinutes()!=0))
+                    invalid("activity","实际数量安排须使用版本 6，弹性分钟为 0");
+                    if (Set.of("CHECK_ONLY","COUNT_STUDY","COUNT_REVIEW").contains(t.activity().mode())) {
                         if (item.amount()!=null || item.estimatedMinutes()!=null)
-                            invalid("days."+d.date(),"完成确认型不填写数量或预计用时");
+                            invalid("days."+d.date(),"完成确认和实际数量安排不填写计划数量或预计用时");
                     } else if (item.amount()!=null || item.estimatedMinutes()!=null && (item.estimatedMinutes()<=0 || item.estimatedMinutes()>1440))
                         invalid("days."+d.date(),"活动安排数量须留空；预计用时可省略，提供时须为 1—1440 分钟");
                 } else if (item.amount()==null) invalid("days."+d.date()+".amount","数量型任务必须填写日计划量");

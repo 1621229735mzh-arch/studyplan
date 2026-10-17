@@ -33,3 +33,9 @@
 V17 保存 `task_sequence`、`task_sequence_item` 和 `study_record.sequence_item_id`，不保存第二份完成游标。计划模块维护序列定义，学习模块派生完成情况和校验记录。`GET /api/learning/sequences/{taskId}?date=YYYY-MM-DD` 返回清单、第一道未完成题及日期展示题；普通任务返回空响应。所有接口沿用身份验证与 CSRF。
 
 扩展目录及编辑题目顺序暂不开放；新一期使用独立计划导入。个人题目计划仍保存在忽略目录，不写入数据库迁移。
+
+## 自行输入题号（2026-10-17）
+
+SELECT_BY_NUMBER 是显式选择的新模式。今日完成或尝试均填写正整数 problemNumber，当前题为空且不自动推进；dayItem只显示当天真实记录。v7导入时items必须为空，运行时题目身份按输入建立，旧目录条目可保留用于历史追溯，但不作为待做清单。每天最多完成1题，同题不重复增加首次完成量，未完成尝试不计量且不计时。编辑原记录可更正题号，版本检查与事务保留。
+
+GET /api/plan/tasks/{id}/problem-number-mode 返回任务、工作区、记录版本和按日期、ID排列的历史记录；POST携带全部历史记录的id、version、problemNumber与预览版本，原地转换并通过学习服务更正变化的题号。日期、原记录及数量保持；失败整体回滚。旧固定顺序模式不自动转换。

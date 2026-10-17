@@ -16,6 +16,7 @@ import com.kaoyan.study.plan.entity.PlanSource;
 import com.kaoyan.study.plan.entity.Task;
 import com.kaoyan.study.plan.service.DailyPlanService;
 import com.kaoyan.study.plan.service.TaskService;
+import static com.kaoyan.study.plan.service.TaskActivityService.counted;
 import com.kaoyan.study.settings.service.StudyUnitService;
 import com.kaoyan.study.settings.service.SubjectService;
 
@@ -112,6 +113,8 @@ public class StudyRecordService {
         if (request.clientToken() != null && !request.clientToken().isBlank()) {
             StudyRecord existing = studyRecordMapper.findByClientToken(request.clientToken());
             if (existing != null) {
+                verifyCountRetry(existing,request.taskId(),request.recordDate(),request.amount());
+                sequences.verifyNumberRetry(existing,request.taskId(),request.recordDate(),request.amount(),request.problemNumber());
                 return get(existing.getId());
             }
         }
@@ -130,21 +133,23 @@ public class StudyRecordService {
         // Recheck after taking the task lock: an identical retry may have committed while waiting.
         if (request.clientToken()!=null) {
             var retry=studyRecordMapper.findByClientToken(request.clientToken());
-            if (retry!=null) return get(retry.getId());
+            if (retry!=null) { verifyCountRetry(retry,request.taskId(),request.recordDate(),request.amount()); sequences.verifyNumberRetry(retry,request.taskId(),request.recordDate(),request.amount(),request.problemNumber()); return get(retry.getId()); }
         }
         if (continuations.streamId(request.taskId())!=null && continuedLearning.dayTasks(request.recordDate()).stream()
                 .noneMatch(t->t.id().equals(request.taskId())))
             throw new ConflictException("CONTINUATION_NOT_AVAILABLE","该内容尚未进入当天安排，请刷新当前学习内容");
-        sequences.bind(record,request.sequenceItemId(),null);
+        sequences.bind(record,request.sequenceItemId(),request.problemNumber(),null);
         try {
             studyRecordMapper.insert(record);
         } catch (DuplicateKeyException ex) {
             // 并发重复提交：唯一键兜底，返回已存在的那一条
             StudyRecord existing = studyRecordMapper.findByClientToken(request.clientToken());
             if (existing != null) {
+                verifyCountRetry(existing,request.taskId(),request.recordDate(),request.amount());
+                sequences.verifyNumberRetry(existing,request.taskId(),request.recordDate(),request.amount(),request.problemNumber());
                 return get(existing.getId());
             }
-            if (continuations.streamId(record.getTaskId())!=null)
+            if (continuations.streamId(record.getTaskId())!=null || counted(activities.get(record.getTaskId())) || sequences.state(record.getTaskId(),record.getRecordDate())!=null)
                 throw new ConflictException("TOKEN_REUSED","该提交令牌已使用或已撤销，请刷新后重新提交");
             throw ex;
         }
@@ -171,6 +176,8 @@ public class StudyRecordService {
         if (originalActivity!=null && "CHECK_ONLY".equals(originalActivity.mode())
                 || targetActivity!=null && "CHECK_ONLY".equals(targetActivity.mode()))
             throw new BusinessException("CONFIRMATION_EDIT","完成确认请在今日勾选或取消，不能修改为数量或用时记录");
+        if ((counted(originalActivity) || counted(targetActivity)) && !Objects.equals(existing.getTaskId(),request.taskId()))
+            throw new BusinessException("COUNTED_IDENTITY","实际数量记录保留原任务；需要更正归属请删除后重新记录");
         var original=new StudyRecord();
         original.setTaskId(existing.getTaskId());
         original.setSequenceItemId(existing.getSequenceItemId());
@@ -178,6 +185,7 @@ public class StudyRecordService {
         if (!Objects.equals(existing.getTaskId(),request.taskId())) existing.setActivityCompleted(false);
         existing.setRecordDate(request.recordDate());
         existing.setAmount(request.amount());
+        existing.setReviewAmount(null);
         existing.setDurationMinutes(request.durationMinutes());
         existing.setContent(request.content());
         existing.setNote(request.note());
@@ -186,7 +194,7 @@ public class StudyRecordService {
         if (continuations.streamId(request.taskId())!=null && continuedLearning.dayTasks(request.recordDate()).stream()
                 .noneMatch(t->t.id().equals(request.taskId())))
             throw new ConflictException("CONTINUATION_NOT_AVAILABLE","该内容尚未进入当天安排，不能将其他记录改挂到这里");
-        sequences.bind(existing,request.sequenceItemId(),original);
+        sequences.bind(existing,request.sequenceItemId(),request.problemNumber(),original);
         if (studyRecordMapper.update(existing) == 0) {
             throw new ConflictException("STUDY_RECORD_STALE", "该记录已在其他设备上修改，请刷新后重试");
         }
@@ -231,7 +239,7 @@ public class StudyRecordService {
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             var completed = taskRecords.stream().map(StudyRecordView::amount).filter(Objects::nonNull)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
-            var fraction = activity!=null ? (studyRecordMapper.completedActivities(entry.getKey(),date)>0 ? BigDecimal.ONE:BigDecimal.ZERO) : planned.signum() == 0 ? BigDecimal.ONE
+            var fraction = counted(activity) && (completed.signum()>0 || taskRecords.stream().anyMatch(r->r.reviewAmount()!=null)) ? BigDecimal.ONE : activity!=null ? (studyRecordMapper.completedActivities(entry.getKey(),date)>0 ? BigDecimal.ONE:BigDecimal.ZERO) : planned.signum() == 0 ? BigDecimal.ONE
                     : completed.divide(planned, 10, RoundingMode.HALF_UP).min(BigDecimal.ONE);
             Integer estimate = items.stream().anyMatch(x -> x.estimatedMinutes() == null) ? null
                     : items.stream().mapToInt(x -> x.estimatedMinutes()).sum();
@@ -240,13 +248,13 @@ public class StudyRecordService {
                     : activity!=null && estimate!=null ? BigDecimal.valueOf(Math.max(0,estimate-actualMinutes))
                     : estimate == null ? null : BigDecimal.valueOf(estimate).multiply(BigDecimal.ONE.subtract(fraction)).setScale(1, RoundingMode.HALF_UP);
             // Includes plan AND record versions, catching quantity/time edits and delete/recreate races.
-            String revision = items.stream().sorted(Comparator.comparing(x -> x.id()))
+            String revision = taskService.get(entry.getKey()).getVersion()+":"+(activity==null ? "":activity.mode())+":"+items.stream().sorted(Comparator.comparing(x -> x.id()))
                     .map(x -> "p" + x.id() + ":" + x.version()).collect(Collectors.joining(","))
                     + ";" + taskRecords.stream().sorted(Comparator.comparing(StudyRecordView::id))
                     .map(x -> "r" + x.id() + ":" + x.version()).collect(Collectors.joining(","));
             var sequence=sequences.state(entry.getKey(),date);
             if (sequence!=null) revision += ";sequence:"+sequence.revision();
-            if (activity!=null && "CHECK_ONLY".equals(activity.mode()))
+            if (activity!=null && ("CHECK_ONLY".equals(activity.mode()) || counted(activity)))
                 revision += ";confirmation:"+studyRecordMapper.confirmationHistory(entry.getKey(),date);
             // Fixed-size digest keeps the revision bounded even with many sessions.
             try {
@@ -293,6 +301,8 @@ public class StudyRecordService {
         if (retry != null) {
             if (!request.taskId().equals(retry.getTaskId()) || !request.date().equals(retry.getRecordDate()))
                 throw new ConflictException("TOKEN_REUSED", "提交令牌已被其他记录使用");
+            verifyCountRetry(retry,request.taskId(),request.date(),request.actualAmount());
+            sequences.verifyNumberRetry(retry,request.taskId(),request.date(),request.completionPercent()==100 ? BigDecimal.ONE:null,request.problemNumber());
             return get(retry.getId());
         }
         continuations.lockForTasks(request.taskId());
@@ -317,12 +327,14 @@ public class StudyRecordService {
                 throw new BusinessException("CONFIRMATION_ENTRY","此安排只需勾选完成，不填写数量或用时");
             if (request.completionPercent()!=0 && request.completionPercent()!=100)
                 throw new BusinessException("ACTIVITY_COMPLETION","时间型安排请选择继续记录或结束本次安排；不填写虚构百分比");
-            if (snapshot.completionPercent().intValue()==100)
+            if (!counted(snapshot.activity()) && snapshot.completionPercent().intValue()==100)
                 throw new ConflictException("ACTIVITY_ALREADY_COMPLETED","本次安排已结束，请在学习记录中补记或修改");
             return createEntry(new StudyRecordCreateRequest(request.taskId(),null,null,request.date(),request.actualAmount(),request.durationMinutes(),
                     null,request.note(),request.clientToken()),request.completionPercent()==100);
         }
         if (request.actualAmount()!=null) throw new BusinessException("QUANTITY_PROGRESS","数量型任务请使用原有完成比例或学习记录入口");
+        if (snapshot.sequence()!=null && "SELECT_BY_NUMBER".equals(snapshot.sequence().mode()) && snapshot.completionPercent().intValue()==100)
+            throw new ConflictException("SEQUENCE_ALREADY_COMPLETED","当天已完成一题，请在记录页更正题号");
         if (snapshot.sequence()!=null && request.completionPercent()!=0 && request.completionPercent()!=100)
             throw new BusinessException("SEQUENCE_WHOLE_ITEM","接续任务只在整题完成后推进；尝试请选择未完成");
         var target = snapshot.plannedAmount().multiply(BigDecimal.valueOf(request.completionPercent()))
@@ -334,7 +346,15 @@ public class StudyRecordService {
             throw new BusinessException("EMPTY_PROGRESS", "请增加完成比例");
         return create(new StudyRecordCreateRequest(request.taskId(), null, null, request.date(),
                 delta.signum() == 0 ? null : delta, request.durationMinutes(), null, null, request.clientToken(),
-                snapshot.sequence()==null || snapshot.sequence().dayItem()==null ? null : snapshot.sequence().dayItem().id()));
+                snapshot.sequence()==null || snapshot.sequence().dayItem()==null ? null : snapshot.sequence().dayItem().id(),request.problemNumber()));
+    }
+
+    private void verifyCountRetry(StudyRecord existing,Long taskId,LocalDate date,BigDecimal amount) {
+        if (!counted(activities.get(existing.getTaskId())) && !counted(activities.get(taskId))) return;
+        var saved=existing.getReviewAmount()!=null ? existing.getReviewAmount():existing.getAmount();
+        if (!Objects.equals(taskId,existing.getTaskId()) || !date.equals(existing.getRecordDate())
+                || saved==null || amount==null || saved.compareTo(amount)!=0)
+            throw new ConflictException("TOKEN_REUSED","提交令牌已被不同内容使用，请刷新后重试");
     }
 
     /**
@@ -349,6 +369,20 @@ public class StudyRecordService {
             Task task = taskService.requireExistingForUpdate(taskId);
             continuations.lockForTasks(taskId);
             var activity=activities.get(taskId);
+            if (counted(activity)) {
+                if (record.getId()==null && (record.getClientToken()==null || record.getClientToken().isBlank()))
+                    throw new BusinessException("TOKEN_REQUIRED","实际数量记录需要提交令牌，请刷新后重试");
+                var amount=record.getAmount();
+                if (amount==null || amount.signum()<=0 || amount.stripTrailingZeros().scale()>0 || amount.compareTo(new BigDecimal("99999999"))>0)
+                    throw new BusinessException("ACTUAL_COUNT_REQUIRED","请填写本次实际数量（1—99999999 的整数），未学习无需提交");
+                if (record.getSequenceItemId()!=null || record.getContinuationDelta()!=null)
+                    throw new BusinessException("COUNTED_IDENTITY","实际数量记录不能关联接续题目或百分比");
+                record.setActivityCompleted(true);
+                if ("COUNT_REVIEW".equals(activity.mode())) {
+                    record.setReviewAmount(amount);
+                    record.setAmount(null);
+                }
+            }
             if (activity!=null && "CONTINUED_STUDY".equals(activity.mode()) && hasAmount)
                 throw new BusinessException("CONTINUATION_QUANTITY","学习接续百分比独立于实际题量，不填写虚构完成量");
             if (activity!=null && "CHECK_ONLY".equals(activity.mode())

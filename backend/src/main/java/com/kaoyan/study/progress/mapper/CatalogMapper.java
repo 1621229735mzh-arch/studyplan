@@ -12,6 +12,7 @@ public interface CatalogMapper {
     record NodeRow(Long id, Long courseId, String nodeKey, String parentKey, String title, BigDecimal totalAmount, Integer sortOrder) {}
     record TaskLink(Long taskId, Long nodeId) {}
     record RecordLink(Long recordId, Long nodeId, Long sourceTaskId) {}
+    record CountedTask(Long id, String title, Long subjectId, Long unitId, String mode) {}
     record PreviewRow(String token, Long revision, String payload, String contextHash, LocalDateTime expiresAt, Integer applied) {}
 
     @Select("SELECT version FROM progress_catalog_revision WHERE id=1") long revision();
@@ -21,6 +22,8 @@ public interface CatalogMapper {
     @Select("SELECT id,course_id,node_key,parent_key,title,total_amount,sort_order FROM progress_catalog_node ORDER BY sort_order,id") List<NodeRow> nodes();
     @Select("SELECT task_id,node_id FROM progress_task_link ORDER BY task_id") List<TaskLink> taskLinks();
     @Select("SELECT record_id,node_id,source_task_id FROM progress_record_link ORDER BY record_id") List<RecordLink> recordLinks();
+    @Select("SELECT t.id,t.title,t.subject_id,t.unit_id,a.mode FROM task t JOIN task_activity a ON a.task_id=t.id WHERE a.mode IN ('COUNT_STUDY','COUNT_REVIEW') ORDER BY a.mode DESC,t.id")
+    List<CountedTask> countedTasks();
     @Insert("INSERT INTO progress_course(course_key,direction,branch,title,subject_id,unit_id) VALUES(#{key},#{direction},#{branch},#{title},#{subjectId},#{unitId})")
     void insertCourse(@Param("key") String key,@Param("direction") String direction,@Param("branch") String branch,@Param("title") String title,@Param("subjectId") Long subjectId,@Param("unitId") Long unitId);
     @Update("UPDATE progress_course SET direction=#{direction},branch=#{branch},title=#{title} WHERE id=#{id}")
