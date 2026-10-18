@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { ElAlert, ElButton, ElDatePicker, ElDialog, ElInput, ElInputNumber, ElMessage, ElRadioGroup, ElRadioButton } from 'element-plus'
 import { toApiError } from '@/api/http'
+import AppIcon from '@/components/AppIcon.vue'
+import ArchiveArtwork from '@/components/ArchiveArtwork.vue'
 import { formatDateTime, todayIso } from '@/composables/useFormat'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import { useOfflineSnapshotStore } from '@/offline/useOfflineSnapshot'
@@ -160,6 +162,17 @@ async function saveAction(): Promise<void> {
 }
 const recordFormRef = ref<InstanceType<typeof RecordForm> | null>(null)
 const recording = ref(false)
+const extraRecordRef = ref<HTMLDetailsElement | null>(null)
+async function openExtraRecord(): Promise<void> {
+  if (!extraRecordRef.value || readonly.value) return
+  extraRecordRef.value.open = true
+  await nextTick()
+  extraRecordRef.value.scrollIntoView?.({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })
+  extraRecordRef.value.querySelector<HTMLElement>('input, textarea, button')?.focus({ preventScroll: true })
+}
+function subjectIcon(name: string): string {
+  return name.includes('数学') ? 'math' : name.includes('英语') ? 'english' : name.includes('政治') ? 'politics' : name === '408' ? 'computer' : 'review'
+}
 const taskOptions = computed(() => (today.value?.plannedTasks ?? []).filter(t=>t.activityMode!=='CHECK_ONLY' && t.activityMode!=='CONTINUED_STUDY').map(t => ({
   sequential: !!today.value?.sections?.flatMap(s => s.tasks).find(task => task.kind === 'LEARNING' && task.id === t.taskId)?.sequence,
   activityMode: t.activityMode, id: t.taskId, title: t.taskTitle, subjectId: t.subjectId ?? null, unitId: t.unitId ?? null,
@@ -182,26 +195,32 @@ onMounted(() => { void catalog.load(); void loadToday() })
 </script>
 <template>
   <div class="page today-page">
-    <div class="page__header">
-      <div class="page__actions">
-        <ElDatePicker :model-value="date" type="date" value-format="YYYY-MM-DD" :clearable="false" aria-label="查看日期" @update:model-value="onDateChange" />
-        <ElButton :loading="loading" @click="loadToday">刷新</ElButton>
+    <header class="today-hero">
+      <ArchiveArtwork variant="hero" class="today-hero__art" />
+      <div class="today-hero__copy"><span class="today-eyebrow">STUDY ROOM</span><h1>今日学习</h1><p>按计划学习，按实际记录。</p>
       </div>
-    </div>
+      <div class="today-hero__tools">
+        <ElButton class="today-extra-button" :disabled="readonly || saving || !today?.sections" @click="openExtraRecord"><AppIcon name="edit" :size="20" />补记学习</ElButton>
+        <div class="page__actions today-controls">
+        <ElDatePicker :model-value="date" type="date" value-format="YYYY-MM-DD" :clearable="false" aria-label="查看日期" @update:model-value="onDateChange" />
+        <ElButton :loading="loading" @click="loadToday"><AppIcon v-if="!loading" name="refresh" :size="15" />刷新</ElButton>
+        </div>
+      </div>
+    </header>
     <ElAlert v-if="dataFromCache" type="info" :closable="false" show-icon
       :title="`只读快照 · 同步于 ${lastSyncText}`" description="联网后刷新即可记录进度。" />
     <ElAlert v-if="errorMessage" type="error" :closable="false" :title="errorMessage" />
     <ElAlert v-if="today && !today.sections" type="info" :closable="false" title="当前数据是旧版快照，请联网更新今日清单。" />
     <template v-if="today?.sections">
       <section v-if="today.taskCounts" class="today-summary" aria-label="今日任务概览">
-        <div class="summary-metric"><span>已完成</span><strong>{{ today.taskCounts.completed }} 项</strong></div>
-        <div class="summary-metric"><span>进行中</span><strong>{{ today.taskCounts.inProgress }} 项</strong></div>
-        <div class="summary-metric"><span>还剩</span><strong>{{ today.taskCounts.remaining }} 项</strong></div>
+        <div class="summary-metric summary-metric--done"><span class="metric-icon"><AppIcon name="check" :size="32" /></span><div><span>已完成</span><strong>{{ today.taskCounts.completed }} <small>项</small></strong></div></div>
+        <div class="summary-metric summary-metric--active"><span class="metric-icon"><AppIcon name="partial" :size="30" /></span><div><span>进行中</span><strong>{{ today.taskCounts.inProgress }} <small>项</small></strong></div></div>
+        <div class="summary-metric summary-metric--pending"><span class="metric-icon"><AppIcon name="pending" :size="30" /></span><div><span>还剩</span><strong>{{ today.taskCounts.remaining }} <small>项</small></strong></div></div>
       </section>
       <ElAlert v-else type="info" :closable="false" title="当前数据尚无任务项数统计，请联网刷新今日清单。" />
       <section v-for="section in today.sections" :key="section.name" class="section-card subject-section">
         <div class="subject-heading">
-          <h2>{{ section.name }}</h2>
+          <h2><AppIcon :name="subjectIcon(section.name)" :size="30" />{{ section.name }}</h2>
         </div>
         <ul class="checklist">
           <ChecklistTask v-for="task in section.tasks.filter(t => !t.continuation && t.completionPercent < 100)" :key="`${task.kind}-${task.id}`"
@@ -216,7 +235,7 @@ onMounted(() => { void catalog.load(); void loadToday() })
           <ul class="checklist"><ChecklistTask v-for="task in section.tasks.filter(t => !t.continuation && t.completionPercent >= 100)" :key="`${task.kind}-${task.id}`" :task="task" :readonly="readonly || saving" @action="openAction" /></ul>
         </details>
       </section>
-      <details class="section-card extra-record"><summary>补记学习 / 计划外记录</summary>
+      <details ref="extraRecordRef" class="section-card extra-record"><summary>补记学习 / 计划外记录</summary>
         <fieldset :disabled="readonly" class="extra-record-fields"><RecordForm ref="recordFormRef" :tasks="taskOptions" :submitting="recording" @submit="saveExtraRecord" /></fieldset>
       </details>
     </template>
@@ -246,12 +265,4 @@ onMounted(() => { void catalog.load(); void loadToday() })
     </ElDialog>
   </div>
 </template>
-<style scoped>
-.extra-record-fields{border:0;margin:0;padding:0}.today-page{max-width:1000px;margin:0 auto}.page__header{justify-content:flex-end}
-.today-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;padding:25px 30px;background:var(--kaoyan-card,#fff);border:1px solid var(--kaoyan-border);border-radius:14px;margin-bottom:20px}
-.summary-metric{display:flex;flex-direction:column;gap:8px}.summary-metric>span{font-size:13px;color:var(--kaoyan-text-secondary)}.summary-metric strong{font-size:26px;font-weight:600;letter-spacing:-.5px}
-.subject-section{margin-bottom:16px}.subject-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:12px}.subject-heading h2{font-size:18px;font-weight:600;margin:0}.subject-times{display:flex;gap:22px;font-size:12px;color:var(--kaoyan-text-secondary)}.subject-times b{font-weight:500;color:var(--kaoyan-text)}
-.checklist{list-style:none;padding:0;margin:0}.empty-subject{font-size:13px;color:var(--kaoyan-text-secondary);margin:14px 0 4px}.section-note{font-size:12px;color:var(--kaoyan-text-secondary);line-height:1.6}
-.completed{margin-top:8px}.completed summary,.extra-record summary{font-size:13px;color:var(--kaoyan-text-secondary);cursor:pointer;padding:10px 0}.extra-record :deep(form){margin-top:16px}.dialog-task{font-size:15px;margin:0 0 20px}.field-label{display:block;margin:18px 0 8px;font-size:13px}.save-error{margin-top:20px}
-@media(max-width:600px){.today-summary{padding:20px;gap:12px}.summary-metric strong{font-size:18px}.subject-heading{align-items:flex-start;flex-direction:column;gap:8px}.subject-times{gap:18px}.page__actions :deep(.el-date-editor){width:160px}}
-</style>
+<style scoped src="@/styles/today.css"></style>

@@ -20,8 +20,9 @@ defineEmits<{ action: [task: TodayChecklistTask, complete: boolean] }>()
   </li>
 </template>
 <style scoped>
-.book-task{border-top:1px solid var(--kaoyan-border);padding:16px 0}.book-task h3{font-size:15px;margin:0 0 12px;font-weight:600}
-ul{list-style:none;padding:0;margin:0}.book-content{padding-left:12px;border-left:2px solid var(--kaoyan-border);margin-top:12px}
-.content-origin,summary{font-size:12px;color:var(--kaoyan-text-secondary)}summary{cursor:pointer;padding:10px 0}
-.book-content :deep(.task-row){border-top:0;padding:6px 0}
+.book-task{border-top:1px solid var(--kaoyan-border);padding:22px 0}.book-task h3{font-size:14px;margin:0 0 8px;font-weight:500;color:#cbb7df;letter-spacing:.5px}
+ul{list-style:none;padding:0;margin:0}.book-content{margin-top:8px}
+.content-origin{display:inline-block;padding:2px 8px;border:1px solid var(--kaoyan-border);border-radius:4px;font-size:11px;color:var(--kaoyan-text-secondary)}summary{font-size:14px;color:var(--kaoyan-text-secondary);cursor:pointer;padding:10px 0}
+.book-content :deep(.task-row){border-top:0;padding:14px 0 4px}
+@media(max-width:760px){.book-task{padding:18px 0}.book-task h3{font-size:13px}}
 </style>

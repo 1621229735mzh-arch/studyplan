@@ -38,4 +38,4 @@ onBeforeUnmount(()=>{++request})
     <div class="classification-actions"><ElButton :disabled="busy || loading || !library || !online" @click="save(true)">恢复任务自动归属</ElButton><ElButton type="primary" :disabled="busy || loading || !nodeId || !online" @click="save()">确认归属</ElButton></div>
   </ElDialog>
 </template>
-<style scoped>.help { font-size:13px; color:#75867b; line-height:1.7; }.classification-select { width:100%; margin:18px 0; }.classification-actions { display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px; }.classification-actions :deep(.el-button) { margin:0; }</style>
+<style scoped>.help { font-size:13px; color:var(--kaoyan-text-secondary); line-height:1.7; }.classification-select { width:100%; margin:18px 0; }.classification-actions { display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px; }.classification-actions :deep(.el-button) { margin:0; }</style>

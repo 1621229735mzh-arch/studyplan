@@ -48,4 +48,4 @@ watch(() => [props.taskId, props.date], load, { immediate: true })
     </template>
   </div>
 </template>
-<style scoped>.sequence-record{grid-column:1 / -1;padding:10px 14px;background:#f3f7f4;border-radius:8px;margin-bottom:12px;font-size:13px}.sequence-record p{margin:6px 0 0;color:#64756b}</style>
+<style scoped>.sequence-record{grid-column:1 / -1;padding:10px 14px;background:var(--kaoyan-surface);border-radius:8px;margin-bottom:12px;font-size:13px}.sequence-record p{margin:6px 0 0;color:var(--kaoyan-text-secondary)}</style>

@@ -107,6 +107,8 @@ SQL XML 放在 `backend/src/main/resources/mapper/<module>/`，与对应 Mapper 
 
 前端除预留的 `ai` 外，各功能按需使用 `api/`、`components/`、`views/`：分别放业务接口调用、功能内组件与页面。功能专用的类型或状态按需放回该功能目录，共享目录只放真正跨功能的内容。
 
+2026-10-18 暗紫主题：`styles/variables.css` 维护全站与 Element Plus 共用的语义色，`styles/index.css` 负责通用控件、弹窗和可访问性；`styles/layout.css` 组织桌面侧栏、今日插画区及手机底栏，`styles/today.css` 负责今日页。`components/AppIcon.vue` 提供统一细线图标，`ArchiveArtwork.vue` 使用 `assets/theme/` 中桌面插画、手机插画和旧纸污蚀三张独立 WebP 素材。插画不包含任务、统计或文字，业务界面仍由真实 DTO 渲染。手机“更多”由原布局内的 Element Plus Drawer 承载，所有现有路由保持可达；素材进入应用外壳预缓存，不扩大个人数据缓存范围。
+
 后端测试已按八个当前业务模块建立同名包。AI 的测试与真实模型评估在智能阶段建立并隔离执行。
 
 ## 实际创建的工程文件

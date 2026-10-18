@@ -1,11 +1,9 @@
 <script setup lang="ts">
-/**
- * 应用主布局：侧边导航 + 顶栏（当前用户、离线状态与最后同步时间、退出）。
- */
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { RouterView, useRoute, useRouter } from 'vue-router'
-import { ElAside, ElButton, ElContainer, ElHeader, ElMain, ElMenu, ElMenuItem, ElMessage, ElTag } from 'element-plus'
-
+import { computed, onMounted, ref, watch } from 'vue'
+import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
+import { ElButton, ElDrawer, ElMessage, ElTag } from 'element-plus'
+import AppIcon from '@/components/AppIcon.vue'
+import ArchiveArtwork from '@/components/ArchiveArtwork.vue'
 import OfflineNotice from '@/components/OfflineNotice.vue'
 import { formatDateTime } from '@/composables/useFormat'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
@@ -19,187 +17,75 @@ const session = useSessionStore()
 const catalog = useCatalogStore()
 const offline = useOfflineSnapshotStore()
 const { online } = useOnlineStatus()
-
-/** 侧边菜单项。index 同时作为路由路径（ElMenu 开启 router 模式）。 */
-const menuItems: Array<{ path: string; label: string; abbr: string }> = [
-  { path: '/', label: '今日', abbr: '今' },
-  { path: '/plan', label: '计划', abbr: '计' },
-  { path: '/learning', label: '记录', abbr: '记' },
-  { path: '/progress', label: '进度', abbr: '进' },
-  { path: '/review', label: '复习', abbr: '复' },
-  { path: '/memo', label: '备忘录', abbr: '备' },
-  { path: '/targets', label: '目标', abbr: '标' },
-  { path: '/settings', label: '设置', abbr: '设' }
+const menuItems = [
+  { path: '/', label: '今日', icon: 'today' },
+  { path: '/plan', label: '计划', icon: 'plan' },
+  { path: '/learning', label: '记录', icon: 'learning' },
+  { path: '/progress', label: '进度', icon: 'progress' },
+  { path: '/review', label: '复习', icon: 'review' },
+  { path: '/memo', label: '备忘录', icon: 'memo' },
+  { path: '/targets', label: '目标', icon: 'targets' },
+  { path: '/settings', label: '设置', icon: 'settings' }
 ]
-
-const activeMenu = computed(() => route.path)
-const pageTitle = computed(() => (typeof route.meta.title === 'string' ? route.meta.title : '今日'))
-const lastSyncText = computed(() =>
-  offline.syncedAt ? formatDateTime(offline.syncedAt) : '尚无同步记录'
-)
-
-/** 窄屏时折叠侧栏，把空间留给记录表单。 */
-const narrow = ref(false)
+const primaryItems = menuItems.slice(0, 4)
+const moreItems = menuItems.slice(4)
+const isToday = computed(() => route.name === 'today')
+const pageTitle = computed(() => typeof route.meta.title === 'string' ? route.meta.title : '今日')
+const moreActive = computed(() => moreItems.some(item => isActive(item.path)))
+const lastSyncText = computed(() => offline.syncedAt ? formatDateTime(offline.syncedAt) : '尚无同步记录')
+const moreOpen = ref(false)
 const loggingOut = ref(false)
-
-function updateNarrow(): void {
-  narrow.value = typeof window !== 'undefined' && window.innerWidth < 900
+function isActive(path: string): boolean {
+  return path === '/' ? route.path === '/' : route.path === path || route.path.startsWith(`${path}/`)
 }
-
-onMounted(() => {
-  updateNarrow()
-  window.addEventListener('resize', updateNarrow)
-  // 科目与单位被多个页面共用，进应用时预加载一次（离线时静默失败）
-  void catalog.load()
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('resize', updateNarrow)
-})
-
+watch(() => route.fullPath, () => { moreOpen.value = false })
+onMounted(() => { void catalog.load() })
 async function handleLogout(): Promise<void> {
   loggingOut.value = true
   try {
     await session.logout()
+    moreOpen.value = false
     ElMessage.success('已退出登录，本地离线缓存已清理')
     await router.push({ name: 'login' })
-  } finally {
-    loggingOut.value = false
-  }
+  } finally { loggingOut.value = false }
 }
 </script>
 
 <template>
-  <ElContainer class="app-layout">
-    <ElAside :width="narrow ? '64px' : '200px'" class="app-layout__aside">
-      <div class="app-layout__brand">
-        <img src="@/assets/logo.svg" alt="考研学习工作台" class="app-layout__logo" />
-        <span v-if="!narrow" class="app-layout__brand-text">考研工作台</span>
-      </div>
-      <ElMenu :default-active="activeMenu" :collapse="narrow" router class="app-layout__menu">
-        <ElMenuItem v-for="item in menuItems" :key="item.path" :index="item.path">
-          <span class="app-layout__menu-abbr">{{ item.abbr }}</span>
-          <template #title>{{ item.label }}</template>
-        </ElMenuItem>
-      </ElMenu>
-    </ElAside>
-
-    <ElContainer class="app-layout__body">
-      <ElHeader class="app-layout__header">
-        <div class="app-layout__title">{{ pageTitle }}</div>
+  <div class="app-layout" :class="{ 'app-layout--today': isToday }">
+    <a class="skip-link" href="#study-main">跳到主要内容</a>
+    <aside class="app-layout__aside">
+      <RouterLink to="/" class="app-layout__brand" aria-label="学习工作台首页">
+        <img src="@/assets/logo.svg" alt="" class="app-layout__logo" />
+        <div class="app-layout__brand-text"><strong>学习工作台</strong><span>STUDY ROOM</span></div>
+      </RouterLink>
+      <nav class="app-layout__menu" aria-label="主导航">
+        <RouterLink v-for="item in menuItems" :key="item.path" :to="item.path" class="app-layout__nav-link" :class="{ 'is-active': isActive(item.path) }" :aria-current="isActive(item.path) ? 'page' : undefined" :aria-label="item.label"><AppIcon :name="item.icon" /><span>{{ item.label }}</span></RouterLink>
+      </nav>
+      <div class="app-layout__seal" aria-hidden="true"><span></span></div>
+      <div class="app-layout__aside-foot"><span class="connection-dot" :class="{ 'is-offline': !online }"></span>{{ online ? '已连接' : '离线只读' }}</div>
+    </aside>
+    <div class="app-layout__body">
+      <header class="app-layout__header">
+        <div class="app-layout__title"><span class="desktop-page-title">{{ pageTitle }}</span><span class="mobile-brand">学习工作台</span></div>
         <div class="app-layout__status">
-          <ElTag :type="online ? 'success' : 'warning'" size="small" effect="plain">
-            {{ online ? '在线' : '离线' }}
-          </ElTag>
+          <ElTag :type="online ? 'success' : 'warning'" size="small" effect="plain">{{ online ? '在线' : '离线' }}</ElTag>
           <span class="app-layout__sync">最后同步：{{ lastSyncText }}</span>
           <span class="app-layout__user">{{ session.displayName }}</span>
-          <ElButton size="small" :loading="loggingOut" @click="handleLogout">退出</ElButton>
+          <ElButton class="desktop-logout" size="small" :loading="loggingOut" @click="handleLogout">退出</ElButton>
         </div>
-      </ElHeader>
-
-      <ElMain class="app-layout__main">
-        <OfflineNotice />
-        <RouterView />
-      </ElMain>
-    </ElContainer>
-  </ElContainer>
+      </header>
+      <main id="study-main" class="app-layout__main"><OfflineNotice /><RouterView /></main>
+    </div>
+    <aside v-if="isToday" class="app-layout__art" aria-hidden="true"><ArchiveArtwork /></aside>
+    <nav class="mobile-navigation" aria-label="手机主导航">
+      <RouterLink v-for="item in primaryItems" :key="item.path" :to="item.path" :class="{ 'is-active': isActive(item.path) }" :aria-current="isActive(item.path) ? 'page' : undefined"><AppIcon :name="item.icon" :size="22" /><span>{{ item.label }}</span></RouterLink>
+      <button type="button" :class="{ 'is-active': moreActive || moreOpen }" :aria-expanded="moreOpen" :aria-controls="moreOpen ? 'mobile-more-menu' : undefined" @click="moreOpen = !moreOpen"><AppIcon name="more" :size="22" /><span>更多</span></button>
+    </nav>
+    <ElDrawer v-model="moreOpen" title="更多" direction="btt" size="auto" class="mobile-more-drawer">
+      <nav id="mobile-more-menu" class="more-menu" aria-label="更多页面"><RouterLink v-for="item in moreItems" :key="item.path" :to="item.path" :class="{ 'is-active': isActive(item.path) }" :aria-current="isActive(item.path) ? 'page' : undefined"><AppIcon :name="item.icon" :size="22" /><span>{{ item.label }}</span></RouterLink></nav>
+      <div class="more-session"><div><strong>{{ session.displayName }}</strong><p>{{ online ? '在线' : '离线只读' }} · 最后同步：{{ lastSyncText }}</p></div><ElButton :loading="loggingOut" @click="handleLogout"><AppIcon name="logout" :size="16" />退出</ElButton></div>
+    </ElDrawer>
+  </div>
 </template>
-
-<style scoped>
-.app-layout {
-  min-height: 100vh;
-}
-
-.app-layout__aside {
-  background: #1f2d3d;
-  color: #fff;
-  overflow-x: hidden;
-}
-
-.app-layout__brand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 56px;
-  padding: 0 12px;
-  color: #fff;
-  font-weight: 600;
-}
-
-.app-layout__logo {
-  width: 26px;
-  height: 26px;
-  flex: 0 0 auto;
-}
-
-.app-layout__brand-text {
-  white-space: nowrap;
-}
-
-.app-layout__menu {
-  border-right: none;
-  background: transparent;
-  --el-menu-bg-color: transparent;
-  --el-menu-text-color: #d5dbe3;
-  --el-menu-active-color: #ffffff;
-  --el-menu-hover-bg-color: #2b3d52;
-}
-
-.app-layout__menu-abbr {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  margin-right: 8px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.16);
-  font-size: 12px;
-}
-
-.app-layout__body {
-  background: var(--kaoyan-bg);
-}
-
-.app-layout__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  height: 56px;
-  background: #fff;
-  border-bottom: 1px solid var(--kaoyan-border);
-}
-
-.app-layout__title {
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.app-layout__status {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: var(--kaoyan-text-secondary);
-  font-size: 13px;
-  flex-wrap: wrap;
-}
-
-.app-layout__sync {
-  white-space: nowrap;
-}
-
-.app-layout__user {
-  color: var(--kaoyan-text);
-}
-
-.app-layout__main {
-  padding: 16px;
-}
-
-@media (max-width: 700px) {
-  .app-layout__sync {
-    display: none;
-  }
-}
-</style>
+<style scoped src="@/styles/layout.css"></style>

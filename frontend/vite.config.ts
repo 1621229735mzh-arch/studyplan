@@ -19,8 +19,8 @@ export default defineConfig({
         start_url: '/',
         scope: '/',
         display: 'standalone',
-        background_color: '#ffffff',
-        theme_color: '#2f6feb',
+        background_color: '#131019',
+        theme_color: '#131019',
         icons: [
           {
             src: 'icon.svg',
@@ -32,7 +32,7 @@ export default defineConfig({
       },
       workbox: {
         // 只预缓存应用外壳（HTML/JS/CSS/图标）。
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest,woff2}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,webp,ico,webmanifest,woff2}'],
         navigateFallback: '/index.html',
         // /api 请求绝不落到导航回退，也绝不进入任何运行时缓存：
         // 个人数据只通过 src/offline 的显式快照保存。

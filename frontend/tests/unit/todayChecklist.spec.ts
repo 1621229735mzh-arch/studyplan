@@ -24,6 +24,17 @@ function button(wrapper: ReturnType<typeof mount>, text: string, index=0) {retur
 beforeEach(()=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-10-01T12:00:00+08:00'));mocks.online.value=true;mocks.snapshot=null;vi.clearAllMocks();mocks.fetch.mockResolvedValue(fixture());mocks.learning.mockResolvedValue({id:1});mocks.review.mockResolvedValue({id:2});mocks.cache.mockResolvedValue(undefined)})
 afterEach(()=>{wrappers.splice(0).forEach(w=>w.unmount());document.body.innerHTML='';vi.useRealTimers()})
 describe('今日清单操作',()=>{
+ it('补记快捷入口展开原表单，不直接生成学习记录',async()=>{
+  const w=await page();await button(w,'补记学习').trigger('click');await flushPromises()
+  expect((w.get('.extra-record').element as HTMLDetailsElement).open).toBe(true)
+  expect(mocks.learning).not.toHaveBeenCalled();expect(mocks.review).not.toHaveBeenCalled()
+ })
+ it('进度条沿用服务端比例，实际数量任务不生成百分比进度条',async()=>{
+  const w=await page();expect(w.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('30')
+  const data=fixture();Object.assign(data.sections![0].tasks[0],{completionPercent:100,recordedAmount:23,unitName:'词',activity:{mode:'COUNT_STUDY',description:'实际新词数量',flexibleMinutes:null}})
+  mocks.fetch.mockResolvedValue(data);await button(w,'刷新').trigger('click');await flushPromises()
+  expect(w.find('[role="progressbar"]').exists()).toBe(false);expect(w.text()).toContain('23 词')
+ })
  it('顶部依次展示服务端完成、进行中和未开始项数，不显示时间',async()=>{
   const data=fixture();data.taskCounts={completed:2,inProgress:3,remaining:4};data.missingEstimates=2;data.missingDurations=1;mocks.fetch.mockResolvedValue(data)
   const w=await page();const summary=w.get('[aria-label="今日任务概览"]')

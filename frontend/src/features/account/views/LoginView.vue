@@ -9,6 +9,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElAlert, ElButton, ElForm, ElFormItem, ElInput } from 'element-plus'
 
 import { useSessionStore } from '@/stores/session'
+import ArchiveArtwork from '@/components/ArchiveArtwork.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -49,8 +50,10 @@ async function handleSubmit(): Promise<void> {
 
 <template>
   <div class="login-page">
+    <div class="login-page__art" aria-hidden="true"><ArchiveArtwork /></div>
     <div class="login-page__panel">
-      <h1 class="login-page__title">考研学习工作台</h1>
+      <span class="login-page__eyebrow">STUDY ROOM</span>
+      <h1 class="login-page__title">学习工作台</h1>
       <p class="login-page__subtitle">预设账号登录，不开放注册。登录后学习数据在电脑与手机之间同步。</p>
 
       <ElAlert
@@ -90,39 +93,48 @@ async function handleSubmit(): Promise<void> {
 
 <style scoped>
 .login-page {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  padding: 24px;
-  background: var(--kaoyan-bg);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:100vh;
+  padding:24px;
+  background:var(--kaoyan-bg);
+  position:relative;
+  overflow:hidden;
 }
 
 .login-page__panel {
-  width: min(420px, 100%);
-  padding: 28px;
-  background: #fff;
-  border: 1px solid var(--kaoyan-border);
-  border-radius: var(--kaoyan-card-radius);
+  width:min(420px, 100%);
+  padding:28px;
+  background:var(--kaoyan-card);
+  border:1px solid var(--kaoyan-border);
+  border-radius:var(--kaoyan-card-radius);
+  position:relative;
+  margin-right:28vw;
+  box-shadow:var(--kaoyan-shadow);
 }
 
 .login-page__title {
-  margin: 0;
-  font-size: 20px;
+  margin:0;
+  font-size:20px;
 }
 
 .login-page__subtitle {
-  margin: 6px 0 20px;
-  color: var(--kaoyan-text-secondary);
-  font-size: 13px;
-  line-height: 1.6;
+  margin:6px 0 20px;
+  color:var(--kaoyan-text-secondary);
+  font-size:13px;
+  line-height:1.6;
 }
 
 .login-page__error {
-  margin-bottom: 16px;
+  margin-bottom:16px;
 }
 
 .login-page__submit {
-  width: 100%;
+  width:100%;
 }
+.login-page__art { position:absolute; inset:0 0 0 60%; }
+.login-page__eyebrow { font-size:10px; letter-spacing:3px; color:var(--kaoyan-primary); }
+.login-page__title { font-size:25px; font-weight:550; margin-top:8px; }
+@media(max-width:760px) { .login-page { padding:28px 16px; }.login-page__art { inset:0; opacity:.2; }.login-page__panel { margin:0; padding:26px 22px; background:rgba(26,21,37,.96); } }
 </style>

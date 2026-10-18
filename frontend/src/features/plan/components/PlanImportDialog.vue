@@ -100,12 +100,12 @@ function downloadCatalog() {
 </template>
 
 <style scoped>
-.import-steps { display: flex; gap: 14px; align-items: center; color: #85909d; flex-wrap: wrap; }
-.import-steps .active { color: #326a61; font-weight: 600; }.import-steps i { font-style: normal; }
-.import-hint,.import-upload span { color: #727d89; font-size: 13px; }.import-downloads { display:flex; flex-wrap:wrap; margin: 8px 0 20px; }
+.import-steps { display: flex; gap: 14px; align-items: center; color: var(--kaoyan-text-secondary); flex-wrap: wrap; }
+.import-steps .active { color: var(--kaoyan-text); font-weight: 600; }.import-steps i { font-style: normal; }
+.import-hint,.import-upload span { color: var(--kaoyan-text-secondary); font-size: 13px; }.import-downloads { display:flex; flex-wrap:wrap; margin: 8px 0 20px; }
 .import-downloads :deep(.el-button) { margin-left: 0; }.import-upload { display:flex; gap:12px; align-items:center; margin: 16px 0; }
 .import-preview { display:flex; flex-direction:column; gap: 14px; padding-top:18px; }.import-preview h3,.import-preview p { margin:0; }.import-preview details p { margin-top:8px; }
-.import-warnings { background: #fff8eb; padding:14px; border-radius:10px; max-height:170px; overflow:auto; }.import-warnings p { margin-top:6px; }
-.import-table { overflow:auto; }.import-table table { border-collapse:collapse; width:100%; font-size:13px; }.import-table th { text-align:left; color:#727d89; font-weight:500; background:#f6f8fa; }.import-table th,.import-table td { padding:12px; border-bottom:1px solid #eef0f3; }.import-table td:first-child { white-space:nowrap; }.import-table small { display:block; color:#7d8895; }
+.import-warnings { background: var(--kaoyan-primary-soft); padding:14px; border-radius:10px; max-height:170px; overflow:auto; }.import-warnings p { margin-top:6px; }
+.import-table { overflow:auto; }.import-table table { border-collapse:collapse; width:100%; font-size:13px; }.import-table th { text-align:left; color:var(--kaoyan-text-secondary); font-weight:500; background:var(--kaoyan-surface); }.import-table th,.import-table td { padding:12px; border-bottom:1px solid var(--kaoyan-border); }.import-table td:first-child { white-space:nowrap; }.import-table small { display:block; color:var(--kaoyan-text-secondary); }
 .import-preview :deep(.el-checkbox) { white-space:normal; height:auto; }.import-preview :deep(.el-checkbox__label) { white-space:normal; }
 </style>

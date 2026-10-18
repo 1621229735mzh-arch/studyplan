@@ -20,6 +20,6 @@ defineProps<{ activities: CountedProgress[] }>()
   </section>
 </template>
 <style scoped>
-.counted-progress { margin-bottom:28px; }.activity-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }.activity-card { border:1px solid #e0e7de; border-radius:14px; background:#fff; padding:24px; min-width:0; }.activity-card h3 { margin:8px 0 20px; color:#36533e; font-size:19px; overflow-wrap:anywhere; }.activity-quantity { color:#517759; font-size:15px; }.activity-quantity strong { margin-left:8px; font-size:26px; font-weight:550; }.activity-card .workspace-note { line-height:1.7; }
+.counted-progress { margin-bottom:28px; }.activity-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }.activity-card { border:1px solid var(--kaoyan-border); border-radius:14px; background:var(--kaoyan-card); padding:24px; min-width:0; }.activity-card h3 { margin:8px 0 20px; color:var(--kaoyan-text); font-size:19px; overflow-wrap:anywhere; }.activity-quantity { color:var(--kaoyan-primary); font-size:15px; }.activity-quantity strong { margin-left:8px; font-size:26px; font-weight:550; }.activity-card .workspace-note { line-height:1.7; }
 @media(max-width:760px) { .activity-grid { grid-template-columns:1fr; }.activity-card { padding:20px; } }
 </style>

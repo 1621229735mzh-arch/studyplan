@@ -41,14 +41,14 @@ function choose(key: string) {
 
 <style scoped>
 .period-filter { min-width:0; }
-nav { display:flex; flex-wrap:wrap; gap:4px; padding:5px; border-radius:12px; background:#eaf0ed; width:fit-content; }
-button { border:0; border-radius:8px; background:transparent; color:#63756a; font:inherit; padding:9px 18px; cursor:pointer; }
-button.selected { background:white; color:#2a6257; font-weight:600; box-shadow:0 2px 5px #233b2910; }
-button:disabled { cursor:default; opacity:.6; } button:focus-visible { outline:2px solid #39776d; outline-offset:2px; }
+nav { display:flex; flex-wrap:wrap; gap:4px; padding:5px; border-radius:12px; background:var(--kaoyan-surface); width:fit-content; }
+button { border:0; border-radius:8px; background:transparent; color:var(--kaoyan-text-secondary); font:inherit; padding:9px 18px; cursor:pointer; }
+button.selected { background:var(--kaoyan-card); color:var(--kaoyan-text); font-weight:600; box-shadow:0 2px 5px rgba(5,2,10,.2); }
+button:disabled { cursor:default; opacity:.6; } button:focus-visible { outline:2px solid var(--kaoyan-primary); outline-offset:2px; }
 .custom-range { display:flex; align-items:flex-end; flex-wrap:wrap; gap:8px; margin-top:12px; max-width:100%; }
-.custom-range label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:#63756a; min-width:0; }
-.custom-range input { font:inherit; color:#405b50; border:1px solid #dce4df; border-radius:6px; background:white; min-width:0; padding:6px 8px; height:32px; }
-.custom-range input:focus-visible { outline:2px solid #39776d; outline-offset:2px; }
-.range-error { font-size:12px; color:#a34a36; }
-@media(max-width:640px) { button { padding:8px 11px; font-size:12px; } }
+.custom-range label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--kaoyan-text-secondary); min-width:0; }
+.custom-range input { font:inherit; color:var(--kaoyan-text); border:1px solid var(--kaoyan-border); border-radius:6px; background:var(--kaoyan-card); min-width:0; padding:6px 8px; height:32px; }
+.custom-range input:focus-visible { outline:2px solid var(--kaoyan-primary); outline-offset:2px; }
+.range-error { font-size:12px; color:var(--el-color-danger); }
+@media(max-width:640px) { button { min-height:44px; padding:8px 11px; font-size:12px; }.custom-range input { min-height:44px; font-size:16px; } }
 </style>

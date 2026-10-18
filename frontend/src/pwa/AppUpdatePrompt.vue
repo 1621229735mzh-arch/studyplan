@@ -53,4 +53,7 @@ const handleUpdate = async (): Promise<void> => {
   gap: 8px;
   margin-top: 8px;
 }
+@media(max-width:760px) {
+  .app-update-prompt { bottom:calc(84px + env(safe-area-inset-bottom)); right:12px; width:calc(100vw - 24px); }
+}
 </style>
