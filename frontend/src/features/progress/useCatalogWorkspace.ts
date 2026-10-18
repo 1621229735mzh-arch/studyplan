@@ -23,7 +23,7 @@ export function useCatalogWorkspace() {
   let request = 0
   let controller: AbortController | null = null
   async function snapshot(value: CatalogLibrary, id: number) {
-    const summary: CatalogSummary = { revision: value.revision, cumulative: value.cumulative, activities: value.activities, courses: value.courses.map(({ nodes: _nodes, ...course }) => course) }
+    const summary: CatalogSummary = { revision: value.revision, cumulative: value.cumulative, activities: value.activities, courses: value.courses.map(({ nodes: _nodes, completedProblemNumbers: _numbers, ...course }) => course) }
     const timestamp = new Date().toISOString()
     if (id === request) syncedAt.value = timestamp
     const username = session.username

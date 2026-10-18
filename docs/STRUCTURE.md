@@ -124,7 +124,7 @@ SQL XML 放在 `backend/src/main/resources/mapper/<module>/`，与对应 Mapper 
 | `backend/` | `pom.xml`、`mvnw`、`mvnw.cmd`、`.mvn/wrapper/maven-wrapper.properties`（Maven 3.9.16） |
 | `backend/src/main/java/com/kaoyan/study/` | `StudyApplication.java`（`@MapperScan` + `@ConfigurationPropertiesScan`） |
 | `backend/src/main/resources/` | `application.yml`、`application-dev.yml`、`application-prod.yml` |
-| `backend/src/main/resources/db/migration/` | `V1`–`V22`（V13 会话大小写归一化、V14 今日用时与部分复习、V15 计划工作区与导入防重、V16 课程目录与学习归属、V17 接续题目、V18 时间型安排、V19 每日完成确认、V20 按书学习接续、V21 实际复习数量、V22 自填题号；V22尚未上线） |
+| `backend/src/main/resources/db/migration/` | `V1`–`V22`（V13 会话大小写归一化、V14 今日用时与部分复习、V15 计划工作区与导入防重、V16 课程目录与学习归属、V17 接续题目、V18 时间型安排、V19 每日完成确认、V20 按书学习接续、V21 实际复习数量、V22 自填题号；V22于2026-10-18上线） |
 | `backend/src/main/java/com/kaoyan/study/config/` | 安全（Spring Security 7 + JDBC 会话 + CSRF）、OpenAPI、预设账号配置 |
 | `frontend/` | `package.json`、`pnpm-lock.yaml`、`index.html`、Vite/TypeScript/Vitest 配置 |
 | `frontend/src/` | `main.ts`、`App.vue` 及各功能页面 |
@@ -137,6 +137,8 @@ SQL XML 放在 `backend/src/main/resources/mapper/<module>/`，与对应 Mapper 
 记录回看由 `learning/views/LearningView.vue` 和 `RecordArchiveTree.vue` 组织，月/周/日/课程汇总由 `RecordArchiveService` 生成。记录页独立使用 `RecordEditorForm.vue`、`recordEditorValidation.ts`，通过 `RecordClassificationDialog.vue` 更正目录归属。今日保留原有 `RecordForm.vue` 及 `validation.ts`，两页表单演进互不影响。
 
 进度首页 `ProgressView.vue` 只显示四个方向；`DirectionProgressView.vue` 根据路由及 query 组织分科、课程和完整目录。`CourseRing` 显示课程完成比例，`CatalogNodeTree` 展示内容，`CatalogEditorDialog` 与 `CatalogImportDialog` 共用后端预览确认流程。`CatalogService` / `CatalogMapper` 管理本模块目录和归属，通过学习业务服务检查原记录版本；旧 `ProgressMapper` 的区间查询保留兼容。
+
+LeetCode课程详情的 `completedProblemNumbers` 由 `CatalogMapper` 只读关联自填题号与有效完成记录，`CatalogService` 沿用明确课程归属汇总、去重排序；前端在完成数量下方仅展示数字。无需迁移，不保存第二份完成事实；题号明细不写入原进度概览快照。
 
 记录与进度共用 `styles/retrospective.css`；记录日期筛选使用 `PeriodFilter.vue`。进度概览通过原 offline store 保存，`useCatalogWorkspace` 不新增本地缓存层。目录说明、Schema 与示例统一放在 `docs/business/progress-catalog*`，由 Vite 和 Docker 构建打包。
 

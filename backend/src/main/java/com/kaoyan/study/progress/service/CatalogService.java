@@ -68,6 +68,11 @@ public class CatalogService {
         var s=state(); var rows=records.list(null,null,null,null); var assigned=resolve(rows,s);
         var totals=new HashMap<Long,BigDecimal>();
         for(var r:rows) if(assigned.containsKey(r.id()) && r.amount()!=null) totals.merge(assigned.get(r.id()).id(),r.amount(),BigDecimal::add);
+        var completedProblems=new HashMap<Long,SortedSet<Integer>>();
+        for(var problem:mapper.completedProblems()) {
+            var node=assigned.get(problem.recordId());
+            if(node!=null) completedProblems.computeIfAbsent(node.courseId(),id->new TreeSet<>()).add(problem.problemNumber());
+        }
         var views=new ArrayList<CourseView>();
         for(var c:s.courses()) {
             var nodes=s.nodes().stream().filter(n->n.courseId().equals(c.id())).toList();
@@ -77,7 +82,8 @@ public class CatalogService {
             views.add(new CourseView(c.id(),c.courseKey(),c.direction(),c.branch(),c.title(),c.subjectId(),c.unitId(),units.get(c.unitId()).getName(),
                     leaves.stream().map(NodeRow::totalAmount).reduce(BigDecimal.ZERO,BigDecimal::add),
                     leaves.stream().map(n->totals.getOrDefault(n.id(),BigDecimal.ZERO).min(n.totalAmount())).reduce(BigDecimal.ZERO,BigDecimal::add),
-                    leaves.stream().map(n->totals.getOrDefault(n.id(),BigDecimal.ZERO)).reduce(BigDecimal.ZERO,BigDecimal::add),nv));
+                    leaves.stream().map(n->totals.getOrDefault(n.id(),BigDecimal.ZERO)).reduce(BigDecimal.ZERO,BigDecimal::add),nv,
+                    List.copyOf(completedProblems.getOrDefault(c.id(),Collections.emptySortedSet()))));
         }
         var cumulative=new LinkedHashMap<String,Quantity>();
         for(var r:rows) if(r.subjectId()!=null && r.unitId()!=null && r.amount()!=null) {

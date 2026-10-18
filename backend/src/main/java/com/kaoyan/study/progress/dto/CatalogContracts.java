@@ -27,7 +27,8 @@ public final class CatalogContracts {
                            BigDecimal completedAmount, List<Long> taskIds, int sortOrder) {}
     public record CourseView(Long id, String key, String direction, String branch, String title,
                              Long subjectId, Long unitId, String unitName, BigDecimal totalAmount,
-                             BigDecimal completedAmount, BigDecimal recordedAmount, List<NodeView> nodes) {}
+                             BigDecimal completedAmount, BigDecimal recordedAmount, List<NodeView> nodes,
+                             List<Integer> completedProblemNumbers) {}
     public record CountedProgress(Long taskId, String title, String direction, String mode,
                                   Long subjectId, String subjectName, Long unitId, String unitName,
                                   BigDecimal recordedAmount, int recordCount, long learningDays,

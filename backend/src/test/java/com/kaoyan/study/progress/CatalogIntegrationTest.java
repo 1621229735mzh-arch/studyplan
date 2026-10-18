@@ -6,6 +6,8 @@ import com.kaoyan.study.learning.dto.*;
 import com.kaoyan.study.learning.service.*;
 import com.kaoyan.study.plan.dto.TaskCreateRequest;
 import com.kaoyan.study.plan.service.TaskService;
+import com.kaoyan.study.plan.service.TaskSequenceService;
+import com.kaoyan.study.plan.dto.PlanImportDocument;
 import com.kaoyan.study.progress.dto.CatalogContracts.*;
 import com.kaoyan.study.progress.service.CatalogService;
 import com.kaoyan.study.settings.dto.*;
@@ -30,6 +32,7 @@ class CatalogIntegrationTest {
     @Autowired StudyRecordService records;
     @Autowired RecordArchiveService archive;
     @Autowired TaskService tasks;
+    @Autowired TaskSequenceService sequences;
     @Autowired SubjectService subjects;
     @Autowired StudyUnitService units;
     @Autowired JdbcTemplate jdbc;
@@ -57,6 +60,26 @@ class CatalogIntegrationTest {
         return records.create(new StudyRecordCreateRequest(task,task==null?subjectId:null,task==null?unitId:null,day,new BigDecimal(amount),minutes,"学习内容",null,UUID.randomUUID().toString()));
     }
 
+    @Test void completedProblemNumbersUseCurrentCompletedRecordsAndTheirResolvedCourse() {
+        sequences.create(taskId,date,date.plusDays(6),new PlanImportDocument.Sequence("SELECT_BY_NUMBER",List.of()));
+        apply(doc(leaf("problems","31",List.of(taskId))));
+        var first=records.create(new StudyRecordCreateRequest(taskId,null,null,date,BigDecimal.ONE,null,null,null,UUID.randomUUID().toString(),null,283));
+        var second=records.create(new StudyRecordCreateRequest(taskId,null,null,date.plusDays(1),BigDecimal.ONE,null,null,null,UUID.randomUUID().toString(),null,31));
+        records.create(new StudyRecordCreateRequest(taskId,null,null,date.plusDays(2),null,null,null,null,UUID.randomUUID().toString(),null,128));
+        assertThat(course().completedProblemNumbers()).containsExactly(31,283);
+        assertThat(course().completedAmount()).isEqualByComparingTo("2");
+        var edited=records.update(first.id(),new StudyRecordUpdateRequest(taskId,null,null,date,BigDecimal.ONE,null,null,null,first.version(),null,49));
+        assertThat(course().completedProblemNumbers()).containsExactly(31,49);
+        records.delete(edited.id(),edited.version());
+        assertThat(course().completedProblemNumbers()).containsExactly(31);
+        // 显式归属覆盖任务归属后，题号随同一条记录移动，不串到原课程。
+        var other=new CourseInput(courseKey+"-other","MATH","高等数学","另一课程",subjectId,unitId,List.of(leaf("other","31",List.of())));
+        apply(new Document(1,List.of(other)));
+        var otherCourse=catalog.library().courses().stream().filter(c->c.key().equals(other.key())).findFirst().orElseThrow();
+        catalog.assign(second.id(),new AssignRequest(otherCourse.nodes().getFirst().id(),second.version(),catalog.library().revision()));
+        assertThat(course().completedProblemNumbers()).isEmpty();
+        assertThat(catalog.library().courses().stream().filter(c->c.key().equals(other.key())).findFirst().orElseThrow().completedProblemNumbers()).containsExactly(31);
+    }
     @Test void fullDenominatorAndAutomaticTaskHistoryDoNotCreateRecordsOrChangePlans() {
         var r=record(taskId,"10",60,date);
         var initial=doc(leaf("lesson1","20",List.of(taskId)),leaf("unplanned","60",List.of()));

@@ -6,9 +6,11 @@
 
 需求与技术栈依据见 [PLAN.md](PLAN.md)；工程约束见 [AGENTS.md](AGENTS.md)；目录职责见 [docs/STRUCTURE.md](docs/STRUCTURE.md)。
 
-## 当前状态（更新于 2026-10-17）
+## 当前状态（更新于 2026-10-18）
 
-LeetCode每日自填题号（V22、导入v7）已完成本地实现与相关验证，随本次代码提交交付；尚未部署或更正线上题号。线上仍为V21。使用及发布边界见 [自填题号验证](docs/testing/leetcode-number-20261017.md)。
+LeetCode每日自填题号（V22、导入v7）已于2026-10-18正式发布，五次历史题号已更正为31、32、49、128、283，保留原日期与完成量。使用与验证见 [自填题号验证](docs/testing/leetcode-number-20261017.md)，线上证据见 [发布记录](docs/operations/leetcode-number-release-20261018.md)。
+
+2026-10-18 11:24补充发布：LeetCode课程详情在完成数量下方展示已完成题号数字，按原有效完成记录及课程归属去重、升序汇总，修改或删除后重算。无新增迁移，启动命令不变，题号明细需联网；[发布验收](docs/operations/completed-problems-release-20261018.md)通过，原记录保留。
 
 英语进度已分别显示“每日背诵新词”和“每日单词复习”的累计实际词数、天数与记录次数，历史未填写数量的复习显示未知，修改或删除原记录后重算。2026-10-17已正式发布并完成网页刷新验收，31张业务表及原7条学习记录保留；本地启动命令不变。见 [验证记录](docs/testing/english-progress-20261017.md) 和 [发布记录](docs/operations/english-progress-release-20261017.md)。
 
@@ -178,4 +180,4 @@ Nginx 提供前端静态文件并转发 `/api`；数据库与管理端点都不�
 
 2026-10-15 学习接续验证：隔离 MySQL9.7 上后端136项及打包、前端87项、类型检查和生产构建通过；未执行Linux Docker会话专测或MySQL8.4验收，未发布。详见上述验证记录。
 
-LeetCode 自行填写题号（本地实现）：每日完成／尝试输入实际题号，记录页可更正。已有清单在任务库“自填题号”预览转换，保留原安排与记录；v7计划不预设题目清单。新增V22，启动命令不变，详见 [执行规则](docs/business/sequential-practice.md) 和 [本轮验证](docs/testing/leetcode-number-20261017.md)。
+LeetCode 自行填写题号（已上线）：每日完成／尝试输入实际题号，记录页可更正。已有清单在任务库“自填题号”预览转换，保留原安排与记录；v7计划不预设题目清单。新增V22，启动命令不变，详见 [执行规则](docs/business/sequential-practice.md) 和 [本轮验证](docs/testing/leetcode-number-20261017.md)。

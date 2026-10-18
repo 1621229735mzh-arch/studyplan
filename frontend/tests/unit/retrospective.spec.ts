@@ -115,6 +115,26 @@ describe('月周日学习记录与目录进度', () => {
     expect(w.find('.course-ring').exists()).toBe(true); expect(w.text()).toContain('2 / 3 讲'); expect(w.text()).toContain('第一讲'); expect(w.text()).not.toContain(learningRecordFixture.recordDate)
     expect(mocks.save).toHaveBeenCalledWith(expect.objectContaining({ progress: expect.objectContaining({ planningBasis: 'catalog', trend: [], catalog: expect.objectContaining({ courses: [expect.not.objectContaining({ nodes: expect.anything() })] }) }) }))
   })
+  it('课程详情仅展示完成题号数字，刷新后更新且不缓存题号明细', async () => {
+    const value = structuredClone(library)
+    value.courses[0].completedProblemNumbers = [31,32,49,128,283]
+    mocks.get.mockResolvedValue(value)
+    const w = await render(DirectionView,'/progress/CS408?course=1')
+    expect(w.find('[aria-label="已完成题号"]').text()).toBe('31、32、49、128、283')
+    expect(mocks.save.mock.calls[0][0].progress.catalog.courses[0]).not.toHaveProperty('completedProblemNumbers')
+    mocks.get.mockResolvedValue({ ...value,courses:[{ ...value.courses[0],completedProblemNumbers:[31,32,49,283] }] })
+    await button(w,'刷新进度').trigger('click'); await flushPromises()
+    expect(w.find('[aria-label="已完成题号"]').text()).toBe('31、32、49、283')
+    mocks.get.mockResolvedValue(library)
+    await button(w,'刷新进度').trigger('click'); await flushPromises()
+    expect(w.find('[aria-label="已完成题号"]').exists()).toBe(false)
+  })
+  it('离线课程概览不显示完成题号明细', async () => {
+    mocks.online = false
+    mocks.cache = { planningBasis:'catalog',catalog:{ ...library,courses:library.courses.map(({nodes:_nodes,...course})=>({ ...course,completedProblemNumbers:[31,49] })) } }
+    const w = await render(DirectionView,'/progress/CS408?course=1')
+    expect(w.find('[aria-label="已完成题号"]').exists()).toBe(false)
+  })
   it('英语直接展示背词与复习的独立进度，没有总目标或完成百分比', async () => {
     const activities = [
       { taskId:510,title:'每日背诵新词',direction:'ENGLISH',mode:'COUNT_STUDY',subjectId:5,subjectName:'英语一',unitId:4,unitName:'词',recordedAmount:100,recordCount:2,learningDays:2,unknownQuantityRecords:0 },
