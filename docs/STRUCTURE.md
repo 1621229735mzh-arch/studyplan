@@ -179,3 +179,6 @@ V20 新增学习接续规划表与原学习记录的 `continuation_delta`。`Tas
 2026-10-17 英语数量进度：`CatalogService.library` 的 activities 从原数量任务与有效学习记录生成累计数量、次数、天数及历史未知数量次数；`CountedProgressCards.vue` 在所属方向页展示，复习单列，不创建课程总量或额外事实表。概览进入原 `useCatalogWorkspace` 只读统计快照；旧快照没有 activities 时兼容读取。无表结构迁移。
 
 2026-10-17 LeetCode 自填题号：V22 为原 task_sequence 添加 mode，SELECT_BY_NUMBER 使用原题目身份与学习记录。TaskSequenceService 按实际输入解析题号；SequenceLearningService 校验每日一题、首次题量与日期；ProblemNumberModeService 在计划模块组织预览转换，通过 StudyRecordService 修改历史题号。今日和 SequenceRecordItem.vue 增加题号输入，ProblemNumberModeDialog.vue 位于任务库；导入 v7 不预设 items，不新增完成事实表。
+
+
+2026-10-18 学习日截止：学习日期规则归 `settings/service/StudyDay`，统一以 Asia/Shanghai 的09:00切换，供今日、序列执行、统计与复习服务调用；不放在 common。前端 `composables/useFormat.ts` 的 `todayIso` 使用同一规则，已有默认日期与离线快照共用。真实时间戳、日期运算和明确选中的历史日期不变；无需数据库迁移。

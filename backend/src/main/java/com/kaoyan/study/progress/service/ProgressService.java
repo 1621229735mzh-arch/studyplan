@@ -1,5 +1,7 @@
 package com.kaoyan.study.progress.service;
 
+import com.kaoyan.study.settings.service.StudyDay;
+
 import com.kaoyan.study.progress.dto.DailyUnitAmountView;
 import com.kaoyan.study.progress.dto.ProgressOverviewResponse;
 import com.kaoyan.study.progress.dto.TrendPointView;
@@ -25,14 +27,16 @@ public class ProgressService {
     /** 默认观察窗口：最近 4 周。 */
     private static final int DEFAULT_WINDOW_DAYS = 28;
 
+    private final StudyDay studyDay;
     private final ProgressMapper progressMapper;
 
-    public ProgressService(ProgressMapper progressMapper) {
+    public ProgressService(ProgressMapper progressMapper, StudyDay studyDay) {
         this.progressMapper = progressMapper;
+        this.studyDay = studyDay;
     }
 
     public ProgressOverviewResponse overview(LocalDate from, LocalDate to) {
-        LocalDate end = to == null ? LocalDate.now() : to;
+        LocalDate end = to == null ? studyDay.today() : to;
         LocalDate start = from == null ? end.minusDays(DEFAULT_WINDOW_DAYS - 1L) : from;
 
         List<UnitProgressView> items = progressMapper.findUnitProgress(start, end);
@@ -40,7 +44,7 @@ public class ProgressService {
     }
 
     public List<TrendPointView> trend(LocalDate from, LocalDate to) {
-        LocalDate end = to == null ? LocalDate.now() : to;
+        LocalDate end = to == null ? studyDay.today() : to;
         LocalDate start = from == null ? end.minusDays(DEFAULT_WINDOW_DAYS - 1L) : from;
 
         Map<LocalDate, Integer> minutesByDate = new LinkedHashMap<>();

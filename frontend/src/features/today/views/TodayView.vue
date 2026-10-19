@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { ElAlert, ElButton, ElDatePicker, ElDialog, ElInput, ElInputNumber, ElMessage, ElRadioGroup, ElRadioButton } from 'element-plus'
 import { toApiError } from '@/api/http'
 import AppIcon from '@/components/AppIcon.vue'
@@ -22,6 +22,17 @@ const catalog = useCatalogStore()
 const offline = useOfflineSnapshotStore()
 const { online } = useOnlineStatus()
 const date = ref(todayIso())
+let lastStudyDay = date.value
+let followsToday = true
+function syncStudyDay(): boolean {
+  const current = todayIso()
+  if (current === lastStudyDay) return false
+  lastStudyDay = current
+  if (!followsToday) return false
+  date.value = current
+  today.value = null
+  return true
+}
 const today = ref<TodayResponse | null>(null)
 const loading = ref(false)
 const errorMessage = ref<string | null>(null)
@@ -41,6 +52,7 @@ async function loadFromCache(): Promise<boolean> {
 }
 
 async function loadToday(): Promise<void> {
+  syncStudyDay()
   const requestId = ++loadSequence
   const requestedDate = date.value
   errorMessage.value = null
@@ -76,6 +88,7 @@ async function loadToday(): Promise<void> {
 
 function onDateChange(value: unknown): void {
   date.value = typeof value === 'string' && value ? value : todayIso()
+  followsToday = date.value === todayIso()
   today.value = null
   void loadToday()
 }
@@ -106,6 +119,7 @@ let attempt: { signature: string; token: string } | null = null
 let confirmationAttempt: {signature: string; token: string} | null = null
 async function confirmTask(task: TodayChecklistTask, completed: boolean): Promise<void> {
   if (readonly.value || saving.value || !task.actionable) return
+  if (syncStudyDay()) { void loadToday(); return }
   const signature=JSON.stringify([date.value,task.id,completed,task.revision])
   if (confirmationAttempt?.signature!==signature) confirmationAttempt={signature,token:crypto.randomUUID()}
   saving.value=true; errorMessage.value=null
@@ -118,6 +132,7 @@ async function confirmTask(task: TodayChecklistTask, completed: boolean): Promis
 }
 function openAction(task: TodayChecklistTask, complete: boolean): void {
   if (readonly.value || !task.actionable) return
+  if (syncStudyDay()) { void loadToday(); return }
   if (task.activity?.mode==='CHECK_ONLY') { void confirmTask(task,complete); return }
   selected.value = { ...task }
   actionDate = date.value
@@ -165,6 +180,7 @@ const recording = ref(false)
 const extraRecordRef = ref<HTMLDetailsElement | null>(null)
 async function openExtraRecord(): Promise<void> {
   if (!extraRecordRef.value || readonly.value) return
+  if (syncStudyDay()) { await loadToday(); return }
   extraRecordRef.value.open = true
   await nextTick()
   extraRecordRef.value.scrollIntoView?.({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })
@@ -191,13 +207,29 @@ async function saveExtraRecord(payload: LearningRecordFormSubmission): Promise<v
     recordFormRef.value?.setServerError(error.message, error.fieldErrors)
   } finally { recording.value = false }
 }
-onMounted(() => { void catalog.load(); void loadToday() })
+let dayTimer: ReturnType<typeof setInterval> | undefined
+function checkStudyDay(): void {
+  // 正在填写的记录保留原日期与输入；关闭后再切换今日。
+  if (dialogVisible.value || saving.value || recording.value || extraRecordRef.value?.open) return
+  if (syncStudyDay()) void loadToday()
+}
+onMounted(() => {
+  void catalog.load(); void loadToday()
+  dayTimer = setInterval(checkStudyDay, 1000)
+  window.addEventListener('focus', checkStudyDay)
+  document.addEventListener('visibilitychange', checkStudyDay)
+})
+onUnmounted(() => {
+  clearInterval(dayTimer)
+  window.removeEventListener('focus', checkStudyDay)
+  document.removeEventListener('visibilitychange', checkStudyDay)
+})
 </script>
 <template>
   <div class="page today-page">
     <header class="today-hero">
       <ArchiveArtwork variant="hero" class="today-hero__art" />
-      <div class="today-hero__copy"><span class="today-eyebrow">STUDY ROOM</span><h1>今日学习</h1><p>按计划学习，按实际记录。</p>
+      <div class="today-hero__copy"><span class="today-eyebrow">STUDY ROOM</span><h1>今日学习</h1><p>学习日 {{ date }} · 次日早上 9 点截止（北京时间）。</p>
       </div>
       <div class="today-hero__tools">
         <ElButton class="today-extra-button" :disabled="readonly || saving || !today?.sections" @click="openExtraRecord"><AppIcon name="edit" :size="20" />补记学习</ElButton>

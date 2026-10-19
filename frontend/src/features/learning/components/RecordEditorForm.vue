@@ -207,6 +207,7 @@ defineExpose({ form, submit, reset, fillFrom, setServerError })
       description="第一版离线只读，无法提交学习记录；已填内容会保留，联网后可直接重试。"
     />
 
+    <p class="page-description">学习日次日早上 9 点截止（北京时间）；补记可自行选择日期。</p>
     <div class="record-form__grid">
       <SequenceRecordItem v-if="selectedTask?.sequential || form.sequenceItemId" :task-id="form.taskId" :date="form.recordDate" :item-id="form.sequenceItemId" :editing="mode === 'edit'" :problem-number="form.problemNumber" :disabled="submitting || !online" @number="form.problemNumber = $event" @item="form.sequenceItemId = $event" @ready="sequenceReady = $event" />
       <ElFormItem label="日期" :error="fieldErrors.recordDate">

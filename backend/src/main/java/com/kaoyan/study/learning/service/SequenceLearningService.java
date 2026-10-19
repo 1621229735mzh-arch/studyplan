@@ -1,5 +1,7 @@
 package com.kaoyan.study.learning.service;
 
+import com.kaoyan.study.settings.service.StudyDay;
+
 import com.kaoyan.study.common.exception.BusinessException;
 import com.kaoyan.study.common.exception.ConflictException;
 import com.kaoyan.study.learning.dto.StudyRecordView;
@@ -20,9 +22,11 @@ public class SequenceLearningService {
         public State summary() { return new State(List.of(),current,dayItem,"",actionable,mode); }
     }
     private final TaskSequenceService sequences;
+    private final StudyDay studyDay;
     private final StudyRecordMapper records;
-    public SequenceLearningService(TaskSequenceService sequences, StudyRecordMapper records) {
+    public SequenceLearningService(TaskSequenceService sequences, StudyRecordMapper records, StudyDay studyDay) {
         this.sequences=sequences; this.records=records;
+        this.studyDay = studyDay;
     }
     public State state(Long taskId, LocalDate date) {
         var definition=sequences.definition(taskId);
@@ -34,7 +38,7 @@ public class SequenceLearningService {
         // Historical attempts retain their actual identity; completed days do not show tomorrow's item.
         var own=rows.stream().filter(r -> r.recordDate().equals(date) && r.sequenceItemId()!=null)
                 .sorted(Comparator.comparing((StudyRecordView r) -> r.amount()==null).thenComparing(StudyRecordView::id)).findFirst().orElse(null);
-        boolean retainOwn=own!=null && (own.amount()!=null || date.isBefore(LocalDate.now(java.time.ZoneId.of("Asia/Shanghai"))));
+        boolean retainOwn=own!=null && (own.amount()!=null || date.isBefore(studyDay.today()));
         var dayItem=!retainOwn ? current : entries.stream().filter(i -> i.id().equals(own.sequenceItemId())).findFirst().orElse(null);
         var revision=definition.mode()+":"+records.sequenceHistory(taskId)+":"+rows.stream().sorted(Comparator.comparing(StudyRecordView::id))
                 .map(r -> r.id()+":"+r.version()).collect(java.util.stream.Collectors.joining(","));

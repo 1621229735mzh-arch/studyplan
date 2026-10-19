@@ -33,9 +33,10 @@ export function toIsoDate(date: Date): string {
   return `${year}-${month}-${day}`
 }
 
-/** 今天。 */
-export function todayIso(): string {
-  return toIsoDate(new Date())
+/** 当前学习日：北京时间每天 09:00 切换，与后端 StudyDay 一致。 */
+export function todayIso(now: Date = new Date()): string {
+  // 上海 UTC+8，减去 9 小时截止偏移，等价于将当前 UTC 时间减 1 小时。
+  return new Date(now.getTime() - 60 * 60 * 1000).toISOString().slice(0, 10)
 }
 
 /** 日期加减天数。 */

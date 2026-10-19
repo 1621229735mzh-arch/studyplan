@@ -1,5 +1,7 @@
 package com.kaoyan.study.today.service;
 
+import com.kaoyan.study.settings.service.StudyDay;
+
 import com.kaoyan.study.learning.dto.StudyRecordView;
 import com.kaoyan.study.learning.service.StudyRecordService;
 import com.kaoyan.study.plan.dto.DailyPlanItemView;
@@ -37,6 +39,7 @@ import java.util.stream.Collectors;
 @Service
 public class TodayService {
 
+    private final StudyDay studyDay;
     private final SubjectService subjectService;
     private final DailyPlanService dailyPlanService;
     private final StudyRecordService studyRecordService;
@@ -47,8 +50,9 @@ public class TodayService {
                         StudyRecordService studyRecordService,
                         ReviewService reviewService,
                         StudySettingsService studySettingsService,
-                        SubjectService subjectService) {
+                        SubjectService subjectService, StudyDay studyDay) {
         this.subjectService = subjectService;
+        this.studyDay = studyDay;
         this.dailyPlanService = dailyPlanService;
         this.studyRecordService = studyRecordService;
         this.reviewService = reviewService;
@@ -57,7 +61,7 @@ public class TodayService {
 
     @Transactional
     public TodayResponse today(LocalDate date) {
-        LocalDate planDate = date == null ? LocalDate.now() : date;
+        LocalDate planDate = date == null ? studyDay.today() : date;
 
         List<DailyPlanItemView> plannedTasks = dailyPlanService.list(planDate);
         List<StudyRecordView> records = studyRecordService.list(planDate, planDate, null, null);

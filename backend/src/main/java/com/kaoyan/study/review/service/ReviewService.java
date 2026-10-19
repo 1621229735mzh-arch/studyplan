@@ -1,5 +1,7 @@
 package com.kaoyan.study.review.service;
 
+import com.kaoyan.study.settings.service.StudyDay;
+
 import com.kaoyan.study.common.exception.BusinessException;
 import com.kaoyan.study.common.exception.ConflictException;
 import com.kaoyan.study.common.exception.NotFoundException;
@@ -54,18 +56,20 @@ public class ReviewService {
     private final TaskService taskService;
     private final SubjectService subjectService;
     private final StudyRecordService studyRecordService;
+    private final StudyDay studyDay;
     private final StudySettingsService studySettingsService;
 
     public ReviewService(ReviewMapper reviewMapper,
                          TaskService taskService,
                          SubjectService subjectService,
                          StudyRecordService studyRecordService,
-                         StudySettingsService studySettingsService) {
+                         StudySettingsService studySettingsService, StudyDay studyDay) {
         this.reviewMapper = reviewMapper;
         this.taskService = taskService;
         this.subjectService = subjectService;
         this.studyRecordService = studyRecordService;
         this.studySettingsService = studySettingsService;
+        this.studyDay = studyDay;
     }
 
     public List<ReviewItem> list(String status, Long subjectId) {
@@ -99,7 +103,7 @@ public class ReviewService {
                 throw new BusinessException("REVIEW_TARGET_INVALID", "任务与计划外学习记录请选择一种来源");
             }
             Task task = taskService.requireExistingForUpdate(request.taskId());
-            if (studyRecordService.list(null, LocalDate.now(), request.taskId(), null).stream()
+            if (studyRecordService.list(null, studyDay.today(), request.taskId(), null).stream()
                     .noneMatch(this::hasStudyEvidence)) {
                 throw new BusinessException("REVIEW_REQUIRES_STUDY", "只能把已经学过的内容加入复习");
             }
@@ -132,7 +136,7 @@ public class ReviewService {
         item.setEstimatedMinutes(request.estimatedMinutes());
         item.setStatus(ReviewStatus.PENDING);
         // 刚加入的内容立即可安排，不预设间隔
-        item.setNextReviewDate(LocalDate.now());
+        item.setNextReviewDate(studyDay.today());
         reviewMapper.insertItem(item);
         return get(item.getId());
     }
@@ -239,18 +243,19 @@ public class ReviewService {
 
     /** 当天到期（含积压）的建议，并说明额度与预计用时的缺口。 */
     public ReviewSuggestionResponse suggestions(LocalDate date) {
+        LocalDate targetDate = date == null ? studyDay.today() : date;
         StudySettings settings = studySettingsService.get();
         Integer quota = settings.getDailyReviewMinutes();
-        int scheduledMinutes = scheduledMinutes(date);
+        int scheduledMinutes = scheduledMinutes(targetDate);
 
-        List<ReviewItem> due = reviewMapper.findDueItems(date);
+        List<ReviewItem> due = reviewMapper.findDueItems(targetDate);
         List<ReviewSuggestionResponse.Item> items = due.stream()
                 .map(item -> new ReviewSuggestionResponse.Item(
                         item.getId(),
                         item.getTitle(),
                         item.getSubjectId(),
                         item.getNextReviewDate(),
-                        ChronoUnit.DAYS.between(item.getNextReviewDate(), date),
+                        ChronoUnit.DAYS.between(item.getNextReviewDate(), targetDate),
                         item.getEstimatedMinutes()))
                 .toList();
 
@@ -263,7 +268,7 @@ public class ReviewService {
             warnings.add("有 " + missingEstimate + " 项缺少预计用时，确认安排时需要补充");
         }
 
-        return new ReviewSuggestionResponse(date, quota, scheduledMinutes,
+        return new ReviewSuggestionResponse(targetDate, quota, scheduledMinutes,
                 quota == null ? null : Math.max(0, quota - scheduledMinutes), items, warnings);
     }
 
@@ -347,7 +352,7 @@ public class ReviewService {
     }
 
     private boolean hasStudyEvidence(StudyRecordView record) {
-        return !record.recordDate().isAfter(LocalDate.now())
+        return !record.recordDate().isAfter(studyDay.today())
                 && ((record.amount() != null && record.amount().signum() > 0)
                 || (record.durationMinutes() != null && record.durationMinutes() > 0)
                 || (record.continuationDelta() != null && record.continuationDelta().signum() > 0)

@@ -96,7 +96,7 @@ public class ReviewController {
     @Operation(summary = "某天的复习建议（含额度与预计用时缺口）")
     public ReviewSuggestionResponse suggestions(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return reviewService.suggestions(date == null ? LocalDate.now() : date);
+        return reviewService.suggestions(date);
     }
 
     @PostMapping("/suggestions/confirm")

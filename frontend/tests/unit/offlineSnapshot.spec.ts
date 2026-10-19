@@ -17,7 +17,7 @@ import { todayFixture } from '../fixtures/today'
 describe('离线快照', () => {
   beforeEach(async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
-    vi.setSystemTime(new Date('2025-03-10T12:00:00'))
+    vi.setSystemTime(new Date('2025-03-10T12:00:00+08:00'))
     setActivePinia(createPinia())
     await clearAll()
   })
@@ -34,9 +34,11 @@ describe('离线快照', () => {
     }
   })
 
-  it('跨日后不把旧快照当成今天，但保留其他切片', async () => {
+  it('早上9点后不把旧快照当成今天，但保留其他切片', async () => {
     await saveSnapshot({ userName: 'kaoyan', today: todayFixture, week: weekFixture })
-    vi.setSystemTime(new Date('2025-03-11T00:01:00'))
+    vi.setSystemTime(new Date('2025-03-11T06:00:00+08:00'))
+    expect((await readSnapshot())?.today).toEqual(todayFixture)
+    vi.setSystemTime(new Date('2025-03-11T09:00:00+08:00'))
     expect((await readSnapshot())?.today).toBeNull()
     expect((await readSnapshot())?.week).toEqual(weekFixture)
     const store = useOfflineSnapshotStore()

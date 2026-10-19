@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
-import ElementPlus, { ElButton, ElInputNumber } from 'element-plus'
+import ElementPlus, { ElButton, ElDatePicker, ElInputNumber } from 'element-plus'
 import { HttpApiError } from '@/api/http'
 import TodayView from '@/features/today/views/TodayView.vue'
 import type { TodayResponse } from '@/features/today/types'
@@ -24,6 +24,42 @@ function button(wrapper: ReturnType<typeof mount>, text: string, index=0) {retur
 beforeEach(()=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-10-01T12:00:00+08:00'));mocks.online.value=true;mocks.snapshot=null;vi.clearAllMocks();mocks.fetch.mockResolvedValue(fixture());mocks.learning.mockResolvedValue({id:1});mocks.review.mockResolvedValue({id:2});mocks.cache.mockResolvedValue(undefined)})
 afterEach(()=>{wrappers.splice(0).forEach(w=>w.unmount());document.body.innerHTML='';vi.useRealTimers()})
 describe('今日清单操作',()=>{
+ it('页面保持打开时九点自动刷新，且不会在截止瞬间用旧清单提交',async()=>{
+  vi.useRealTimers()
+  vi.useFakeTimers({toFake:['Date','setInterval','clearInterval']})
+  vi.setSystemTime(new Date('2026-10-02T08:59:59+08:00'))
+  const w=await page()
+  await vi.advanceTimersByTimeAsync(1000);await flushPromises()
+  expect(mocks.fetch).toHaveBeenLastCalledWith('2026-10-02')
+  vi.setSystemTime(new Date('2026-10-03T09:00:00+08:00'))
+  await button(w,'完成').trigger('click');await flushPromises()
+  expect(mocks.fetch).toHaveBeenLastCalledWith('2026-10-03')
+  expect(mocks.learning).not.toHaveBeenCalled()
+ })
+ it('凌晨六点提交仍归前一天，九点回到页面后自动切换',async()=>{
+  vi.setSystemTime(new Date('2026-10-02T06:00:00+08:00'))
+  const w=await page()
+  expect(mocks.fetch).toHaveBeenLastCalledWith('2026-10-01')
+  await button(w,'完成').trigger('click');await flushPromises()
+  await button(w,'保存').trigger('click');await flushPromises()
+  expect(mocks.learning.mock.calls[0][2].date).toBe('2026-10-01')
+  vi.setSystemTime(new Date('2026-10-02T09:00:00+08:00'))
+  window.dispatchEvent(new Event('focus'));await flushPromises()
+  expect(mocks.fetch).toHaveBeenLastCalledWith('2026-10-02')
+ })
+ it('九点切换保留正在填写的原日期，手动查看历史日期也不跳走',async()=>{
+  vi.setSystemTime(new Date('2026-10-02T08:59:59+08:00'))
+  const w=await page();await button(w,'完成').trigger('click');await flushPromises()
+  vi.setSystemTime(new Date('2026-10-02T09:00:00+08:00'))
+  window.dispatchEvent(new Event('focus'));await flushPromises()
+  expect(mocks.fetch).toHaveBeenLastCalledWith('2026-10-01')
+  await button(w,'保存').trigger('click');await flushPromises()
+  expect(mocks.learning.mock.calls[0][2].date).toBe('2026-10-01')
+  w.findComponent(ElDatePicker).vm.$emit('update:modelValue','2026-09-29');await flushPromises()
+  vi.setSystemTime(new Date('2026-10-03T09:00:00+08:00'))
+  window.dispatchEvent(new Event('focus'));await flushPromises()
+  expect(mocks.fetch).toHaveBeenLastCalledWith('2026-09-29')
+ })
  it('补记快捷入口展开原表单，不直接生成学习记录',async()=>{
   const w=await page();await button(w,'补记学习').trigger('click');await flushPromises()
   expect((w.get('.extra-record').element as HTMLDetailsElement).open).toBe(true)
