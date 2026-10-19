@@ -9,6 +9,13 @@ const item = { id: 31, key: '31', title: 'LeetCode 31', url: 'https://leetcode.c
 const wrappers: ReturnType<typeof mount>[] = []
 afterEach(() => { wrappers.splice(0).forEach(w => w.unmount()); vi.clearAllMocks() })
 describe('接续补记题目', () => {
+  it('同日补记新题时不自动回填已完成的题号',async()=>{
+    mocks.get.mockResolvedValue({mode:'SELECT_BY_NUMBER',items:[item],current:null,dayItem:item,revision:'',actionable:true})
+    const w=mount(SequenceItem,{props:{taskId:10,date:'2026-10-14',editing:false}});wrappers.push(w);await flushPromises()
+    expect(w.emitted('number')?.at(-1)).toEqual([null])
+    expect(w.emitted('ready')?.at(-1)).toEqual([false])
+    expect(w.text()).toContain('同一天可记录多题');expect(w.text()).not.toContain('每天最多完成 1 题')
+  })
   it('记录编辑表单提交更正题号，保留原日期、完成量、内容与复盘', async () => {
     mocks.get.mockResolvedValue({mode:'SELECT_BY_NUMBER',items:[item],current:null,dayItem:item,revision:'',actionable:true})
     const w=mount(RecordEditorForm,{props:{mode:'edit',tasks:[{id:10,title:'LeetCode',unitId:1,unitName:'题',sequential:true}]},global:{plugins:[ElementPlus]}});wrappers.push(w)

@@ -11,6 +11,8 @@ import java.util.List;
 /** 学习记录数据访问。所有查询都排除软删除记录。 */
 @Mapper
 public interface StudyRecordMapper {
+    /** Batch retry validation includes revoked child tokens. */
+    StudyRecord findByClientTokenIncludingDeleted(@Param("clientToken") String clientToken);
     @org.apache.ibatis.annotations.Select("SELECT COUNT(*) FROM study_record WHERE task_id=#{taskId} AND record_date=#{date} AND deleted_at IS NULL AND activity_completed=TRUE")
     int completedActivities(@Param("taskId") Long taskId,@Param("date") LocalDate date);
 

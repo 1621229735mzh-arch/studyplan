@@ -4,8 +4,8 @@ import ElementPlus, { ElButton, ElDatePicker, ElInputNumber } from 'element-plus
 import { HttpApiError } from '@/api/http'
 import TodayView from '@/features/today/views/TodayView.vue'
 import type { TodayResponse } from '@/features/today/types'
-const mocks = vi.hoisted(() => ({ fetch: vi.fn(), learning: vi.fn(), review: vi.fn(), confirmation: vi.fn(), cache: vi.fn(), online: { value: true }, snapshot: null as TodayResponse | null }))
-vi.mock('@/features/today/api', () => ({ fetchToday: mocks.fetch, saveLearningProgress: mocks.learning, saveReviewProgress: mocks.review, saveDayConfirmation: mocks.confirmation }))
+const mocks = vi.hoisted(() => ({ fetch: vi.fn(), learning: vi.fn(), review: vi.fn(), problems: vi.fn(), confirmation: vi.fn(), cache: vi.fn(), online: { value: true }, snapshot: null as TodayResponse | null }))
+vi.mock('@/features/today/api', () => ({ fetchToday: mocks.fetch, saveLearningProgress: mocks.learning, saveCompletedProblemNumbers: mocks.problems, saveReviewProgress: mocks.review, saveDayConfirmation: mocks.confirmation }))
 vi.mock('@/composables/useOnlineStatus', () => ({ useOnlineStatus: () => ({ online: mocks.online }) }))
 vi.mock('@/stores/catalog', () => ({ useCatalogStore: () => ({ load: vi.fn(), subjectNameOf: () => '数学一' }) }))
 vi.mock('@/stores/session', () => ({ useSessionStore: () => ({ username: 'test' }) }))
@@ -21,7 +21,7 @@ function fixture(): TodayResponse {
 const wrappers: ReturnType<typeof mount>[] = []
 async function page() {const wrapper=mount(TodayView,{global:{plugins:[ElementPlus], stubs:{teleport:true, ElDialog:{props:['modelValue'],template:'<div v-if="modelValue"><slot /><slot name="footer" /></div>'}}},attachTo:document.body});wrappers.push(wrapper);await flushPromises();return wrapper}
 function button(wrapper: ReturnType<typeof mount>, text: string, index=0) {return wrapper.findAllComponents(ElButton).filter(b=>b.text()===text)[index]}
-beforeEach(()=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-10-01T12:00:00+08:00'));mocks.online.value=true;mocks.snapshot=null;vi.clearAllMocks();mocks.fetch.mockResolvedValue(fixture());mocks.learning.mockResolvedValue({id:1});mocks.review.mockResolvedValue({id:2});mocks.cache.mockResolvedValue(undefined)})
+beforeEach(()=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-10-01T12:00:00+08:00'));mocks.online.value=true;mocks.snapshot=null;vi.clearAllMocks();mocks.fetch.mockResolvedValue(fixture());mocks.learning.mockResolvedValue({id:1});mocks.problems.mockResolvedValue([]);mocks.review.mockResolvedValue({id:2});mocks.cache.mockResolvedValue(undefined)})
 afterEach(()=>{wrappers.splice(0).forEach(w=>w.unmount());document.body.innerHTML='';vi.useRealTimers()})
 describe('今日清单操作',()=>{
  it('页面保持打开时九点自动刷新，且不会在截止瞬间用旧清单提交',async()=>{
@@ -108,20 +108,60 @@ describe('今日清单操作',()=>{
 
 
 describe('有序题目执行', () => {
- it('自行输入清单外题号，空值拒绝，失败保留题号和令牌', async () => {
+ it('批量完成题号支持分隔符和去重，失败保留输入与令牌', async () => {
   const data=fixture()
-  Object.assign(data.sections![0].tasks[0],{title:'LeetCode每日一题',completionPercent:0,sequence:{mode:'SELECT_BY_NUMBER',items:[],current:null,dayItem:null,revision:'',actionable:true}})
+  Object.assign(data.sections![0].tasks[0],{title:'LeetCode',completionPercent:0,sequence:{mode:'SELECT_BY_NUMBER',items:[],current:null,dayItem:null,revision:'',actionable:true}})
   mocks.fetch.mockResolvedValue(data)
   const w=await page()
-  expect(w.text()).toContain('自选题号');expect(w.text()).not.toContain('题目清单已全部完成')
-  await button(w,'填写题号').trigger('click');await flushPromises()
-  await button(w,'保存').trigger('click');await flushPromises();expect(mocks.learning).not.toHaveBeenCalled()
-  const input=w.findComponent(ElInputNumber);input.vm.$emit('update:modelValue',3000);await flushPromises()
-  mocks.learning.mockRejectedValueOnce(new Error('保存失败'))
+  expect(w.text()).toContain('每天不限题数');expect(w.text()).not.toContain('题目清单已全部完成')
+  await button(w,'填写完成题号').trigger('click');await flushPromises()
+  await button(w,'保存').trigger('click');await flushPromises();expect(mocks.problems).not.toHaveBeenCalled()
+  const input=w.get('textarea[aria-label="LeetCode完成题号"]')
+  await input.setValue('31、32，49\n128 283;31')
+  mocks.problems.mockRejectedValueOnce(new Error('保存失败'))
   await button(w,'保存').trigger('click');await flushPromises()
-  expect(input.props('modelValue')).toBe(3000)
-  const first=mocks.learning.mock.calls[0][2];expect(first).toMatchObject({problemNumber:3000,completionPercent:100,durationMinutes:null})
-  await button(w,'保存').trigger('click');await flushPromises();expect(mocks.learning.mock.calls[1][2].clientToken).toBe(first.clientToken)
+  expect((input.element as HTMLTextAreaElement).value).toBe('31、32，49\n128 283;31')
+  const first=mocks.problems.mock.calls[0]
+  expect(first.slice(0,4)).toEqual([11,'2026-10-01',[31,32,49,128,283],'rev1'])
+  await button(w,'保存').trigger('click');await flushPromises();expect(mocks.problems.mock.calls[1][4]).toBe(first[4])
+  expect(mocks.learning).not.toHaveBeenCalled()
+ })
+ it('完成后仍直接显示追加入口，打开时不回填已完成题号，九点后保存原日期',async()=>{
+  const data=fixture()
+  Object.assign(data.sections![0].tasks[0],{title:'LeetCode',completionPercent:100,recordedAmount:5,sequence:{mode:'SELECT_BY_NUMBER',items:[],current:null,dayItem:{id:31,key:'31',title:'LeetCode 31',url:'https://leetcode.cn/',completed:true},revision:'',actionable:true}})
+  mocks.fetch.mockResolvedValue(data)
+  vi.setSystemTime(new Date('2026-10-02T08:59:59+08:00'))
+  const w=await page()
+  expect(w.text()).toContain('今日已完成 5 题');expect(w.find('.completed').exists()).toBe(false)
+  await button(w,'继续填写').trigger('click');await flushPromises()
+  const input=w.get('textarea[aria-label="LeetCode完成题号"]')
+  expect((input.element as HTMLTextAreaElement).value).toBe('')
+  await input.setValue('3000 3001')
+  vi.setSystemTime(new Date('2026-10-02T09:00:00+08:00'));window.dispatchEvent(new Event('focus'))
+  await button(w,'保存').trigger('click');await flushPromises()
+  expect(mocks.problems.mock.calls[0].slice(0,3)).toEqual([11,'2026-10-01',[3000,3001]])
+ })
+ it('无效题号不提交，重复题业务错误保留，离线禁写',async()=>{
+  const data=fixture()
+  Object.assign(data.sections![0].tasks[0],{completionPercent:0,sequence:{mode:'SELECT_BY_NUMBER',items:[],current:null,dayItem:null,revision:'',actionable:true}})
+  mocks.fetch.mockResolvedValue(data)
+  const w=await page();await button(w,'填写完成题号').trigger('click');await flushPromises()
+  const input=w.get('textarea[aria-label="LeetCode完成题号"]')
+  for (const invalid of ['31 abc','-1','1.5','0','2147483648','31/32']) {
+   await input.setValue(invalid);await button(w,'保存').trigger('click');await flushPromises()
+  }
+  expect(mocks.problems).not.toHaveBeenCalled()
+  await input.setValue('31')
+  mocks.problems.mockRejectedValueOnce(new HttpApiError({message:'该题已有完成记录',status:409,code:'SEQUENCE_ALREADY_COMPLETED'}))
+  await button(w,'保存').trigger('click');await flushPromises()
+  expect(w.text()).toContain('该题已有完成记录')
+  mocks.online.value=false
+  mocks.snapshot=data
+  const offline=await page()
+  expect(button(offline,'填写完成题号').attributes('disabled')).toBeDefined()
+  await button(offline,'填写完成题号').trigger('click');await flushPromises()
+  expect(offline.find('textarea').exists()).toBe(false)
+  expect(mocks.problems).toHaveBeenCalledTimes(1)
  })
  it('尝试无需用时，提交零完成比例并保留当前题链接', async () => {
   const data = fixture()

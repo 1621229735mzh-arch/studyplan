@@ -155,4 +155,4 @@ v4 兼容原数量、接续与时间型安排，新增 CHECK_ONLY。任务仍需
 
 ## v7：每日自行填写题号
 
-sequence.mode 为 SELECT_BY_NUMBER，items 必须为空数组；任务 plannedAmount 仍等于本期日名额总和，每日 amount 为1。日期范围与漏做不积压规则保留，题号不固定、不按序推进。v1—v6不接受此模式；旧COMPLETE_THEN_ADVANCE继续支持。已有计划须走任务库“自填题号”预览转换，不能修改planId后重复追加。历史题号逐条核对，保留原记录；未知题名使用“LeetCode 数字”及官方题库搜索链接。
+sequence.mode 为 SELECT_BY_NUMBER，items 必须为空数组；任务 plannedAmount 仍等于本期日名额总和，每日 amount 为1。日期范围与漏做不积压规则保留，题号不固定、不按序推进。2026-10-19起上述每日amount=1及全期plannedAmount仅为原计划参考，实际每天可完成多题，不能据此限制记录。v1—v6不接受此模式；旧COMPLETE_THEN_ADVANCE继续支持。已有计划须走任务库“自填题号”预览转换，不能修改planId后重复追加。历史题号逐条核对，保留原记录；未知题名使用“LeetCode 数字”及官方题库搜索链接。

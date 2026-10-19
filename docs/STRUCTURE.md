@@ -182,3 +182,5 @@ V20 新增学习接续规划表与原学习记录的 `continuation_delta`。`Tas
 
 
 2026-10-18 学习日截止：学习日期规则归 `settings/service/StudyDay`，统一以 Asia/Shanghai 的09:00切换，供今日、序列执行、统计与复习服务调用；不放在 common。前端 `composables/useFormat.ts` 的 `todayIso` 使用同一规则，已有默认日期与离线快照共用。真实时间戳、日期运算和明确选中的历史日期不变；无需数据库迁移。
+
+2026-10-19 LeetCode每日多题：学习模块的 `CompletedProblemNumbersRequest` 与 `POST /api/learning/records/problem-numbers` 接收批量完成题号；`StudyRecordService` 在任务锁与单个事务内保存每题原学习记录，派生子令牌处理整批重试。复用 `SequenceLearningService` 的题号去重、原进度与课程归属查询，不增加完成事实表或数据库迁移。今日页提供批量输入并保留追加入口。

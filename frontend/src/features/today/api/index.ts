@@ -24,6 +24,9 @@ export interface DayProgressPayload {
 export function saveLearningProgress(taskId: number, revision: string, payload: DayProgressPayload): Promise<unknown> {
   return post('/learning/records/day-progress', { ...payload, taskId, revision })
 }
+export function saveCompletedProblemNumbers(taskId: number, date: string, problemNumbers: number[], revision: string, clientToken: string): Promise<unknown> {
+  return post('/learning/records/problem-numbers', {taskId, date, problemNumbers, revision, clientToken})
+}
 export function saveDayConfirmation(taskId: number, date: string, completed: boolean, revision: string, clientToken: string): Promise<unknown> {
   return post('/learning/records/day-confirmation', {taskId, date, completed, revision, clientToken})
 }

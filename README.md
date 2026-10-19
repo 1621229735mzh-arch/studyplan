@@ -185,3 +185,5 @@ Nginx 提供前端静态文件并转发 `/api`；数据库与管理端点都不�
 2026-10-15 学习接续验证：隔离 MySQL9.7 上后端136项及打包、前端87项、类型检查和生产构建通过；未执行Linux Docker会话专测或MySQL8.4验收，未发布。详见上述验证记录。
 
 LeetCode 自行填写题号（已上线）：每日完成／尝试输入实际题号，记录页可更正。已有清单在任务库“自填题号”预览转换，保留原安排与记录；v7计划不预设题目清单。新增V22，启动命令不变，详见 [执行规则](docs/business/sequential-practice.md) 和 [本轮验证](docs/testing/leetcode-number-20261017.md)。
+
+2026-10-19：LeetCode自填模式支持每天完成多题，今日页一次填写多个题号并可继续追加；按实际题数累计，无需数量或用时输入。历史日期与记录保留。已于2026-10-19 21:16:56 CST正式发布，14条原记录及31张业务表保留；见 [多题记录验证](docs/testing/leetcode-multiple-problems-20261019.md) 与 [发布验收](docs/operations/leetcode-multiple-problems-release-20261019.md)。

@@ -5,6 +5,7 @@ import com.kaoyan.study.common.exception.ConflictException;
 import com.kaoyan.study.common.exception.NotFoundException;
 import com.kaoyan.study.learning.dto.DayLearningTaskView;
 import com.kaoyan.study.learning.dto.DayProgressRequest;
+import com.kaoyan.study.learning.dto.CompletedProblemNumbersRequest;
 import com.kaoyan.study.learning.dto.DayConfirmationRequest;
 import com.kaoyan.study.learning.dto.StudyRecordCreateRequest;
 import com.kaoyan.study.learning.dto.StudyRecordUpdateRequest;
@@ -333,10 +334,12 @@ public class StudyRecordService {
                     null,request.note(),request.clientToken()),request.completionPercent()==100);
         }
         if (request.actualAmount()!=null) throw new BusinessException("QUANTITY_PROGRESS","数量型任务请使用原有完成比例或学习记录入口");
-        if (snapshot.sequence()!=null && "SELECT_BY_NUMBER".equals(snapshot.sequence().mode()) && snapshot.completionPercent().intValue()==100)
-            throw new ConflictException("SEQUENCE_ALREADY_COMPLETED","当天已完成一题，请在记录页更正题号");
         if (snapshot.sequence()!=null && request.completionPercent()!=0 && request.completionPercent()!=100)
             throw new BusinessException("SEQUENCE_WHOLE_ITEM","接续任务只在整题完成后推进；尝试请选择未完成");
+        if (snapshot.sequence()!=null && "SELECT_BY_NUMBER".equals(snapshot.sequence().mode()))
+            return createEntry(new StudyRecordCreateRequest(request.taskId(),null,null,request.date(),
+                    request.completionPercent()==100 ? BigDecimal.ONE:null,request.durationMinutes(),null,null,
+                    request.clientToken(),null,request.problemNumber()),false);
         var target = snapshot.plannedAmount().multiply(BigDecimal.valueOf(request.completionPercent()))
                 .movePointLeft(2).setScale(6, RoundingMode.HALF_UP);
         var delta = target.subtract(snapshot.completedAmount());
@@ -347,6 +350,72 @@ public class StudyRecordService {
         return create(new StudyRecordCreateRequest(request.taskId(), null, null, request.date(),
                 delta.signum() == 0 ? null : delta, request.durationMinutes(), null, null, request.clientToken(),
                 snapshot.sequence()==null || snapshot.sequence().dayItem()==null ? null : snapshot.sequence().dayItem().id(),request.problemNumber()));
+    }
+
+    /** The task lock serializes batches, single records, edits and deletes. All inserts roll back together. */
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public List<StudyRecordView> recordCompletedProblems(CompletedProblemNumbersRequest request) {
+        var numbers=request.problemNumbers();
+        if (numbers==null || numbers.isEmpty() || numbers.size()>200
+                || numbers.stream().anyMatch(n->n==null || n<1)
+                || numbers.stream().distinct().count()!=numbers.size())
+            throw new BusinessException("PROBLEM_NUMBERS_INVALID","请填写不重复的正整数题号，每次最多提交200题");
+        if (request.clientToken()==null || request.clientToken().isBlank() || request.clientToken().length()>64)
+            throw new BusinessException("TOKEN_REQUIRED","请刷新后重新提交");
+        taskService.requireExistingForUpdate(request.taskId());
+        var state=sequences.state(request.taskId(),request.date());
+        if (state==null || !"SELECT_BY_NUMBER".equals(state.mode()))
+            throw new BusinessException("PROBLEM_NUMBER_MODE","此入口仅用于自行填写题号的任务");
+        var entries=java.util.stream.IntStream.range(0,numbers.size()).mapToObj(index ->
+                new StudyRecordCreateRequest(request.taskId(),null,null,request.date(),BigDecimal.ONE,
+                        null,null,null,problemBatchToken(request.clientToken(),index),null,numbers.get(index))).toList();
+        var existing=entries.stream().map(e->studyRecordMapper.findByClientTokenIncludingDeleted(e.clientToken())).toList();
+        if (existing.stream().anyMatch(Objects::nonNull)) {
+            // Atomic batches have contiguous tokens. Checking the next token rejects shortened retries;
+            // requiring every requested token rejects extended retries. Payload checks reject reordered/edited retries.
+            if (existing.stream().anyMatch(Objects::isNull)
+                    || studyRecordMapper.findByClientTokenIncludingDeleted(problemBatchToken(request.clientToken(),numbers.size()))!=null)
+                throw new ConflictException("TOKEN_REUSED","该提交令牌已被不同题号列表使用，请刷新后重试");
+            for (int i=0;i<entries.size();i++) verifyCreateRetry(existing.get(i),entries.get(i));
+            return existing.stream().map(r->get(r.getId())).toList();
+        }
+        var snapshot=dayTasks(request.date()).stream().filter(t->t.id().equals(request.taskId()))
+                .findFirst().orElseThrow(()->new NotFoundException("当天学习安排不存在"));
+        if (!snapshot.revision().equals(request.revision()))
+            throw new ConflictException("DAY_PROGRESS_STALE","当天计划或学习记录已变化，请刷新后重试");
+        return entries.stream().map(e->createEntry(e,false)).toList();
+    }
+
+    private String problemBatchToken(String token,int index) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(("problem-batch:"+token+":"+index).getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
+    }
+
+    private void requireActiveRetry(StudyRecord existing) {
+        if (existing.getDeletedAt() != null)
+            throw new ConflictException("TOKEN_REUSED", "该提交已撤销，请刷新后重新提交");
+    }
+
+    /** Compare effective task ownership: omitted subject/unit inherit the task, decimals ignore scale. */
+    private void verifyCreateRetry(StudyRecord existing, StudyRecordCreateRequest request) {
+        requireActiveRetry(existing);
+        verifyCountRetry(existing, request.taskId(), request.recordDate(), request.amount());
+        sequences.verifyNumberRetry(existing, request.taskId(), request.recordDate(), request.amount(), request.problemNumber());
+        var savedAmount = existing.getReviewAmount() != null ? existing.getReviewAmount() : existing.getAmount();
+        boolean sameAmount = savedAmount == null ? request.amount() == null
+                : request.amount() != null && savedAmount.compareTo(request.amount()) == 0;
+        if (!Objects.equals(existing.getTaskId(), request.taskId())
+                || !Objects.equals(existing.getRecordDate(), request.recordDate())
+                || !sameAmount
+                || (request.taskId() == null || request.subjectId() != null) && !Objects.equals(existing.getSubjectId(), request.subjectId())
+                || (request.taskId() == null || request.unitId() != null) && !Objects.equals(existing.getUnitId(), request.unitId())
+                || !Objects.equals(existing.getDurationMinutes(), request.durationMinutes())
+                || !Objects.equals(existing.getContent(), request.content())
+                || !Objects.equals(existing.getNote(), request.note())
+                || request.sequenceItemId() != null && !Objects.equals(existing.getSequenceItemId(), request.sequenceItemId()))
+            throw new ConflictException("TOKEN_REUSED", "提交令牌已被不同内容使用，请刷新后重试");
     }
 
     private void verifyCountRetry(StudyRecord existing,Long taskId,LocalDate date,BigDecimal amount) {

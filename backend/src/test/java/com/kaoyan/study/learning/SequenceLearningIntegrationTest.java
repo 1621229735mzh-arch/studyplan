@@ -21,6 +21,8 @@ import static org.assertj.core.api.Assertions.*;
 
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT)
 class SequenceLearningIntegrationTest {
+    @org.springframework.boot.test.web.server.LocalServerPort int port;
+    @Autowired com.kaoyan.study.today.service.TodayService today;
     @Autowired PlanImportService imports;
     @Autowired StudyRecordService records;
     @Autowired SequenceLearningService sequences;
@@ -205,7 +207,7 @@ class SequenceLearningIntegrationTest {
         records.delete(edited.id(),edited.version());
         assertThat(tasks.progress(taskId).completedAmount()).isEqualByComparingTo("0");
     }
-    @Test void numberedDayProgressRejectsTokenChangesSecondCompletionAndDeletedReplay() {
+    @Test void numberedDayProgressAllowsSameDayAppendAndRejectsTokenChangesAndDeletedReplay() {
         convertNumbers(List.of());
         var snapshot=records.dayTasks(date).stream().filter(t->t.id().equals(taskId)).findFirst().orElseThrow();
         var request=new DayProgressRequest(date,taskId,100,null,snapshot.revision(),UUID.randomUUID().toString(),null,null,49);
@@ -213,11 +215,124 @@ class SequenceLearningIntegrationTest {
         assertThat(records.recordDayProgress(request).id()).isEqualTo(saved.id());
         assertThatThrownBy(()->records.recordDayProgress(new DayProgressRequest(date,taskId,100,null,snapshot.revision(),request.clientToken(),null,null,50))).isInstanceOf(BusinessException.class);
         var refreshed=records.dayTasks(date).stream().filter(t->t.id().equals(taskId)).findFirst().orElseThrow();
-        assertThatThrownBy(()->records.recordDayProgress(new DayProgressRequest(date,taskId,100,null,refreshed.revision(),UUID.randomUUID().toString(),null,null,50))).isInstanceOf(BusinessException.class);
+        var second=records.recordDayProgress(new DayProgressRequest(date,taskId,100,null,refreshed.revision(),UUID.randomUUID().toString(),null,null,50));
+        assertThat(second.amount()).isEqualByComparingTo("1");
+        assertThat(tasks.progress(taskId).completedAmount()).isEqualByComparingTo("2");
         records.delete(saved.id(),saved.version());
         assertThat(records.dayTasks(date).stream().filter(t->t.id().equals(taskId)).findFirst().orElseThrow().revision()).isNotEqualTo(snapshot.revision());
         assertThatThrownBy(()->records.create(numbered(0,49,BigDecimal.ONE,request.clientToken()))).isInstanceOf(BusinessException.class);
+        assertThat(records.list(null,null,taskId,null)).extracting(StudyRecordView::id).containsExactly(second.id());
+    }
+
+    com.kaoyan.study.learning.dto.CompletedProblemNumbersRequest batch(int day,List<Integer> numbers,String token) {
+        var snapshot=records.dayTasks(date.plusDays(day)).stream().filter(t->t.id().equals(taskId)).findFirst().orElseThrow();
+        return new com.kaoyan.study.learning.dto.CompletedProblemNumbersRequest(date.plusDays(day),taskId,numbers,snapshot.revision(),token);
+    }
+    @Test void multipleProblemsAppendBeyondReferenceTargetAndEditsAndDeletesRecalculate() {
+        convertNumbers(List.of());
+        var request=batch(0,List.of(31,32),UUID.randomUUID().toString());
+        var first=records.recordCompletedProblems(request);
+        assertThat(records.recordCompletedProblems(request)).extracting(StudyRecordView::id)
+                .containsExactlyElementsOf(first.stream().map(StudyRecordView::id).toList());
+        records.recordCompletedProblems(batch(0,List.of(49,128,283),UUID.randomUUID().toString()));
+        assertThat(tasks.progress(taskId).completedAmount()).isEqualByComparingTo("5");
+        var day=records.dayTasks(date).stream().filter(t->t.id().equals(taskId)).findFirst().orElseThrow();
+        assertThat(day.completedAmount()).isEqualByComparingTo("5");
+        assertThat(day.sequence().actionable()).isTrue();
+        var checklist=today.today(date).sections().stream().flatMap(s->s.tasks().stream())
+                .filter(t->t.id().equals(taskId) && t.kind().equals("LEARNING")).findFirst().orElseThrow();
+        assertThat(checklist.actionable()).isTrue();
+        assertThat(checklist.recordedAmount()).isEqualByComparingTo("5");
+        assertThat(records.list(date.plusDays(1),date.plusDays(1),taskId,null)).isEmpty();
+        assertThat(records.list(null,null,taskId,null)).allSatisfy(r->{
+            assertThat(r.recordDate()).isEqualTo(date); assertThat(r.durationMinutes()).isNull();
+            assertThat(r.amount()).isEqualByComparingTo("1");
+        });
+        var corrected=records.update(first.getFirst().id(),new StudyRecordUpdateRequest(taskId,null,null,date,
+                BigDecimal.ONE,null,null,null,first.getFirst().version(),first.getFirst().sequenceItemId(),3000));
+        assertThat(corrected.sequenceTitle()).isEqualTo("LeetCode 3000");
+        records.delete(first.get(1).id(),first.get(1).version());
+        assertThat(tasks.progress(taskId).completedAmount()).isEqualByComparingTo("4");
+        records.recordCompletedProblems(batch(1,List.of(32),UUID.randomUUID().toString()));
+        assertThat(records.get(corrected.id()).recordDate()).isEqualTo(date);
+        assertThat(tasks.progress(taskId).completedAmount()).isEqualByComparingTo("5");
+    }
+    @Test void batchRetryRejectsChangedListsDatesAndRevokedOrEditedRecords() {
+        convertNumbers(List.of());
+        String token=UUID.randomUUID().toString();
+        var request=batch(0,List.of(31,32),token);
+        var saved=records.recordCompletedProblems(request);
+        for (var changed:List.of(List.of(31),List.of(31,32,49),List.of(32,31),List.of(31,49)))
+            assertThatThrownBy(()->records.recordCompletedProblems(batch(0,changed,token))).isInstanceOf(BusinessException.class);
+        assertThatThrownBy(()->records.recordCompletedProblems(batch(1,List.of(31,32),token))).isInstanceOf(BusinessException.class);
+        var second=saved.get(1);
+        var edited=records.update(second.id(),new StudyRecordUpdateRequest(taskId,null,null,date,BigDecimal.ONE,
+                null,null,null,second.version(),second.sequenceItemId(),49));
+        assertThatThrownBy(()->records.recordCompletedProblems(request)).isInstanceOf(BusinessException.class);
+        records.delete(edited.id(),edited.version());
+        assertThatThrownBy(()->records.recordCompletedProblems(request)).isInstanceOf(BusinessException.class);
+        assertThat(records.list(null,null,taskId,null)).hasSize(1);
+    }
+    @Test void duplicateProblemRollsBackEntireBatchAndFailedTokenCanRetry() {
+        convertNumbers(List.of());
+        records.create(numbered(0,49,BigDecimal.ONE,UUID.randomUUID().toString()));
+        var request=batch(1,List.of(128,49),UUID.randomUUID().toString());
+        assertThatThrownBy(()->records.recordCompletedProblems(request)).isInstanceOf(BusinessException.class);
+        assertThat(records.list(null,null,taskId,null)).hasSize(1);
+        var valid=new com.kaoyan.study.learning.dto.CompletedProblemNumbersRequest(request.date(),taskId,
+                List.of(128,283),request.revision(),request.clientToken());
+        assertThat(records.recordCompletedProblems(valid)).hasSize(2);
+        assertThat(tasks.progress(taskId).completedAmount()).isEqualByComparingTo("3");
+    }
+    @Test void concurrentBatchesSerializeAndStaleRevisionsCannotAppend() throws Exception {
+        convertNumbers(List.of());
+        var request=batch(0,List.of(31,32),UUID.randomUUID().toString());
+        var gate=new CountDownLatch(1);
+        try (var pool=Executors.newFixedThreadPool(2)) {
+            Callable<List<Long>> write=()->{gate.await();return records.recordCompletedProblems(request).stream().map(StudyRecordView::id).toList();};
+            var a=pool.submit(write);var b=pool.submit(write);gate.countDown();
+            assertThat(a.get(20,TimeUnit.SECONDS)).isEqualTo(b.get(20,TimeUnit.SECONDS));
+        }
+        var left=batch(0,List.of(49),UUID.randomUUID().toString());
+        var right=batch(0,List.of(128),UUID.randomUUID().toString());
+        var gate2=new CountDownLatch(1);
+        try (var pool=Executors.newFixedThreadPool(2)) {
+            var requests=List.of(left,right);
+            var futures=requests.stream().map(r->pool.submit(()->{gate2.await();try {records.recordCompletedProblems(r);return true;} catch(BusinessException e){return false;}})).toList();
+            gate2.countDown();
+            assertThat(List.of(futures.get(0).get(20,TimeUnit.SECONDS),futures.get(1).get(20,TimeUnit.SECONDS))).containsExactlyInAnyOrder(true,false);
+        }
+        assertThatThrownBy(()->records.recordCompletedProblems(new com.kaoyan.study.learning.dto.CompletedProblemNumbersRequest(
+                date,taskId,List.of(283),request.revision(),UUID.randomUUID().toString()))).isInstanceOf(BusinessException.class);
+        assertThat(records.list(null,null,taskId,null)).hasSize(3);
+    }
+    @Test void batchRejectsWrongModeInvalidNumbersAndDuplicates() {
+        assertThatThrownBy(()->records.recordCompletedProblems(batch(0,List.of(31,32),UUID.randomUUID().toString()))).isInstanceOf(BusinessException.class);
+        convertNumbers(List.of());
+        for (var invalid:List.of(List.<Integer>of(),List.of(0),List.of(-1),List.of(31,31)))
+            assertThatThrownBy(()->records.recordCompletedProblems(batch(0,invalid,UUID.randomUUID().toString()))).isInstanceOf(BusinessException.class);
         assertThat(records.list(null,null,taskId,null)).isEmpty();
+    }
+    @Test void batchHttpRequiresAuthenticationCsrfAndValidatesWholeList() {
+        convertNumbers(List.of());
+        var client=new com.kaoyan.study.support.HttpTestClient("http://127.0.0.1:"+port);
+        String path="/api/learning/records/problem-numbers";
+        var csrf=client.fetchCsrfToken();
+        assertThat(client.post(path,"{}",csrf).status()).isEqualTo(401);
+        assertThat(client.post("/api/auth/login","{\"username\":\"kaoyan\",\"password\":\"test-only-password\"}",csrf).status()).isEqualTo(200);
+        var request=batch(0,List.of(31,32),UUID.randomUUID().toString());
+        String body="{\"date\":\"%s\",\"taskId\":%d,\"problemNumbers\":[31,32],\"revision\":\"%s\",\"clientToken\":\"%s\"}"
+                .formatted(date,taskId,request.revision(),request.clientToken());
+        assertThat(client.post(path,body,null).status()).isEqualTo(403);
+        csrf=client.fetchCsrfToken();
+        for (String invalid:List.of("[]","[0]","[null]","[2147483648]","[31,31]"))
+            assertThat(client.post(path,body.replace("[31,32]",invalid),csrf).status()).isEqualTo(400);
+        assertThat(records.list(null,null,taskId,null)).isEmpty();
+        var saved=client.post(path,body,csrf);
+        assertThat(saved.status()).as(saved.body()).isEqualTo(201);
+        assertThat(saved.number("$.length()").intValue()).isEqualTo(2);
+        assertThat(client.post(path,body,csrf).status()).isEqualTo(201);
+        assertThat(records.list(null,null,taskId,null)).hasSize(2);
     }
     @Test void numberedModeRejectsInvalidNumberFractionDateAndDuplicateProblem() {
         convertNumbers(List.of());

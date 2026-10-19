@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
 import com.kaoyan.study.learning.dto.DayProgressRequest;
+import com.kaoyan.study.learning.dto.CompletedProblemNumbersRequest;
 import com.kaoyan.study.learning.dto.DayConfirmationRequest;
 import com.kaoyan.study.learning.dto.DayLearningTaskView;
 import com.kaoyan.study.learning.dto.StudyRecordCreateRequest;
@@ -72,6 +73,13 @@ public class StudyRecordController {
     @PostMapping("/day-confirmation")
     public DayLearningTaskView dayConfirmation(@Valid @RequestBody DayConfirmationRequest request) {
         return studyRecordService.confirmDay(request);
+    }
+
+    @PostMapping("/problem-numbers")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "批量记录完成题号（原子保存，允许同日继续追加）")
+    public List<StudyRecordView> problemNumbers(@Valid @RequestBody CompletedProblemNumbersRequest request) {
+        return studyRecordService.recordCompletedProblems(request);
     }
 
     @PutMapping("/{id}")

@@ -87,7 +87,7 @@ function downloadCatalog() {
       <details v-for="task in preview.document.tasks.filter(t => t.sequence)" :key="task.key" open>
         <summary>{{ task.title }} · {{ task.sequence!.mode === 'SELECT_BY_NUMBER' ? '每天自行填写题号' : `有序接续清单（${task.sequence!.items.length} 题）` }}</summary>
         <p v-if="task.sequence!.mode !== 'SELECT_BY_NUMBER'">每天最多完成 1 题。未完成继续当前题，漏做名额不积压；尝试无需计时且不推进题目，结束日期不自动延长。</p>
-        <p v-if="task.sequence!.mode === 'SELECT_BY_NUMBER'">不预设题号或顺序；每天最多完成 1 题，漏做不积压。</p>
+        <p v-if="task.sequence!.mode === 'SELECT_BY_NUMBER'">不预设题号或顺序；每天可填写多题，也可分次追加，漏做不积压。原计划量仅作参考。</p>
         <ol><li v-for="item in task.sequence!.items" :key="item.key"><a :href="item.url" target="_blank" rel="noopener noreferrer">{{ item.title }}</a></li></ol>
       </details>
       <div v-if="preview.warnings.length" class="import-warnings"><strong>请核对疑似重复项（最多显示 100 条）</strong><p v-for="warning in preview.warnings" :key="warning">{{ warning }}</p></div>

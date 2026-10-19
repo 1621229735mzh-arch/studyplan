@@ -25,7 +25,7 @@ async function load() {
     if (token !== request) return
     state.value = result || null
     if (result?.mode === 'SELECT_BY_NUMBER') {
-      const retained=props.editing ? result.items.find(i=>i.id===props.itemId) : result.dayItem
+      const retained=props.editing ? result.items.find(i=>i.id===props.itemId) : null
       numberChanged(props.problemNumber ?? (retained ? Number(retained.key) : undefined))
       return
     }
@@ -44,7 +44,7 @@ watch(() => [props.taskId, props.date], load, { immediate: true })
       <template v-if="numbered"><label>LeetCode 题号 <ElInputNumber :model-value="problemNumber ?? undefined" :min="1" :max="2147483647" :precision="0" :controls="false" :disabled="disabled" aria-label="LeetCode题号" @update:model-value="numberChanged" /></label><p>填写实际做的题号，无需按顺序；修改题号不会改变原日期和完成量。</p></template>
       <template v-else><a v-if="item" :href="item.url" target="_blank" rel="noopener noreferrer">{{ item.title }} ↗</a>
       <span v-else>题目清单已全部完成</span></template>
-      <p>完成整题填写 1；尝试未完成请留空完成量，无需计时。每天最多完成 1 题。</p>
+      <p>完成整题填写 1；尝试未完成请留空完成量，无需计时。{{ numbered ? '同一天可记录多题；批量填写请使用今日页。' : '每天最多完成 1 题。' }}</p>
     </template>
   </div>
 </template>

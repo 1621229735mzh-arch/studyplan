@@ -99,6 +99,12 @@
         WHERE client_token = #{clientToken} AND deleted_at IS NULL
     </select>
 
+    <select id="findByClientTokenIncludingDeleted" resultMap="studyRecordResultMap" flushCache="true" useCache="false">
+        SELECT id, review_amount, continuation_delta, activity_completed, sequence_item_id, task_id, subject_id, unit_id, record_date, amount, duration_minutes,
+               content, note, client_token, version, created_at, updated_at, deleted_at
+        FROM study_record WHERE client_token = #{clientToken}
+    </select>
+
     <insert id="insert" parameterType="com.kaoyan.study.learning.entity.StudyRecord"
             useGeneratedKeys="true" keyProperty="id">
         INSERT INTO study_record (task_id, subject_id, unit_id, record_date, amount, duration_minutes,

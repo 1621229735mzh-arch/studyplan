@@ -64,7 +64,7 @@ class CatalogIntegrationTest {
         sequences.create(taskId,date,date.plusDays(6),new PlanImportDocument.Sequence("SELECT_BY_NUMBER",List.of()));
         apply(doc(leaf("problems","31",List.of(taskId))));
         var first=records.create(new StudyRecordCreateRequest(taskId,null,null,date,BigDecimal.ONE,null,null,null,UUID.randomUUID().toString(),null,283));
-        var second=records.create(new StudyRecordCreateRequest(taskId,null,null,date.plusDays(1),BigDecimal.ONE,null,null,null,UUID.randomUUID().toString(),null,31));
+        var second=records.create(new StudyRecordCreateRequest(taskId,null,null,date,BigDecimal.ONE,null,null,null,UUID.randomUUID().toString(),null,31));
         records.create(new StudyRecordCreateRequest(taskId,null,null,date.plusDays(2),null,null,null,null,UUID.randomUUID().toString(),null,128));
         assertThat(course().completedProblemNumbers()).containsExactly(31,283);
         assertThat(course().completedAmount()).isEqualByComparingTo("2");

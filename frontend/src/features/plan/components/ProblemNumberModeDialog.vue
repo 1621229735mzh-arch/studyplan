@@ -37,7 +37,7 @@ watch(()=>props.taskId,load,{immediate:true})
     <p v-if="loading">正在核对计划和历史记录…</p>
     <template v-if="preview">
       <label>任务名称<ElInput v-model="title" maxlength="200" :disabled="saving" /></label>
-      <p>每天自行填写实际题号，取消固定清单和顺序限制。每天最多完成 1 题，漏做不积压；日期与计划名额保持原样。</p>
+      <p>每天自行填写完成题号，取消固定清单和顺序限制。一天可填多题，也可分次追加，漏做不积压；原计划日期与总目标保留作参考。</p>
       <p>核对以下历史题号。保存时保留原记录、日期、完成量和复盘，只更正填写有变化的题号。</p>
       <div v-for="h in preview.history" :key="h.record.id" class="history-row">
         <label>{{ h.record.recordDate }} · {{ h.record.amount ? '完成' : '尝试' }} · {{ h.record.sequenceTitle }}

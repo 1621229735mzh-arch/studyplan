@@ -106,8 +106,6 @@ public class SequenceLearningService {
         if (record.getAmount()!=null && record.getAmount().compareTo(BigDecimal.ONE)!=0)
             throw new BusinessException("SEQUENCE_WHOLE_ITEM","完成整题记 1；尝试未完成请留空完成量");
         var others=records.findAll(null,null,record.getTaskId(),null).stream().filter(r->!r.id().equals(record.getId())).toList();
-        if (record.getAmount()!=null && others.stream().anyMatch(r->r.recordDate().equals(record.getRecordDate()) && r.amount()!=null))
-            throw new ConflictException("SEQUENCE_ALREADY_COMPLETED","当天已完成一题，请在记录页更正题号");
         var item=sequences.resolveNumber(record.getTaskId(),number);
         if (record.getAmount()!=null && others.stream().anyMatch(r->item.id().equals(r.sequenceItemId()) && r.amount()!=null))
             throw new ConflictException("SEQUENCE_ALREADY_COMPLETED","该题已有完成记录，不重复增加首次完成量");
