@@ -199,4 +199,56 @@ class ContinuedStudyIntegrationTest {
         assertThat(snapshots(start.plusDays(1))).extracting(DayLearningTaskView::title).contains("教材1").doesNotContain("教材2");
     }
 
+    @Test void finishingTodayImmediatelyOffersNextContentAndAllowsMultipleChunks() {
+        var referenceBefore=workspace.read(start,start.plusDays(2),subjectId);
+        var baseline=today.today(start).taskCounts();
+        records.recordDayProgress(request("教材1",start,100,0));
+        assertThat(today.today(start).taskCounts()).isEqualTo(new com.kaoyan.study.today.dto.TodayTaskCounts(
+                baseline.completed()+1,baseline.inProgress(),baseline.remaining()-1));
+        assertThat(snapshots(start)).extracting(DayLearningTaskView::title).containsExactly("教材1","教材2","练习1");
+        assertThat(snapshot("教材2",start).continuation().referenceDate()).isEqualTo(start.plusDays(1));
+        assertThat(snapshot("教材2",start).continuation().optional()).isTrue();
+        assertThat(snapshot("教材2",start).completionPercent()).isEqualByComparingTo("0");
+        records.recordDayProgress(request("教材2",start,100,0));
+        assertThat(snapshots(start)).extracting(DayLearningTaskView::title).containsExactly("教材1","教材2","教材3","练习1");
+        var last=records.recordDayProgress(request("教材3",start,100,0));
+        assertThatThrownBy(()->records.recordDayProgress(new DayProgressRequest(start,last.taskId(),100,0,
+                snapshot("教材3",start).revision(),UUID.randomUUID().toString()))).isInstanceOf(BusinessException.class);
+        assertThat(snapshots(start.plusDays(1))).extracting(DayLearningTaskView::title).containsExactly("练习1");
+        assertThat(workspace.read(start,start.plusDays(2),subjectId).entries())
+                .extracting(e->List.of(e.date(),e.taskId(),e.estimatedMinutes()))
+                .isEqualTo(referenceBefore.entries().stream().map(e->List.of(e.date(),e.taskId(),e.estimatedMinutes())).toList());
+    }
+
+    @Test void earlyPartialContentContinuesTomorrowWithoutWaitingForReferenceDate() {
+        records.recordDayProgress(request("教材1",start,100,0));
+        records.recordDayProgress(request("教材2",start,30,0));
+        assertThat(snapshot("教材2",start).continuation().optional()).isFalse();
+        assertThat(snapshots(start)).extracting(DayLearningTaskView::title).doesNotContain("教材3");
+        assertThat(snapshots(start.plusDays(1))).extracting(DayLearningTaskView::title).containsExactly("教材2","教材3","练习1");
+        assertThat(snapshot("教材2",start.plusDays(1)).completionPercent()).isEqualByComparingTo("30");
+    }
+
+    @Test void unfinishedRemaindersMustBeFinishedBeforeContinuingAgainToday() {
+        records.recordDayProgress(request("教材1",start,40,0));
+        var tomorrow=start.plusDays(1);
+        records.recordDayProgress(request("教材2",tomorrow,100,0));
+        assertThat(snapshots(tomorrow)).extracting(DayLearningTaskView::title).doesNotContain("教材3");
+        records.recordDayProgress(request("教材1",tomorrow,100,0));
+        assertThat(snapshots(tomorrow)).extracting(DayLearningTaskView::title).contains("教材3");
+    }
+
+    @Test void deletingEarlyCompletionReopensOldContentWithoutChangingLaterRecordIdentity() {
+        var first=records.recordDayProgress(request("教材1",start,100,0));
+        var second=records.recordDayProgress(request("教材2",start,30,0));
+        var stale=request("教材2",start,60,0);
+        records.delete(first.id(),first.version());
+        assertThat(snapshot("教材1",start).completionPercent()).isEqualByComparingTo("0");
+        assertThat(snapshot("教材2",start).completionPercent()).isEqualByComparingTo("30");
+        assertThat(snapshots(start)).extracting(DayLearningTaskView::title).doesNotContain("教材3");
+        assertThatThrownBy(()->records.recordDayProgress(stale)).isInstanceOf(BusinessException.class);
+        assertThat(records.update(second.id(),new StudyRecordUpdateRequest(second.taskId(),null,null,start,null,0,
+                "保留原第二段记录",null,second.version())).taskId()).isEqualTo(ids.get("教材2"));
+    }
+
 }

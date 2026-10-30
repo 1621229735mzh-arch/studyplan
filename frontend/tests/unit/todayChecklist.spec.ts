@@ -230,6 +230,38 @@ describe('按书接续学习',()=>{
   data.sections![0].tasks=[task(11,'函数定义',1,'《基础30讲》',true,40),task(12,'函数性质',1,'《基础30讲》',false,0),task(13,'第1章①',2,'《1000题》基础篇',true,0)]
   return data
  }
+ it('完成当天内容后可自选下一段，展开不产生学习记录，保存后继续提供后续段',async()=>{
+  const data=continuedFixture()
+  const first=data.sections![0].tasks[0]; first.completionPercent=100
+  const next=data.sections![0].tasks[1]; next.continuation!.optional=true
+  mocks.fetch.mockResolvedValue(data)
+  const w=await page()
+  expect(w.findAll('.book-content').map(item=>item.text()).join('')).not.toContain('函数性质')
+  await button(w,'继续学习下一段').trigger('click');await flushPromises()
+  expect(w.findAll('.book-content')[0].text()).toContain('函数性质')
+  expect(w.text()).toContain('继续学习 · 自选')
+  expect(mocks.learning).not.toHaveBeenCalled()
+  const updated=structuredClone(data)
+  updated.sections![0].tasks[1].completionPercent=100
+  updated.sections![0].tasks[1].continuation!.optional=false
+  updated.sections![0].tasks.splice(2,0,{...next,id:14,title:'极限定义',revision:'rev-14',continuation:{...next.continuation!,position:14}})
+  mocks.fetch.mockResolvedValue(updated)
+  await button(w,'完成',0).trigger('click');await flushPromises()
+  await button(w,'保存').trigger('click');await flushPromises()
+  expect(mocks.learning.mock.calls[0].slice(0,2)).toEqual([12,'rev-12'])
+  expect(button(w,'继续学习下一段')).toBeDefined()
+  expect(w.findAll('.book-content').map(item=>item.text()).join('')).not.toContain('极限定义')
+ })
+ it('离线时保留继续学习提示但禁止展开和写入',async()=>{
+  const data=continuedFixture();data.sections![0].tasks[0].completionPercent=100
+  data.sections![0].tasks[1].continuation!.optional=true
+  mocks.online.value=false;mocks.snapshot=data
+  const w=await page()
+  expect(button(w,'继续学习下一段').attributes('disabled')).toBeDefined()
+  await button(w,'继续学习下一段').trigger('click');await flushPromises()
+  expect(w.findAll('.book-content').map(item=>item.text()).join('')).not.toContain('函数性质')
+  expect(mocks.learning).not.toHaveBeenCalled()
+ })
  it('按书收纳旧内容和新内容，省去执行说明和教材位置要求',async()=>{
   mocks.fetch.mockResolvedValue(continuedFixture());const w=await page()
   expect(w.findAll('.book-task')).toHaveLength(2)

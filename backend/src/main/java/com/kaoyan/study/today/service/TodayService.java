@@ -125,9 +125,9 @@ public class TodayService {
             missingDurations.merge(group, task.missingDurations(), Integer::sum);
         }
         var sections = groups.entrySet().stream().map(entry -> {
-            var remaining = entry.getValue().stream().map(TodayChecklistTask::remainingMinutes)
+            var remaining = entry.getValue().stream().filter(x -> !optionalContinuation(x)).map(TodayChecklistTask::remainingMinutes)
                     .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
-            int missing = (int) entry.getValue().stream().filter(x -> x.remainingMinutes() == null
+            int missing = (int) entry.getValue().stream().filter(x -> !optionalContinuation(x) && x.remainingMinutes() == null
                     && (x.activity()==null || !"CHECK_ONLY".equals(x.activity().mode()))).count();
             return new TodaySubjectSection(entry.getKey(), actual.getOrDefault(entry.getKey(), 0),
                     remaining, missing, missingDurations.getOrDefault(entry.getKey(), 0), entry.getValue());
@@ -137,6 +137,7 @@ public class TodayService {
         int remaining = 0;
         for (var section : sections) {
             for (var task : section.tasks()) {
+                if (optionalContinuation(task)) continue;
                 if (task.completionPercent().compareTo(BigDecimal.valueOf(100)) >= 0) {
                     completed++;
                 } else if (task.completionPercent().signum() > 0
@@ -155,6 +156,9 @@ public class TodayService {
                 sections.stream().mapToInt(TodaySubjectSection::missingEstimates).sum(),
                 sections.stream().mapToInt(TodaySubjectSection::missingDurations).sum(), sections,
                 new TodayTaskCounts(completed, inProgress, remaining));
+    }
+    private boolean optionalContinuation(TodayChecklistTask task) {
+        return task.continuation()!=null && task.continuation().optional();
     }
     private String sectionName(String subject) {
         if (subject == null) return "未分类";
