@@ -31,6 +31,7 @@ class ContinuedStudyIntegrationTest {
     @Autowired PlanWorkspaceService workspace;
     @Autowired SubjectService subjects;
     @Autowired StudyUnitService units;
+    @Autowired com.kaoyan.study.progress.service.CatalogService catalog;
     LocalDate start=LocalDate.of(2026,10,15);
     Long subjectId;
     String source;
@@ -249,6 +250,66 @@ class ContinuedStudyIntegrationTest {
         assertThatThrownBy(()->records.recordDayProgress(stale)).isInstanceOf(BusinessException.class);
         assertThat(records.update(second.id(),new StudyRecordUpdateRequest(second.taskId(),null,null,start,null,0,
                 "保留原第二段记录",null,second.version())).taskId()).isEqualTo(ids.get("教材2"));
+    }
+
+    com.kaoyan.study.progress.dto.CatalogContracts.Document contentCatalog(String key) {
+        var nodes=new ArrayList<com.kaoyan.study.progress.dto.CatalogContracts.NodeInput>();
+        nodes.add(new com.kaoyan.study.progress.dto.CatalogContracts.NodeInput("chapter",null,"完整章节",null,0,List.of()));
+        for(int i=1;i<=3;i++) nodes.add(new com.kaoyan.study.progress.dto.CatalogContracts.NodeInput("part-"+i,"chapter","教材"+i,null,i,List.of(ids.get("教材"+i))));
+        return new com.kaoyan.study.progress.dto.CatalogContracts.Document(2,List.of(
+                new com.kaoyan.study.progress.dto.CatalogContracts.CourseInput(key,"MATH","高等数学","教材完整目录",subjectId,tasks.get(ids.get("教材1")).getUnitId(),nodes,"CONTENT_PERCENT")));
+    }
+    String catalogJson(com.kaoyan.study.progress.dto.CatalogContracts.Document doc) {
+        return tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(doc);
+    }
+    @Test void catalogReadsOriginalPercentagesWithoutQuantityOrScheduleWritesAndImportIsIdempotent() {
+        var learned=records.recordDayProgress(request("教材1",start,40,0));
+        var original=records.list(null,null,null,null);
+        var schedule=workspace.read(start,start.plusDays(2),subjectId).entries();
+        String key="content-"+UUID.randomUUID();
+        var preview=catalog.preview(catalogJson(contentCatalog(key)));
+        assertThat(preview.changes().getFirst().previousTotal()).isNull();
+        assertThat(preview.changes().getFirst().nextItems()).isEqualTo(3);
+        var first=catalog.confirm(preview.previewToken());
+        var course=first.courses().stream().filter(c->c.key().equals(key)).findFirst().orElseThrow();
+        assertThat(course.totalAmount()).isNull();assertThat(course.completedAmount()).isNull();assertThat(course.recordedAmount()).isNull();
+        assertThat(course.contentCounts()).isEqualTo(new com.kaoyan.study.progress.dto.CatalogContracts.ContentCounts(3,0,1,2));
+        assertThat(course.nodes().stream().filter(n->n.key().equals("part-1")).findFirst().orElseThrow().completionPercent()).isEqualByComparingTo("40");
+        assertThat(course.nodes().stream().filter(n->n.key().equals("chapter")).findFirst().orElseThrow().contentCounts()).isEqualTo(course.contentCounts());
+        assertThat(first.cumulative()).noneMatch(q->q.subjectId().equals(subjectId));
+        assertThat(records.list(null,null,null,null)).containsExactlyElementsOf(original);
+        assertThat(workspace.read(start,start.plusDays(2),subjectId).entries()).isEqualTo(schedule);
+        assertThat(catalog.confirm(preview.previewToken()).revision()).isEqualTo(first.revision());
+        var repeat=catalog.preview(catalogJson(contentCatalog(key)));
+        assertThat(repeat.changes().getFirst().addedNodes()).isZero();
+        assertThat(catalog.confirm(repeat.previewToken()).courses().stream().filter(c->c.key().equals(key))).hasSize(1);
+        assertThat(catalog.classifications(List.of(learned)).get(learned.id()).courseId()).isEqualTo(course.id());
+    }
+    @Test void catalogRecalculatesPartialCompletionAndDeletionWithoutASecondCompletionFact() {
+        String key="content-"+UUID.randomUUID();
+        catalog.confirm(catalog.preview(catalogJson(contentCatalog(key))).previewToken());
+        var first=records.recordDayProgress(request("教材1",start,100,0));
+        records.recordDayProgress(request("教材2",start,30,0));
+        var course=catalog.library().courses().stream().filter(c->c.key().equals(key)).findFirst().orElseThrow();
+        assertThat(course.contentCounts()).isEqualTo(new com.kaoyan.study.progress.dto.CatalogContracts.ContentCounts(3,1,1,1));
+        records.delete(first.id(),first.version());
+        course=catalog.library().courses().stream().filter(c->c.key().equals(key)).findFirst().orElseThrow();
+        assertThat(course.contentCounts()).isEqualTo(new com.kaoyan.study.progress.dto.CatalogContracts.ContentCounts(3,0,1,2));
+        assertThat(course.nodes().stream().filter(n->n.key().equals("part-2")).findFirst().orElseThrow().completionPercent()).isEqualByComparingTo("30");
+    }
+    @Test void catalogRejectsFabricatedQuantitiesMultiplePercentTasksAndModeChanges() {
+        String key="content-"+UUID.randomUUID();
+        String source=catalogJson(contentCatalog(key));
+        assertThatThrownBy(()->catalog.preview(source.replace("\"schemaVersion\":2","\"schemaVersion\":1"))).isInstanceOf(BusinessException.class);
+        assertThatThrownBy(()->catalog.preview(source.replace("\"totalAmount\":null","\"totalAmount\":1"))).isInstanceOf(BusinessException.class);
+        var ordinary=tasks.create(subjectId,tasks.get(ids.get("教材1")).getUnitId(),"数量任务",null);
+        assertThatThrownBy(()->catalog.preview(source.replace("\"taskIds\":["+ids.get("教材1")+"]","\"taskIds\":["+ordinary.getId()+"]"))).isInstanceOf(BusinessException.class);
+        assertThatThrownBy(()->catalog.preview(source.replace("\"taskIds\":["+ids.get("教材1")+"]","\"taskIds\":["+ids.get("教材1")+","+ids.get("教材2")+"]"))).isInstanceOf(BusinessException.class);
+        var library=catalog.confirm(catalog.preview(source).previewToken());
+        var course=library.courses().stream().filter(c->c.key().equals(key)).findFirst().orElseThrow();
+        var node=course.nodes().stream().filter(n->n.key().equals("part-1")).findFirst().orElseThrow();
+        assertThatThrownBy(()->catalog.linkTasks(node.id(),new com.kaoyan.study.progress.dto.CatalogContracts.TaskLinkRequest(List.of(ordinary.getId()),library.revision()))).isInstanceOf(BusinessException.class);
+        assertThatThrownBy(()->catalog.preview(source.replace("CONTENT_PERCENT","QUANTITY"))).isInstanceOf(BusinessException.class);
     }
 
 }

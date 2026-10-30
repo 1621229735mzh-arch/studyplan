@@ -4,6 +4,7 @@ import com.kaoyan.study.common.exception.*;
 import com.kaoyan.study.learning.dto.StudyRecordView;
 import com.kaoyan.study.learning.service.StudyRecordService;
 import com.kaoyan.study.plan.service.TaskService;
+import com.kaoyan.study.plan.service.TaskActivityService;
 import com.kaoyan.study.progress.dto.CatalogContracts.*;
 import com.kaoyan.study.progress.mapper.CatalogMapper;
 import com.kaoyan.study.progress.mapper.CatalogMapper.*;
@@ -28,11 +29,12 @@ public class CatalogService {
     private final TaskService tasks;
     private final SubjectService subjects;
     private final StudyUnitService units;
+    private final TaskActivityService activities;
     private final JsonMapper json = JsonMapper.builder().enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
             .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT).enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build();
     private static final Set<String> DIRECTIONS = Set.of("MATH","ENGLISH","POLITICS","CS408");
-    public CatalogService(CatalogMapper mapper, StudyRecordService records, TaskService tasks, SubjectService subjects, StudyUnitService units) {
-        this.mapper=mapper; this.records=records; this.tasks=tasks; this.subjects=subjects; this.units=units;
+    public CatalogService(CatalogMapper mapper, StudyRecordService records, TaskService tasks, SubjectService subjects, StudyUnitService units,TaskActivityService activities) {
+        this.mapper=mapper; this.records=records; this.tasks=tasks; this.subjects=subjects; this.units=units; this.activities=activities;
     }
 
     private record State(List<CourseRow> courses, List<NodeRow> nodes, List<TaskLink> tasks, List<RecordLink> records) {}
@@ -51,7 +53,7 @@ public class CatalogService {
             Long nodeId=explicit==null ? taskLinks.get(r.taskId())
                     : Objects.equals(explicit.sourceTaskId(),r.taskId()) ? explicit.nodeId() : null;
             var node=nodes.get(nodeId); var course=node==null ? null:courses.get(node.courseId());
-            if(node!=null && node.totalAmount()!=null && course!=null
+            if(node!=null && course!=null && (content(course) ? leaf(node,sameCourseNodes(state,course.id())) : node.totalAmount()!=null)
                     && Objects.equals(r.subjectId(),course.subjectId()) && Objects.equals(r.unitId(),course.unitId())) result.put(r.id(),node);
         }
         return result;
@@ -68,6 +70,9 @@ public class CatalogService {
         var s=state(); var rows=records.list(null,null,null,null); var assigned=resolve(rows,s);
         var totals=new HashMap<Long,BigDecimal>();
         for(var r:rows) if(assigned.containsKey(r.id()) && r.amount()!=null) totals.merge(assigned.get(r.id()).id(),r.amount(),BigDecimal::add);
+        var percents=new HashMap<Long,BigDecimal>();
+        for(var r:rows) if(assigned.containsKey(r.id()) && r.continuationDelta()!=null)
+            percents.merge(assigned.get(r.id()).id(),r.continuationDelta(),BigDecimal::add);
         var completedProblems=new HashMap<Long,SortedSet<Integer>>();
         for(var problem:mapper.completedProblems()) {
             var node=assigned.get(problem.recordId());
@@ -78,12 +83,14 @@ public class CatalogService {
             var nodes=s.nodes().stream().filter(n->n.courseId().equals(c.id())).toList();
             var leaves=nodes.stream().filter(n->n.totalAmount()!=null).toList();
             var nv=nodes.stream().map(n->new NodeView(n.id(),n.nodeKey(),n.parentKey(),n.title(),n.totalAmount(),
-                    nodeCompleted(n,nodes,totals),s.tasks().stream().filter(t->t.nodeId().equals(n.id())).map(TaskLink::taskId).toList(),n.sortOrder())).toList();
+                    content(c) ? null:nodeCompleted(n,nodes,totals),s.tasks().stream().filter(t->t.nodeId().equals(n.id())).map(TaskLink::taskId).toList(),n.sortOrder(),
+                    content(c) && leaf(n,nodes) ? percent(n,percents):null,content(c) ? counts(descendantLeaves(n,nodes),percents):null)).toList();
             views.add(new CourseView(c.id(),c.courseKey(),c.direction(),c.branch(),c.title(),c.subjectId(),c.unitId(),units.get(c.unitId()).getName(),
-                    leaves.stream().map(NodeRow::totalAmount).reduce(BigDecimal.ZERO,BigDecimal::add),
-                    leaves.stream().map(n->totals.getOrDefault(n.id(),BigDecimal.ZERO).min(n.totalAmount())).reduce(BigDecimal.ZERO,BigDecimal::add),
-                    leaves.stream().map(n->totals.getOrDefault(n.id(),BigDecimal.ZERO)).reduce(BigDecimal.ZERO,BigDecimal::add),nv,
-                    List.copyOf(completedProblems.getOrDefault(c.id(),Collections.emptySortedSet()))));
+                    content(c) ? null:leaves.stream().map(NodeRow::totalAmount).reduce(BigDecimal.ZERO,BigDecimal::add),
+                    content(c) ? null:leaves.stream().map(n->totals.getOrDefault(n.id(),BigDecimal.ZERO).min(n.totalAmount())).reduce(BigDecimal.ZERO,BigDecimal::add),
+                    content(c) ? null:leaves.stream().map(n->totals.getOrDefault(n.id(),BigDecimal.ZERO)).reduce(BigDecimal.ZERO,BigDecimal::add),nv,
+                    List.copyOf(completedProblems.getOrDefault(c.id(),Collections.emptySortedSet())),c.progressMode(),
+                    content(c) ? counts(nodes.stream().filter(n->leaf(n,nodes)).toList(),percents):null));
         }
         var cumulative=new LinkedHashMap<String,Quantity>();
         for(var r:rows) if(r.subjectId()!=null && r.unitId()!=null && r.amount()!=null) {
@@ -92,6 +99,20 @@ public class CatalogService {
                     r.amount().add(old==null ? BigDecimal.ZERO:old.amount())));
         }
         return new Library(mapper.revision(),views,new ArrayList<>(cumulative.values()),rows.stream().filter(r->r.amount()!=null && !assigned.containsKey(r.id())).toList(),countedProgress(rows,s.courses()));
+    }
+    private static String mode(CourseInput c) { return c.progressMode()==null ? "QUANTITY":c.progressMode(); }
+    private static boolean content(CourseRow c) { return "CONTENT_PERCENT".equals(c.progressMode()); }
+    private static boolean leaf(NodeRow n,List<NodeRow> nodes) { return nodes.stream().noneMatch(x->Objects.equals(x.parentKey(),n.nodeKey())); }
+    private static List<NodeRow> sameCourseNodes(State s,Long id) { return s.nodes().stream().filter(n->n.courseId().equals(id)).toList(); }
+    private static List<NodeRow> descendantLeaves(NodeRow n,List<NodeRow> nodes) {
+        if(leaf(n,nodes)) return List.of(n);
+        return nodes.stream().filter(x->Objects.equals(x.parentKey(),n.nodeKey())).flatMap(x->descendantLeaves(x,nodes).stream()).toList();
+    }
+    private static BigDecimal percent(NodeRow n,Map<Long,BigDecimal> values) { return values.getOrDefault(n.id(),BigDecimal.ZERO).min(BigDecimal.valueOf(100)); }
+    private static ContentCounts counts(List<NodeRow> leaves,Map<Long,BigDecimal> values) {
+        int done=(int)leaves.stream().filter(n->percent(n,values).compareTo(BigDecimal.valueOf(100))>=0).count();
+        int started=(int)leaves.stream().filter(n->percent(n,values).signum()>0 && percent(n,values).compareTo(BigDecimal.valueOf(100))<0).count();
+        return new ContentCounts(leaves.size(),done,started,leaves.size()-done-started);
     }
     /** 无固定总量的每日数量任务直接从原记录汇总，不创建课程分母或第二份完成事实。 */
     private List<CountedProgress> countedProgress(List<StudyRecordView> rows,List<CourseRow> courses) {
@@ -137,14 +158,14 @@ public class CatalogService {
     }
     private void checkTypes(tools.jackson.databind.JsonNode node,String key) {
         if(node==null || node.isNull()) return;
-        if(Set.of("key","parentKey","title","direction","branch").contains(key) && !node.isString()) invalid(key+" 必须是文本");
+        if(Set.of("key","parentKey","title","direction","branch","progressMode").contains(key) && !node.isString()) invalid(key+" 必须是文本");
         if(Set.of("subjectId","unitId","sortOrder","schemaVersion").contains(key) && !node.isIntegralNumber()) invalid(key+" 必须是整数");
         if(key.equals("totalAmount") && !node.isNumber()) invalid("totalAmount 必须是数值");
         if(node.isObject()) for(var name:node.propertyNames()) checkTypes(node.get(name),name);
         if(node.isArray()) for(var child:node) { if(child.isNull()) invalid("列表不能含 null"); if(key.equals("taskIds") && !child.isIntegralNumber()) invalid("taskIds 必须是整数列表"); checkTypes(child,""); }
     }
     private List<CourseChange> validate(Document doc,State s) {
-        if(doc==null || !Integer.valueOf(1).equals(doc.schemaVersion()) || doc.courses()==null || doc.courses().isEmpty() || doc.courses().size()>100) invalid("版本必须为 1，courses 须包含 1—100 门课程");
+        if(doc==null || !Set.of(1,2).contains(doc.schemaVersion()==null ? 0:doc.schemaVersion()) || doc.courses()==null || doc.courses().isEmpty() || doc.courses().size()>100) invalid("版本必须为 1 或 2，courses 须包含 1—100 门课程");
         var changes=new ArrayList<CourseChange>(); var courseKeys=new HashSet<String>(); var taskIds=new HashSet<Long>();
         var existingCourses=s.courses().stream().collect(Collectors.toMap(CourseRow::courseKey,c->c));
         var incomingTargets=new HashMap<Long,String>();
@@ -156,7 +177,10 @@ public class CatalogService {
             if(!courseKeys.add(c.key())) invalid("课程 key 重复");
             if(c.subjectId()==null || c.unitId()==null) invalid("课程必须指定现有科目和单位");
             subjects.get(c.subjectId()); var unit=units.get(c.unitId()); var old=existingCourses.get(c.key());
+            if(!Set.of("QUANTITY","CONTENT_PERCENT").contains(mode(c)) || "CONTENT_PERCENT".equals(mode(c)) && doc.schemaVersion()!=2) invalid("按内容百分比须使用版本2与CONTENT_PERCENT");
+            boolean percentMode="CONTENT_PERCENT".equals(mode(c));
             if(old!=null && (!old.subjectId().equals(c.subjectId()) || !old.unitId().equals(c.unitId()))) invalid("已有课程不能改变科目或单位，请新建课程 key");
+            if(old!=null && !old.progressMode().equals(mode(c))) invalid("已有课程不能更改进度统计方式");
             String previous=incomingTargets.putIfAbsent(c.subjectId(),c.direction());
             if(previous!=null && !previous.equals(c.direction())) invalid("同一科目不能归入两个大方向");
             for(var other:s.courses()) if(other.subjectId().equals(c.subjectId()) && !other.courseKey().equals(c.key()) && !other.direction().equals(c.direction())) invalid("同一科目不能归入两个大方向");
@@ -165,12 +189,14 @@ public class CatalogService {
             var merged=new LinkedHashMap<String,NodeInput>();
             if(old!=null) for(var n:s.nodes()) if(n.courseId().equals(old.id())) merged.put(n.nodeKey(),new NodeInput(n.nodeKey(),n.parentKey(),n.title(),n.totalAmount(),n.sortOrder(),s.tasks().stream().filter(t->t.nodeId().equals(n.id())).map(TaskLink::taskId).toList()));
             BigDecimal before=merged.values().stream().map(NodeInput::totalAmount).filter(Objects::nonNull).reduce(BigDecimal.ZERO,BigDecimal::add);
+            int previousItems=(int)merged.values().stream().filter(n->merged.values().stream().noneMatch(x->Objects.equals(x.parentKey(),n.key()))).count();
             int added=0; var keys=new HashSet<String>();
             for(var n:c.nodes()) {
                 if(n==null) invalid("目录项不能为空");
                 key(n.key()); text(n.title(),200); if(n.parentKey()!=null) key(n.parentKey());
                 if(!keys.add(n.key())) invalid("目录 key 重复");
                 if(n.totalAmount()!=null && (n.totalAmount().signum()<=0 || n.totalAmount().scale()>6 || n.totalAmount().precision()-n.totalAmount().scale()>12)) invalid("目录总量须为正数，最多 6 位小数及 12 位整数");
+                if(percentMode && n.totalAmount()!=null) invalid("内容百分比目录不填写讲数或题数总量，totalAmount须为null");
                 if(n.sortOrder()!=null && (n.sortOrder()<0 || n.sortOrder()>100000)) invalid("排序值须在 0—100000 内");
                 if(n.taskIds()==null || n.taskIds().size()>2000 || n.taskIds().stream().anyMatch(Objects::isNull)) invalid("taskIds 必须是任务 ID 列表；无关联填 []");
                 if(!merged.containsKey(n.key())) added++;
@@ -179,6 +205,7 @@ public class CatalogService {
                     if(!taskIds.add(taskId)) invalid("一个任务只能关联一个目录项");
                     var task=tasks.get(taskId);
                     if(!task.getSubjectId().equals(c.subjectId()) || !task.getUnitId().equals(c.unitId())) invalid("关联任务的科目和单位必须与课程一致");
+                    validateTaskMode(taskId,percentMode);
                     var link=s.tasks().stream().filter(t->t.taskId().equals(taskId)).findFirst();
                     if(link.isPresent()) {
                         var target=s.nodes().stream().filter(x->x.id().equals(link.get().nodeId())).findFirst().orElseThrow();
@@ -190,7 +217,8 @@ public class CatalogService {
                 if(n.parentKey()!=null && !merged.containsKey(n.parentKey())) invalid("父目录不存在："+n.parentKey());
                 boolean hasChildren=merged.values().stream().anyMatch(x->Objects.equals(x.parentKey(),n.key()));
                 if(hasChildren && (n.totalAmount()!=null || !n.taskIds().isEmpty())) invalid("章节容器不能同时带数量或任务，请把数量及关联放在末级条目");
-                if(!hasChildren && n.totalAmount()==null) invalid("末级目录必须填写完整总量");
+                if(!hasChildren && n.totalAmount()==null && !percentMode) invalid("末级目录必须填写完整总量");
+                if(percentMode && n.taskIds().size()>1) invalid("每个内容条目最多关联一个原接续任务，不能合并不同内容百分比");
                 var seen=new HashSet<String>(); var cursor=n;
                 while(cursor!=null) {if(!seen.add(cursor.key()) || seen.size()>8) invalid("目录有循环或超过 8 层"); cursor=cursor.parentKey()==null ? null:merged.get(cursor.parentKey());}
                 if(old!=null && hasChildren) {
@@ -201,7 +229,8 @@ public class CatalogService {
             }
             BigDecimal after=merged.values().stream().map(NodeInput::totalAmount).filter(Objects::nonNull).reduce(BigDecimal.ZERO,BigDecimal::add);
             if(after.precision()-after.scale()>12) invalid("课程总量过大");
-            changes.add(new CourseChange(c.title(),unit.getName(),before,after,added));
+            int nextItems=(int)merged.values().stream().filter(n->merged.values().stream().noneMatch(x->Objects.equals(x.parentKey(),n.key()))).count();
+            changes.add(new CourseChange(c.title(),unit.getName(),percentMode ? null:before,percentMode ? null:after,added,mode(c),percentMode ? previousItems:null,percentMode ? nextItems:null));
         }
         return changes;
     }
@@ -230,7 +259,7 @@ public class CatalogService {
         validate(doc,state());
         for(var c:doc.courses()) {
             var existing=mapper.courses().stream().filter(x->x.courseKey().equals(c.key())).findFirst();
-            if(existing.isEmpty()) mapper.insertCourse(c.key(),c.direction(),c.branch(),c.title(),c.subjectId(),c.unitId());
+            if(existing.isEmpty()) mapper.insertCourse(c.key(),c.direction(),c.branch(),c.title(),c.subjectId(),c.unitId(),mode(c));
             else mapper.updateCourse(existing.get().id(),c.direction(),c.branch(),c.title());
             Long courseId=mapper.courses().stream().filter(x->x.courseKey().equals(c.key())).findFirst().orElseThrow().id();
             for(var n:c.nodes()) {
@@ -249,6 +278,7 @@ public class CatalogService {
         else {
             var s=state(); var node=s.nodes().stream().filter(n->n.id().equals(request.nodeId())).findFirst().orElseThrow(()->new NotFoundException("目录不存在"));
             var c=s.courses().stream().filter(x->x.id().equals(node.courseId())).findFirst().orElseThrow();
+            if(content(c)) invalid("内容百分比由原接续任务自动归属，请在目录关联原任务");
             if(node.totalAmount()==null || r.amount()==null || !Objects.equals(r.subjectId(),c.subjectId()) || !Objects.equals(r.unitId(),c.unitId())) invalid("只能归类到同科目、同单位的末级目录");
             mapper.assign(recordId,node.id(),r.taskId());
         }
@@ -259,13 +289,20 @@ public class CatalogService {
         checkRevision(request.revision()); var s=state();
         var node=s.nodes().stream().filter(n->n.id().equals(nodeId)).findFirst().orElseThrow(()->new NotFoundException("目录不存在"));
         var c=s.courses().stream().filter(x->x.id().equals(node.courseId())).findFirst().orElseThrow();
-        if(node.totalAmount()==null || request.taskIds()==null || request.taskIds().size()>2000 || request.taskIds().stream().anyMatch(Objects::isNull) || new HashSet<>(request.taskIds()).size()!=request.taskIds().size()) invalid("只能关联末级目录，任务列表不能重复");
+        if(!leaf(node,sameCourseNodes(s,c.id())) || request.taskIds()==null || request.taskIds().size()>2000 || request.taskIds().stream().anyMatch(Objects::isNull) || new HashSet<>(request.taskIds()).size()!=request.taskIds().size()) invalid("只能关联末级目录，任务列表不能重复");
+        if(content(c) && request.taskIds().size()>1) invalid("每个内容条目最多关联一个原接续任务");
         for(var id:request.taskIds().stream().sorted().toList()) {
             var t=tasks.requireExistingForUpdate(id);
             if(!t.getSubjectId().equals(c.subjectId()) || !t.getUnitId().equals(c.unitId())) invalid("任务科目和单位不一致");
+            validateTaskMode(id,content(c));
             if(s.tasks().stream().anyMatch(x->x.taskId().equals(id) && !x.nodeId().equals(nodeId))) invalid("任务已归属于其他目录，请先解除原关联");
         }
         mapper.clearTasks(nodeId); request.taskIds().forEach(id->mapper.linkTask(id,nodeId)); mapper.touch(); return library();
+    }
+    private void validateTaskMode(Long taskId,boolean percentMode) {
+        var activity=activities.get(taskId);
+        boolean continued=activity!=null && "CONTINUED_STUDY".equals(activity.mode());
+        if(percentMode!=continued) invalid("按内容百分比只能关联原学习接续任务；接续任务不能换算数量目录");
     }
     private void checkRevision(Long revision) {long current=mapper.lock(); if(revision==null || revision!=current) stale();}
     private void key(String key) {if(key==null || !key.matches("[A-Za-z0-9_-]{1,64}")) invalid("key 只能包含 1—64 位字母、数字、下划线或短横线");}

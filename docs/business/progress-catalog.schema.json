@@ -1,13 +1,14 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "学习进度完整目录 v1",
+  "title": "学习进度完整目录 v1/v2",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "courses"],
   "properties": {
-    "schemaVersion": { "const": 1 },
+    "schemaVersion": { "enum": [1, 2] },
     "courses": { "type": "array", "minItems": 1, "maxItems": 100, "items": { "$ref": "#/$defs/course" } }
   },
+  "allOf": [{ "if": { "properties": { "schemaVersion": { "const": 1 } } }, "then": { "properties": { "courses": { "items": { "properties": { "progressMode": { "enum": ["QUANTITY"] } } } } } } }],
   "$defs": {
     "key": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
     "course": {
@@ -15,6 +16,7 @@
       "required": ["key", "direction", "branch", "title", "subjectId", "unitId", "nodes"],
       "properties": {
         "key": { "$ref": "#/$defs/key" },
+        "progressMode": { "enum": ["QUANTITY", "CONTENT_PERCENT"] },
         "direction": { "enum": ["MATH", "ENGLISH", "POLITICS", "CS408"] },
         "branch": { "type": "string", "minLength": 1, "maxLength": 100 },
         "title": { "type": "string", "minLength": 1, "maxLength": 200 },

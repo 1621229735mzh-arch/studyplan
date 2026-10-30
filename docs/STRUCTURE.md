@@ -186,3 +186,5 @@ V20 新增学习接续规划表与原学习记录的 `continuation_delta`。`Tas
 2026-10-19 LeetCode每日多题：学习模块的 `CompletedProblemNumbersRequest` 与 `POST /api/learning/records/problem-numbers` 接收批量完成题号；`StudyRecordService` 在任务锁与单个事务内保存每题原学习记录，派生子令牌处理整批重试。复用 `SequenceLearningService` 的题号去重、原进度与课程归属查询，不增加完成事实表或数据库迁移。今日页提供批量输入并保留追加入口。
 
 2026-10-30 数学同日继续学习：`ContinuationLearningService` 从有效记录推导可自选的下一段，`Context.optional` 区分未开始的可选内容。`TodayService` 将其排除于还剩项数和预计负担；`ContinuationBook.vue` 的展开仅为本地界面状态，保存仍走原百分比记录入口，无新表或迁移。
+
+2026-10-30 按内容原百分比目录：已发布V23的progress_course.progress_mode区分QUANTITY与CONTENT_PERCENT。CatalogService只读汇总原continuationDelta，返回末级completionPercent与课程／章节ContentCounts，不创建完成事实或数量。前端ContentProgressSummary和CatalogNodeTree分别展示项数与独立百分比；概览复用原离线切片，不缓存完整目录。两本高数资料共252段已通过正常预览确认导入，见[发布验收](operations/math-content-catalog-release-20261030.md)。

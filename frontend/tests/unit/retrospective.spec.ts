@@ -42,6 +42,35 @@ beforeEach(() => { vi.clearAllMocks(); vi.mocked(listPlanTasks).mockResolvedValu
 afterEach(() => { wrappers.splice(0).forEach(w => w.unmount()) })
 
 describe('月周日学习记录与目录进度', () => {
+  it('内容目录显示原百分比与内容项数，不转换为讲数或生成整体环形百分比',async()=>{
+    const value=structuredClone(library)
+    const course=value.courses[0]
+    Object.assign(course,{direction:'MATH',branch:'高等数学',title:'高数教材',progressMode:'CONTENT_PERCENT',totalAmount:null,completedAmount:null,recordedAmount:null,contentCounts:{total:2,completed:0,inProgress:1,remaining:1}})
+    course.nodes=[{id:1,key:'chapter',parentKey:null,title:'第1讲',totalAmount:null,completedAmount:0,taskIds:[],sortOrder:0,contentCounts:course.contentCounts},
+      {id:2,key:'part1',parentKey:'chapter',title:'函数与极限',totalAmount:null,completedAmount:0,taskIds:[11],sortOrder:1,completionPercent:40},
+      {id:3,key:'part2',parentKey:'chapter',title:'连续性',totalAmount:null,completedAmount:0,taskIds:[12],sortOrder:2,completionPercent:0}]
+    value.cumulative=[];mocks.get.mockResolvedValue(value)
+    const w=await render(DirectionView,'/progress/MATH?course=1')
+    expect(w.find('.course-ring').exists()).toBe(false)
+    expect(w.get('[aria-label="内容学习进度"]').text()).toContain('进行中 1 项')
+    expect(w.text()).toContain('已完成 40%');expect(w.text()).not.toContain('40 /');expect(w.text()).not.toContain('0 / 2 讲')
+    expect(w.findAll('.catalog-leaf')).toHaveLength(2)
+    expect(w.get('progress[aria-label="函数与极限完成进度"]').attributes('value')).toBe('40')
+    const saved=mocks.save.mock.calls[0][0].progress.catalog.courses[0]
+    expect(saved.contentCounts).toEqual({total:2,completed:0,inProgress:1,remaining:1});expect(saved).not.toHaveProperty('nodes')
+    Object.assign(course.contentCounts!,{completed:1,inProgress:0});course.nodes[1].completionPercent=100
+    await button(w,'刷新进度').trigger('click');await flushPromises()
+    expect(w.text()).toContain('已完成 100%')
+  })
+  it('内容百分比目录的离线概览只保留项数，完整条目和归属需联网',async()=>{
+    mocks.online=false
+    const course={...library.courses[0],direction:'MATH',progressMode:'CONTENT_PERCENT',contentCounts:{total:126,completed:1,inProgress:1,remaining:124}}
+    mocks.cache={planningBasis:'catalog',catalog:{...library,courses:[course]}}
+    const w=await render(DirectionView,'/progress/MATH?course=1')
+    expect(w.get('[aria-label="内容学习进度"]').text()).toContain('完整目录 126 项内容')
+    expect(w.find('.course-ring').exists()).toBe(false);expect(w.find('.catalog-tree').exists()).toBe(false)
+    expect(button(w,'维护目录').attributes('disabled')).toBeDefined()
+  })
   it('复习数量单独展示，修改时回填实际词数并保留原任务与版本', async () => {
     const record: LearningRecord = { ...learningRecordFixture, activityMode: 'COUNT_REVIEW', taskTitle: '每日单词复习', unitName: '词', amount: null, reviewAmount: 120, durationMinutes: null }
     const value = archiveFixture(record)
