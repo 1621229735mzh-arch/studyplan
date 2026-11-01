@@ -102,7 +102,7 @@ onBeforeUnmount(() => { request++ })
 <template>
   <div class="study-workspace" :aria-busy="loading">
     <header class="workspace-header">
-      <div><span class="workspace-eyebrow">每一次学习，都留下足迹</span><h1>学习记录</h1><p>从月份到每一天，回看实际学过的内容。</p></div>
+      <div><span class="workspace-eyebrow">每一次学习，都留下足迹</span><h1>学习记录</h1><p>从月份到每一天，回看学习内容与复习痕迹。</p></div>
       <div class="workspace-actions"><RouterLink to="/">去今日学习 ↗</RouterLink><ElButton type="primary" :disabled="!online || submitting" @click="openCreate">＋ 补记学习</ElButton></div>
     </header>
     <div class="workspace-toolbar">
@@ -114,11 +114,11 @@ onBeforeUnmount(() => { request++ })
     </div>
     <ElAlert v-if="error" :title="error" type="error" :closable="false"><ElButton text @click="loadRecords">重新加载</ElButton></ElAlert>
     <ElAlert v-if="taskError || catalog.error" :title="taskError || catalog.error?.message || ''" type="warning" :closable="false"><ElButton text @click="loadTasks">重试</ElButton></ElAlert>
-    <div class="section-heading"><div><h2>月份足迹</h2><p>{{ rangeLabel }}</p></div><span v-if="archive && !loading && !error && online" class="workspace-note">{{ archive.stats.learningDays }} 天 · {{ archive.stats.recordCount }} 次学习</span></div>
+    <div class="section-heading"><div><h2>月份足迹</h2><p>{{ rangeLabel }}</p></div><span v-if="archive && !loading && !error && online" class="workspace-note">{{ archive.stats.learningDays }} 天 · {{ archive.stats.recordCount }} 次学习<template v-if="archive.stats.reviewRecordCount"> · {{ archive.stats.reviewRecordCount }} 次复习记录</template></span></div>
     <div v-if="!online" class="workspace-empty"><h3>联网后查看完整记录</h3><p>离线时可以查看已同步的今日、本周计划和进度概览。</p><RouterLink to="/progress">查看进度快照 ↗</RouterLink></div>
     <div v-else-if="loading" class="workspace-loading" role="status">正在整理学习记录…</div>
     <RecordArchiveTree v-else-if="archive?.months.length" :months="archive.months" :readonly="submitting || !online" @edit="openEdit" @delete="remove" @classify="classifying = $event" />
-    <div v-else-if="!error" class="workspace-empty"><h3>这段时间还没有学习记录</h3><p>补记实际学习后，会自动汇入对应月份、周和日期。</p><ElButton type="primary" @click="openCreate">补记学习</ElButton></div>
+    <div v-else-if="!error" class="workspace-empty"><h3>这段时间还没有学习或复习记录</h3><p>实际学习或复习后，会自动汇入对应月份、周和日期。</p><ElButton type="primary" @click="openCreate">补记学习</ElButton></div>
     <footer class="workspace-footer"><span>学习记录决定实际进度，修改后会同步更新。</span><div><RouterLink to="/progress">查看学习进度 ↗</RouterLink><ElButton text :disabled="!online || loading" @click="loadRecords">刷新</ElButton></div></footer>
     <RecordClassificationDialog :record="classifying" @close="classifying = null" @saved="loadRecords" />
     <ElDialog v-model="createVisible" title="补记学习" width="min(700px, calc(100vw - 24px))" :close-on-click-modal="false" :close-on-press-escape="!submitting" :show-close="!submitting">

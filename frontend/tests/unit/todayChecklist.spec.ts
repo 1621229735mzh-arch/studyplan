@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
-import ElementPlus, { ElButton, ElDatePicker, ElInputNumber } from 'element-plus'
+import ElementPlus, { ElButton, ElDatePicker, ElInputNumber, ElRadioGroup } from 'element-plus'
 import { HttpApiError } from '@/api/http'
 import TodayView from '@/features/today/views/TodayView.vue'
 import type { TodayResponse } from '@/features/today/types'
@@ -332,5 +332,48 @@ describe('自主填写每日实际词数',()=>{
  it('历史确认不显示虚构数量，离线无法填写数量',async()=>{
   const data=countedFixture('COUNT_REVIEW',true);data.sections![0].tasks[0].recordedAmount=null;mocks.online.value=false;mocks.snapshot=data
   const w=await page();expect(w.text()).toContain('数量未记录');expect(button(w,'再记一笔').attributes('disabled')).toBeDefined()
+ })
+})
+
+describe('按教材逐项复习',()=>{
+ function queueFixture(finished=false): TodayResponse {
+  const data=fixture()
+  const task=data.sections![1].tasks[0]
+  Object.assign(task,{title:'函数与反函数',completionPercent:finished?100:0,actionable:!finished,
+   automaticReview:{streamId:1,title:'基础30讲',dueDate:finished?null:'2026-09-29',overdueDays:finished?0:2,round:1,optional:false,remainingCount:finished?1:2}})
+  if(finished) data.sections![1].tasks.push({...task,id:22,title:'极限定义',completionPercent:0,actionable:true,version:4,
+   automaticReview:{...task.automaticReview!,dueDate:'2026-10-01',overdueDays:0,optional:true}})
+  return data
+ }
+ it('逾期任务在对应学科的复习区展示，完整反馈后下一项由用户继续展开',async()=>{
+  mocks.fetch.mockResolvedValueOnce(queueFixture()).mockResolvedValue(queueFixture(true))
+  const w=await page()
+  const area=w.get('.today-review-section')
+  expect(area.text()).toContain('基础30讲');expect(area.text()).toContain('逾期 2 天')
+  expect(area.text()).toContain('2026-09-29');expect(area.text()).toContain('函数与反函数')
+  await button(w,'完成',1).trigger('click');await flushPromises()
+  w.findComponent(ElRadioGroup).vm.$emit('update:modelValue','MASTERED');await flushPromises()
+  await button(w,'保存').trigger('click');await flushPromises()
+  expect(mocks.review.mock.calls[0].slice(0,3)).toEqual([21,3,'MASTERED'])
+  expect(mocks.review.mock.calls[0][3]).toMatchObject({date:'2026-10-01',completionPercent:100,durationMinutes:null})
+  expect(button(w,'继续复习下一项')).toBeDefined()
+  expect(w.find('.review-current').exists()).toBe(false)
+  await button(w,'继续复习下一项').trigger('click');await flushPromises()
+  expect(w.get('.review-current').text()).toContain('极限定义');expect(w.get('.review-current').text()).toContain('今天到期')
+  expect(mocks.review).toHaveBeenCalledTimes(1)
+  await button(w,'剩余',1).trigger('click');await flushPromises()
+  w.findComponent(ElInputNumber).vm.$emit('update:modelValue',35);await flushPromises()
+  await button(w,'保存').trigger('click');await flushPromises()
+  expect(mocks.review.mock.calls[1].slice(0,3)).toEqual([22,4,null])
+ })
+ it('部分完成继续显示当前项，离线不能展开下一项或提交',async()=>{
+  const partial=queueFixture();partial.sections![1].tasks[0].completionPercent=40
+  mocks.fetch.mockResolvedValue(partial)
+  const w=await page();expect(w.get('.review-current').text()).toContain('已完成 40%')
+  expect(button(w,'继续复习下一项')).toBeUndefined()
+  mocks.online.value=false;mocks.snapshot=queueFixture(true)
+  const offline=await page();expect(button(offline,'继续复习下一项').attributes('disabled')).toBeDefined()
+  await button(offline,'继续复习下一项').trigger('click');await flushPromises()
+  expect(offline.find('.review-current').exists()).toBe(false);expect(mocks.review).not.toHaveBeenCalled()
  })
 })

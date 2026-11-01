@@ -10,6 +10,7 @@ import com.kaoyan.study.progress.mapper.CatalogMapper;
 import com.kaoyan.study.progress.mapper.CatalogMapper.*;
 import com.kaoyan.study.settings.service.SubjectService;
 import com.kaoyan.study.settings.service.StudyUnitService;
+import com.kaoyan.study.review.service.ReviewWorkspaceService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.StreamReadFeature;
@@ -30,11 +31,13 @@ public class CatalogService {
     private final SubjectService subjects;
     private final StudyUnitService units;
     private final TaskActivityService activities;
+    private final ReviewWorkspaceService reviews;
     private final JsonMapper json = JsonMapper.builder().enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
             .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT).enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build();
     private static final Set<String> DIRECTIONS = Set.of("MATH","ENGLISH","POLITICS","CS408");
-    public CatalogService(CatalogMapper mapper, StudyRecordService records, TaskService tasks, SubjectService subjects, StudyUnitService units,TaskActivityService activities) {
+    public CatalogService(CatalogMapper mapper, StudyRecordService records, TaskService tasks, SubjectService subjects, StudyUnitService units,TaskActivityService activities,ReviewWorkspaceService reviews) {
         this.mapper=mapper; this.records=records; this.tasks=tasks; this.subjects=subjects; this.units=units; this.activities=activities;
+        this.reviews=reviews;
     }
 
     private record State(List<CourseRow> courses, List<NodeRow> nodes, List<TaskLink> tasks, List<RecordLink> records) {}
@@ -98,7 +101,43 @@ public class CatalogService {
             cumulative.put(key,new Quantity(directionOf(r.subjectId(),s.courses()),r.subjectId(),r.subjectName(),r.unitId(),r.unitName(),
                     r.amount().add(old==null ? BigDecimal.ZERO:old.amount())));
         }
-        return new Library(mapper.revision(),views,new ArrayList<>(cumulative.values()),rows.stream().filter(r->r.amount()!=null && !assigned.containsKey(r.id())).toList(),countedProgress(rows,s.courses()));
+        return new Library(mapper.revision(),views,new ArrayList<>(cumulative.values()),rows.stream().filter(r->r.amount()!=null && !assigned.containsKey(r.id())).toList(),countedProgress(rows,s.courses()),
+                reviews.progress().stream().map(r->new ReviewProgress(directionOf(r.subjectId(),s.courses()),r.subjectId(),r.subjectName(),r.totals())).toList(),
+                branchReviewProgress(s,rows,assigned));
+    }
+    private record ReviewBranch(String direction,String branch,Long subjectId,String subjectName) {}
+    private List<BranchReviewProgress> branchReviewProgress(State state,List<StudyRecordView> rows,Map<Long,NodeRow> assigned) {
+        var nodes=byId(state.nodes(),NodeRow::id);var courses=byId(state.courses(),CourseRow::id);
+        var taskCourses=new HashMap<Long,CourseRow>();
+        for(var link:state.tasks()) {
+            var node=nodes.get(link.nodeId());if(node!=null)taskCourses.put(link.taskId(),courses.get(node.courseId()));
+        }
+        var groups=new LinkedHashMap<ReviewBranch,List<com.kaoyan.study.review.dto.ReviewWorkspaceResponse.SourceProgress>>();
+        for(var source:reviews.progressSources()) {
+            CourseRow course=taskCourses.get(source.taskId());
+            if(course==null && source.sourceRecordId()!=null && assigned.containsKey(source.sourceRecordId()))
+                course=courses.get(assigned.get(source.sourceRecordId()).courseId());
+            if(course==null && source.taskId()!=null) {
+                var learned=rows.stream().filter(r->source.taskId().equals(r.taskId()) && assigned.containsKey(r.id()))
+                        .map(r->courses.get(assigned.get(r.id()).courseId())).filter(Objects::nonNull).toList();
+                var branches=learned.stream().map(c->c.direction()+":"+c.branch()).distinct().toList();
+                if(branches.size()==1)course=learned.getFirst();
+            }
+            if(course!=null && !Objects.equals(course.subjectId(),source.subjectId()))course=null;
+            String direction=course==null ? directionOf(source.subjectId(),state.courses()) : course.direction();
+            String branch=course==null ? null : course.branch();
+            if(branch==null) {
+                var options=state.courses().stream().filter(c->c.subjectId().equals(source.subjectId()))
+                        .map(c->c.direction()+":"+c.branch()).distinct().toList();
+                // Only a unique existing branch is an unambiguous subject-level fallback.
+                branch=options.size()==1 ? options.getFirst().substring(options.getFirst().indexOf(':')+1)
+                        : options.isEmpty() ? source.subjectName() : "待归类复习";
+            }
+            var key=new ReviewBranch(direction,branch,source.subjectId(),source.subjectName());
+            groups.computeIfAbsent(key,k->new ArrayList<>()).add(source);
+        }
+        return groups.entrySet().stream().map(e->new BranchReviewProgress(e.getKey().direction(),e.getKey().branch(),
+                e.getKey().subjectId(),e.getKey().subjectName(),reviews.totalsForSources(e.getValue()))).toList();
     }
     private static String mode(CourseInput c) { return c.progressMode()==null ? "QUANTITY":c.progressMode(); }
     private static boolean content(CourseRow c) { return "CONTENT_PERCENT".equals(c.progressMode()); }

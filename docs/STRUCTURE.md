@@ -71,6 +71,10 @@
 
 ## 业务模块归属
 
+2026-10-30 复习框架：`review/views/ReviewView.vue` 沿用计划工作区四种时间视图，复用计划的 `workspace.css` 和日期工具；`ReviewScheduleDialog` 用于带版本的手动安排与日期调整。后端 `ReviewWorkspaceService` 只读组合原复习项／记录，并通过本模块原 Mapper 更新待执行日期，不增加迁移。`RecordArchiveService` 在原日期树附加复习痕迹；`CatalogService` 在原进度响应及只读概览快照附加按科目的复习统计。共用响应类型位于 `review/dto/ReviewWorkspaceResponse`，前端类型位于 `review/workspace.ts`。规则与当前单个待执行日期边界见 [复习工作区](business/review-workspace.md)。
+
+同日后续复习导入规范统一放在 `docs/business/review-import*`：`review-import-guide.md` 为业务与字段说明，`review-import.schema.json` 为Draft2020-12合同，`review-import-example.json` 和 `review-import-pending-example.json` 为虚构来源ID的格式示例。当前仅规范文件，未接入Vite下载、前端导入按钮或后端导入服务；将来实现归原review模块，不使用plan导入接口，不新建独立服务。
+
 | 目录名 | 职责 | 前端 | 后端 |
 | --- | --- | --- | --- |
 | `account` | 预设账号、登录、会话及退出 | 已建 | 已建 |
@@ -188,3 +192,14 @@ V20 新增学习接续规划表与原学习记录的 `continuation_delta`。`Tas
 2026-10-30 数学同日继续学习：`ContinuationLearningService` 从有效记录推导可自选的下一段，`Context.optional` 区分未开始的可选内容。`TodayService` 将其排除于还剩项数和预计负担；`ContinuationBook.vue` 的展开仅为本地界面状态，保存仍走原百分比记录入口，无新表或迁移。
 
 2026-10-30 按内容原百分比目录：已发布V23的progress_course.progress_mode区分QUANTITY与CONTENT_PERCENT。CatalogService只读汇总原continuationDelta，返回末级completionPercent与课程／章节ContentCounts，不创建完成事实或数量。前端ContentProgressSummary和CatalogNodeTree分别展示项数与独立百分比；概览复用原离线切片，不缓存完整目录。两本高数资料共252段已通过正常预览确认导入，见[发布验收](operations/math-content-catalog-release-20261030.md)。
+
+
+## 按教材自动复习（2026-11-01）
+
+`review/service/FsrsScheduler` 是锁定FSRS4Anki v5.0.0参数的天级纯计算；`AutoReviewService` 管理原接续教材开关、来源资格、事务排期和算法状态，`AutoReviewReconciler` 只校准已启用教材。V24增加 `review_auto_policy`、`review_fsrs_state` 与原复习记录的可空提交摘要，复习完成仍写原记录表。`AutoReviewMapper` 属于复习模块，不能写学习表。
+
+`learning/service/CompletedStudySourceService` 只读核验原百分比与真实完成日；`StudyRecordService` 保存／更正／删除后发出同步事务事件 `learning/dto/StudyTaskChanged`，由复习模块监听，不建立反向服务依赖或独立完成事实。跨模块写操作不调用外模块Mapper；锁顺序为任务升序、教材stream、复习项。
+
+前端 `review/components/AutoReviewBooks.vue` 按教材收纳小段及开关、暂停、改期入口；`review/api/automatic.ts` 管理认证API和专用类型。原日期工作区Entry附教材与轮次，今日仍读原复习安排。只读进度快照不增加算法状态或完整明细。规则见 [自动复习](business/automatic-review.md)。
+
+同日后续今日执行：`AutoReviewMapper.QueueRow`只读关联原复习项／当日记录，`AutoReviewService.dayQueue`按教材排序推荐当前项，`QueuedReviewTask`包装原日任务及`AutomaticReviewContext`；`ReviewService.todayTasks`组合手动项、当天痕迹和候选，`TodayService`只组合且排除未开始的自选候选计数。`today/components/ReviewBook.vue`收纳教材及“继续复习下一项”，复用原百分比反馈接口，无新表或迁移。进度使用`ReviewWorkspaceService.progressSources`的内部只读DTO，`CatalogService`依原目录归属生成branchReviews，分科页面展示；原subject统计保留兼容。只读快照增加分科汇总，不含复习明细或独立完成事实。

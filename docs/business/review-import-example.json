@@ -1,0 +1,21 @@
+{
+  "documentType": "REVIEW_IMPORT",
+  "schemaVersion": 1,
+  "reviewPlanId": "review-format-example-202611",
+  "title": "复习格式示例（虚构来源ID，请替换）",
+  "items": [
+    {
+      "key": "completed-content",
+      "source": { "type": "TASK", "taskId": 900001 },
+      "suggestion": { "mode": "AFTER_COMPLETION", "offsetDays": 3 }
+    },
+    {
+      "key": "completed-ad-hoc-content",
+      "source": { "type": "AD_HOC_RECORD", "sourceRecordId": 900002 },
+      "suggestion": { "mode": "NONE" }
+    }
+  ],
+  "days": [
+    { "date": "2026-11-05", "items": [{ "reviewKey": "completed-content" }] }
+  ]
+}

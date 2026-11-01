@@ -58,13 +58,16 @@ public class StudyRecordService {
     private final TaskService taskService;
     private final SubjectService subjectService;
     private final StudyUnitService studyUnitService;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
     public StudyRecordService(StudyRecordMapper studyRecordMapper,
                               TaskService taskService,
                               SubjectService subjectService,
                               StudyUnitService studyUnitService,
                               DailyPlanService dailyPlanService, SequenceLearningService sequences, com.kaoyan.study.plan.service.TaskActivityService activities,
-                              ContinuationLearningService continuedLearning,com.kaoyan.study.plan.service.TaskContinuationService continuations) {
+                              ContinuationLearningService continuedLearning,com.kaoyan.study.plan.service.TaskContinuationService continuations,
+                              org.springframework.context.ApplicationEventPublisher events) {
+        this.events = events;
         this.continuedLearning=continuedLearning; this.continuations=continuations;
         this.activities=activities;
         this.sequences=sequences;
@@ -154,6 +157,7 @@ public class StudyRecordService {
                 throw new ConflictException("TOKEN_REUSED","该提交令牌已使用或已撤销，请刷新后重新提交");
             throw ex;
         }
+        events.publishEvent(new com.kaoyan.study.learning.dto.StudyTaskChanged(record.getTaskId()));
         return get(record.getId());
     }
 
@@ -199,6 +203,9 @@ public class StudyRecordService {
         if (studyRecordMapper.update(existing) == 0) {
             throw new ConflictException("STUDY_RECORD_STALE", "该记录已在其他设备上修改，请刷新后重试");
         }
+        events.publishEvent(new com.kaoyan.study.learning.dto.StudyTaskChanged(original.getTaskId()));
+        if (!Objects.equals(original.getTaskId(),existing.getTaskId()))
+            events.publishEvent(new com.kaoyan.study.learning.dto.StudyTaskChanged(existing.getTaskId()));
         return get(id);
     }
 
@@ -218,6 +225,7 @@ public class StudyRecordService {
         if (studyRecordMapper.softDelete(id, version) == 0) {
             throw new ConflictException("STUDY_RECORD_STALE", "该记录已在其他设备上修改，请刷新后重试");
         }
+        events.publishEvent(new com.kaoyan.study.learning.dto.StudyTaskChanged(existing.getTaskId()));
     }
 
 

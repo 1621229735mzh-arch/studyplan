@@ -30,6 +30,7 @@
         <result property="intervalDays" column="interval_days"/>
         <result property="clientToken" column="client_token"/>
         <result property="progressDelta" column="progress_delta"/>
+        <result property="submissionHash" column="submission_hash"/>
         <result property="estimatedMinutes" column="estimated_minutes"/>
     </resultMap>
 
@@ -65,6 +66,7 @@
         SELECT <include refid="itemColumns"/>
         FROM review_item
         WHERE status = 'PENDING'
+          AND NOT EXISTS (SELECT 1 FROM review_fsrs_state f WHERE f.review_item_id = review_item.id)
           AND next_review_date IS NOT NULL
           AND next_review_date &lt;= #{date}
         ORDER BY next_review_date, id
@@ -120,15 +122,29 @@
 
     <select id="findRecords" resultMap="reviewRecordResultMap">
         SELECT id, review_item_id, review_date, result, duration_minutes, note,
-               next_review_date, interval_days, client_token, progress_delta, estimated_minutes
+               next_review_date, interval_days, client_token, progress_delta, estimated_minutes, submission_hash
         FROM review_record
         WHERE review_item_id = #{reviewItemId}
         ORDER BY review_date DESC, id DESC
     </select>
 
+    <select id="findHistory" resultType="com.kaoyan.study.review.dto.ReviewWorkspaceResponse$Trace">
+        SELECT r.id, r.review_item_id, i.task_id, i.subject_id, s.name AS subject_name,
+               i.title, r.review_date, r.progress_delta, r.result, r.duration_minutes, r.note
+        FROM review_record r JOIN review_item i ON i.id = r.review_item_id
+        JOIN subject s ON s.id = i.subject_id
+        <where>
+            <if test="from != null">AND r.review_date &gt;= #{from}</if>
+            <if test="to != null">AND r.review_date &lt;= #{to}</if>
+            <if test="subjectId != null">AND i.subject_id = #{subjectId}</if>
+            <if test="taskId != null">AND i.task_id = #{taskId}</if>
+        </where>
+        ORDER BY r.review_date DESC, r.id DESC
+    </select>
+
     <select id="findRecordByToken" resultMap="reviewRecordResultMap">
         SELECT id, review_item_id, review_date, result, duration_minutes, note,
-               next_review_date, interval_days, client_token, progress_delta, estimated_minutes
+               next_review_date, interval_days, client_token, progress_delta, estimated_minutes, submission_hash
         FROM review_record
         WHERE client_token = #{clientToken}
     </select>
@@ -136,9 +152,9 @@
     <insert id="insertRecord" parameterType="com.kaoyan.study.review.entity.ReviewRecord"
             useGeneratedKeys="true" keyProperty="id">
         INSERT INTO review_record (review_item_id, review_date, result, duration_minutes, note,
-                                   next_review_date, interval_days, client_token, progress_delta, estimated_minutes)
+                                   next_review_date, interval_days, client_token, progress_delta, estimated_minutes, submission_hash)
         VALUES (#{reviewItemId}, #{reviewDate}, #{result}, #{durationMinutes}, #{note},
-                #{nextReviewDate}, #{intervalDays}, #{clientToken}, #{progressDelta}, #{estimatedMinutes})
+                #{nextReviewDate}, #{intervalDays}, #{clientToken}, #{progressDelta}, #{estimatedMinutes}, #{submissionHash})
     </insert>
 
     <select id="sumScheduledMinutes" resultType="java.lang.Integer">
@@ -150,13 +166,22 @@
     <update id="touchItem">
         UPDATE review_item SET version = version + 1 WHERE id = #{id} AND version = #{version}
     </update>
+    <update id="updateAutomaticDue">
+        UPDATE review_item SET status='SCHEDULED', scheduled_date=#{date}, next_review_date=#{date},
+            version=version+1 WHERE id=#{id} AND version=#{version}
+    </update>
+    <update id="updateAutomaticReminder">
+        UPDATE review_item SET next_review_date=#{date} WHERE id=#{id} AND version=#{version}
+    </update>
     <select id="findDayTasks" resultType="com.kaoyan.study.review.dto.DayReviewTaskView">
-        SELECT i.id, i.subject_id, i.title,
+        SELECT i.id, i.subject_id, CASE WHEN f.review_item_id IS NOT NULL THEN CONCAT(s.title, ' · ', i.title) ELSE i.title END AS title,
                LEAST(COALESCE(r.percent_done, 0), 100) AS completion_percent,
                COALESCE(r.estimate, i.estimated_minutes) AS estimated_minutes,
                COALESCE(r.minutes, 0) AS actual_minutes, COALESCE(r.missing_durations, 0) AS missing_durations, i.version,
                (i.status = 'SCHEDULED' AND i.scheduled_date = #{date}) AS actionable
         FROM review_item i
+        LEFT JOIN review_fsrs_state f ON f.review_item_id=i.id
+        LEFT JOIN study_continuation_stream s ON s.id=f.stream_id
         LEFT JOIN (SELECT review_item_id, SUM(progress_delta) AS percent_done,
                           SUM(duration_minutes) AS minutes, SUM(duration_minutes IS NULL) AS missing_durations, MAX(estimated_minutes) AS estimate
                    FROM review_record WHERE review_date = #{date} GROUP BY review_item_id) r

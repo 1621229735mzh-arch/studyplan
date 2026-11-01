@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "408doing 复习导入合同 v1（规范，导入功能尚未实现）",
+  "description": "只引用实际已完成来源。items 表示纳入复习及可选日期建议；days 是需要本人在预览中确认的具体安排。学习事实、完成日和掌握反馈不能由文件提供。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["documentType", "schemaVersion", "reviewPlanId", "title", "items", "days"],
+  "properties": {
+    "documentType": { "const": "REVIEW_IMPORT" },
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "reviewPlanId": { "$ref": "#/$defs/key" },
+    "title": { "type": "string", "minLength": 1, "maxLength": 200, "pattern": "\\S" },
+    "items": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/reviewItem" } },
+    "days": { "type": "array", "items": { "$ref": "#/$defs/day" } }
+  },
+  "$defs": {
+    "key": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
+    "id": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+    "date": { "type": "string", "format": "date", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+    "source": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["type", "taskId"],
+          "properties": { "type": { "const": "TASK" }, "taskId": { "$ref": "#/$defs/id" } }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["type", "sourceRecordId"],
+          "properties": { "type": { "const": "AD_HOC_RECORD" }, "sourceRecordId": { "$ref": "#/$defs/id" } }
+        }
+      ]
+    },
+    "suggestion": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["mode"],
+          "properties": { "mode": { "const": "NONE" } }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["mode", "offsetDays"],
+          "properties": {
+            "mode": { "const": "AFTER_COMPLETION" },
+            "offsetDays": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+          }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["mode", "date"],
+          "properties": { "mode": { "const": "ON_DATE" }, "date": { "$ref": "#/$defs/date" } }
+        }
+      ]
+    },
+    "reviewItem": {
+      "type": "object", "additionalProperties": false,
+      "required": ["key", "source", "suggestion"],
+      "properties": {
+        "key": { "$ref": "#/$defs/key" },
+        "source": { "$ref": "#/$defs/source" },
+        "suggestion": { "$ref": "#/$defs/suggestion" }
+      }
+    },
+    "day": {
+      "type": "object", "additionalProperties": false,
+      "required": ["date", "items"],
+      "properties": {
+        "date": { "$ref": "#/$defs/date" },
+        "items": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["reviewKey"],
+            "properties": { "reviewKey": { "$ref": "#/$defs/key" } }
+          }
+        }
+      }
+    }
+  }
+}

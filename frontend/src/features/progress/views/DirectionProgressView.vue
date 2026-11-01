@@ -15,6 +15,7 @@ import CatalogNodeTree from '../components/CatalogNodeTree.vue'
 import CatalogImportDialog from '../components/CatalogImportDialog.vue'
 import CatalogEditorDialog from '../components/CatalogEditorDialog.vue'
 import CountedProgressCards from '../components/CountedProgressCards.vue'
+import ReviewProgressSection from '../components/ReviewProgressSection.vue'
 
 const route = useRoute(); const catalog = useCatalogStore()
 const { library, loading, error, notice, readonly, syncedAt, online, reload, accept } = useCatalogWorkspace()
@@ -22,10 +23,11 @@ const direction = computed(() => directions.find(d => d.key === String(route.par
 const courses = computed(() => library.value?.courses.filter(c => c.direction === direction.value?.key) ?? [])
 const selectedCourse = computed(() => courses.value.find(c => String(c.id) === route.query.course) ?? null)
 const branch = computed(() => selectedCourse.value?.branch || String(route.query.branch || ''))
-const branches = computed(() => [...new Set(courses.value.map(c => c.branch))])
+const branches = computed(() => [...new Set([...courses.value.map(c => c.branch), ...(library.value?.branchReviews?.filter(r => r.direction === direction.value?.key).map(r => r.branch) ?? [])])])
 const visibleCourses = computed(() => courses.value.filter(c => !branch.value || c.branch === branch.value))
 const cumulative = computed(() => library.value?.cumulative.filter(q => q.direction === direction.value?.key) ?? [])
 const activities = computed(() => library.value?.activities?.filter(a => a.direction === direction.value?.key) ?? [])
+const reviews = computed(() => library.value?.branchReviews?.filter(r => r.direction === direction.value?.key && r.branch === branch.value) ?? [])
 const otherCumulative = computed(() => library.value?.cumulative.filter(q => q.direction === 'UNASSIGNED') ?? [])
 const pending = computed(() => library.value?.unclassified.filter(r => {
   const group = library.value?.cumulative.find(q => q.subjectId === r.subjectId)
@@ -87,6 +89,7 @@ onMounted(() => { if (online.value) void catalog.load() })
       <div v-else-if="!activities.length || branch" class="workspace-empty"><h3>还没有课程或资料目录</h3><p>可以从已有计划整理候选，或导入包含未排期内容的完整目录。</p><ElButton type="primary" :disabled="readonly || !online || busy" @click="openEditor()">整理第一份目录</ElButton></div>
       <details v-if="pending.length && !readonly" class="workspace-panel pending-records"><summary>待归类学习成果 · {{ pending.length }} 条</summary><p class="workspace-note">已计入学科累计。选择明确归属后计入课程，不会增加第二份数量。</p><article v-for="record in pending" :key="record.id" class="pending-row"><div><span class="workspace-note">{{ record.subjectName }}</span><h4>{{ record.content || record.taskTitle || '学习记录' }}</h4><span>{{ amountText(record.amount,record.unitName) }}</span></div><div class="pending-target"><ElSelect v-model="choices[record.id]" filterable placeholder="选择课程与具体内容" :disabled="busy || !online"><ElOption v-for="o in courseOptions(record)" :key="o.id" :label="o.title" :value="o.id" /></ElSelect><ElButton :disabled="!choices[record.id] || busy || !online" @click="assign(record)">确认归类</ElButton><p v-if="!courseOptions(record).length" class="workspace-note">先建立同科目、同单位的目录。</p></div></article></details>
       <details v-if="otherCumulative.length && !selectedCourse" class="workspace-panel"><summary>尚未归入四个方向的科目累计</summary><p v-for="q in otherCumulative" :key="q.subjectId + ':' + q.unitId" class="workspace-note">{{ q.subjectName }} · {{ amountText(q.amount, q.unitName) }}</p><p class="workspace-note">整理课程时确认所属方向后，这些成果会进入对应学科。</p></details>
+      <ReviewProgressSection v-if="!selectedCourse && branch" :reviews="reviews" :available="library.branchReviews != null" />
     </template>
     <footer class="workspace-footer"><RouterLink to="/learning">查看或修正学习记录 ↗</RouterLink><ElButton text :disabled="loading || busy || !online" @click="reload">刷新进度</ElButton></footer>
     <CatalogEditorDialog v-if="direction" v-model="editorVisible" :direction="direction.key as Direction" :course="editorCourse" :branch="branch" @review="reviewSource" />

@@ -32,5 +32,11 @@ public record ReviewRecordCreateRequest(
         LocalDate nextReviewDate,
 
         @Size(max = 64, message = "提交令牌过长")
-        String clientToken) {
+        String clientToken,
+
+        @Min(0) Long version) {
+    public ReviewRecordCreateRequest(Long reviewItemId, LocalDate reviewDate, MasteryResult result,
+            Integer durationMinutes, String note, LocalDate nextReviewDate, String clientToken) {
+        this(reviewItemId,reviewDate,result,durationMinutes,note,nextReviewDate,clientToken,null);
+    }
 }

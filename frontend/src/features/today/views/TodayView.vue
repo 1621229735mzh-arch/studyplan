@@ -16,6 +16,7 @@ import type { MasteryLevel } from '@/types/domain'
 import { fetchToday, saveLearningProgress, saveReviewProgress, saveDayConfirmation, saveCompletedProblemNumbers } from '../api'
 import ChecklistTask from '../components/ChecklistTask.vue'
 import ContinuationBook from '../components/ContinuationBook.vue'
+import ReviewBook from '../components/ReviewBook.vue'
 import type { TodayChecklistTask, TodayResponse } from '../types'
 const session = useSessionStore()
 const catalog = useCatalogStore()
@@ -97,6 +98,15 @@ function bookGroups(tasks: TodayChecklistTask[]) {
   for (const task of tasks) if (task.continuation) {
     const {streamId,title} = task.continuation
     if (!groups.has(streamId)) groups.set(streamId,{id:streamId,title,tasks:[]})
+    groups.get(streamId)!.tasks.push(task)
+  }
+  return [...groups.values()]
+}
+function reviewBookGroups(tasks: TodayChecklistTask[]) {
+  const groups = new Map<number, { id: number; title: string; tasks: TodayChecklistTask[] }>()
+  for (const task of tasks) if (task.automaticReview) {
+    const { streamId, title } = task.automaticReview
+    if (!groups.has(streamId)) groups.set(streamId, { id: streamId, title, tasks: [] })
     groups.get(streamId)!.tasks.push(task)
   }
   return [...groups.values()]
@@ -260,16 +270,23 @@ onUnmounted(() => {
           <h2><AppIcon :name="subjectIcon(section.name)" :size="30" />{{ section.name }}</h2>
         </div>
         <ul class="checklist">
-          <ChecklistTask v-for="task in section.tasks.filter(t => !t.continuation && (t.completionPercent < 100 || t.sequence?.mode === 'SELECT_BY_NUMBER'))" :key="`${task.kind}-${task.id}`"
+          <ChecklistTask v-for="task in section.tasks.filter(t => t.kind !== 'REVIEW' && !t.continuation && (t.completionPercent < 100 || t.sequence?.mode === 'SELECT_BY_NUMBER'))" :key="`${task.kind}-${task.id}`"
             :task="task" :readonly="readonly || saving" :show-estimate="section.name === '数学一'" @action="openAction" />
           <ContinuationBook v-for="book in bookGroups(section.tasks)" :key="`book-${book.id}`" :title="book.title" :tasks="book.tasks" :readonly="readonly || saving" :show-estimate="section.name === '数学一'" @action="openAction" />
+          <li v-if="section.tasks.some(t => t.kind === 'REVIEW')" class="today-review-section">
+            <h3>复习</h3>
+            <ul class="checklist">
+              <ChecklistTask v-for="task in section.tasks.filter(t => t.kind === 'REVIEW' && !t.automaticReview && t.completionPercent < 100)" :key="`review-${task.id}`" :task="task" :readonly="readonly || saving" @action="openAction" />
+              <ReviewBook v-for="book in reviewBookGroups(section.tasks)" :key="`review-book-${book.id}`" :title="book.title" :tasks="book.tasks" :readonly="readonly || saving" @action="openAction" />
+            </ul>
+          </li>
         </ul>
         <p v-if="!section.tasks.some(t => t.completionPercent < 100 || t.sequence?.mode === 'SELECT_BY_NUMBER')" class="empty-subject">
           {{ section.tasks.length ? '今日任务已完成' : '今天暂无任务' }}
         </p>
-        <details v-if="section.tasks.some(t => !t.continuation && t.completionPercent >= 100 && t.sequence?.mode !== 'SELECT_BY_NUMBER')" class="completed">
-          <summary>已完成 · {{ section.tasks.filter(t => !t.continuation && t.completionPercent >= 100 && t.sequence?.mode !== 'SELECT_BY_NUMBER').length }}</summary>
-          <ul class="checklist"><ChecklistTask v-for="task in section.tasks.filter(t => !t.continuation && t.completionPercent >= 100 && t.sequence?.mode !== 'SELECT_BY_NUMBER')" :key="`${task.kind}-${task.id}`" :task="task" :readonly="readonly || saving" @action="openAction" /></ul>
+        <details v-if="section.tasks.some(t => !t.continuation && !t.automaticReview && t.completionPercent >= 100 && t.sequence?.mode !== 'SELECT_BY_NUMBER')" class="completed">
+          <summary>已完成 · {{ section.tasks.filter(t => !t.continuation && !t.automaticReview && t.completionPercent >= 100 && t.sequence?.mode !== 'SELECT_BY_NUMBER').length }}</summary>
+          <ul class="checklist"><ChecklistTask v-for="task in section.tasks.filter(t => !t.continuation && !t.automaticReview && t.completionPercent >= 100 && t.sequence?.mode !== 'SELECT_BY_NUMBER')" :key="`${task.kind}-${task.id}`" :task="task" :readonly="readonly || saving" @action="openAction" /></ul>
         </details>
       </section>
       <details ref="extraRecordRef" class="section-card extra-record"><summary>补记学习 / 计划外记录</summary>
@@ -296,6 +313,7 @@ onUnmounted(() => {
       <template v-if="selected?.kind === 'REVIEW' && percent === 100">
         <label class="field-label">掌握情况</label>
         <ElRadioGroup v-model="mastery" :disabled="saving"><ElRadioButton value="FORGOT">不会</ElRadioButton><ElRadioButton value="VAGUE">模糊</ElRadioButton><ElRadioButton value="MASTERED">掌握</ElRadioButton></ElRadioGroup>
+        <p class="section-note">先独立回忆或做题，再核对答案。不会或需要提示选“不会”；能独立完成但吃力选“模糊”；顺利完成选“掌握”。自动复习内容会据此安排下一次日期。</p>
       </template>
       <ElAlert v-if="saveError" class="save-error" type="error" :closable="false" :title="saveError" />
       <template #footer><ElButton :disabled="saving" @click="dialogVisible = false">取消</ElButton><ElButton type="primary" :loading="saving" :disabled="readonly" @click="saveAction">保存</ElButton></template>

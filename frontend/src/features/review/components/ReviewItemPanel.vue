@@ -220,6 +220,7 @@ async function submitFeedback(): Promise<void> {
   try {
     const record = await createReviewRecord({
       reviewItemId: target.id,
+      version: target.version,
       reviewDate: feedback.reviewDate,
       result: feedback.result,
       durationMinutes: feedback.durationMinutes,
@@ -351,6 +352,7 @@ onMounted(() => {
 
     <ElDialog v-model="feedbackVisible" title="记录复习反馈" width="min(540px, 92vw)">
       <p class="hint-text">{{ feedbackTarget?.title }}</p>
+      <p class="hint-text">先独立回忆或做题，再核对答案。需要提示选“不会”；能独立完成但吃力选“模糊”；顺利完成选“掌握”。</p>
       <ElForm label-width="110px" @submit.prevent>
         <ElFormItem label="掌握情况">
           <ElRadioGroup :model-value="feedback.result" @update:model-value="onResultChange">
@@ -373,7 +375,7 @@ onMounted(() => {
             :model-value="feedback.nextReviewDate"
             type="date"
             value-format="YYYY-MM-DD"
-            placeholder="可留空：留空时按设置中的间隔推导"
+            placeholder="留空时按当前复习规则推导"
             @update:model-value="onNextReviewDateChange"
           />
         </ElFormItem>
@@ -382,7 +384,7 @@ onMounted(() => {
         </ElFormItem>
       </ElForm>
       <p class="hint-text">
-        下次日期优先用你填写的值；留空时按“设置”里该掌握档位的间隔推导。间隔未配置时后端不会给出日期，
+        自动复习内容按实际反馈计算下一次日期；手动内容按“设置”里的间隔推导。下次日期优先用你填写的值。间隔未配置时后端不会给出日期，
         界面会如实提示并保留为空。
       </p>
       <template #footer>

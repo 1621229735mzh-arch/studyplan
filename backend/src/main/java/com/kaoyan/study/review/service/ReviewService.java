@@ -10,6 +10,7 @@ import com.kaoyan.study.learning.service.StudyRecordService;
 import com.kaoyan.study.plan.entity.Task;
 import com.kaoyan.study.plan.service.TaskService;
 import com.kaoyan.study.review.dto.DayReviewTaskView;
+import com.kaoyan.study.review.dto.QueuedReviewTask;
 import com.kaoyan.study.review.dto.ReviewConfirmRequest;
 import com.kaoyan.study.review.dto.ReviewConfirmResponse;
 import com.kaoyan.study.review.dto.ReviewDayProgressRequest;
@@ -58,12 +59,14 @@ public class ReviewService {
     private final StudyRecordService studyRecordService;
     private final StudyDay studyDay;
     private final StudySettingsService studySettingsService;
+    private final AutoReviewService automatic;
 
     public ReviewService(ReviewMapper reviewMapper,
                          TaskService taskService,
                          SubjectService subjectService,
                          StudyRecordService studyRecordService,
-                         StudySettingsService studySettingsService, StudyDay studyDay) {
+                         StudySettingsService studySettingsService, StudyDay studyDay, AutoReviewService automatic) {
+        this.automatic = automatic;
         this.reviewMapper = reviewMapper;
         this.taskService = taskService;
         this.subjectService = subjectService;
@@ -149,22 +152,36 @@ public class ReviewService {
      */
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public ReviewRecordResponse recordReview(ReviewRecordCreateRequest request) {
+        automatic.lockSource(request.reviewItemId());
+        return recordReview(request, submissionHash(request.toString()));
+    }
+
+    private ReviewRecordResponse recordReview(ReviewRecordCreateRequest request, String hash) {
         ReviewItem item = reviewMapper.findItemByIdForUpdate(request.reviewItemId());
         if (item == null) throw new NotFoundException("复习项不存在");
         if (request.clientToken() != null && !request.clientToken().isBlank()) {
             ReviewRecord existing = reviewMapper.findRecordByToken(request.clientToken());
             if (existing != null) {
+                verifyRetry(existing,hash,request.reviewItemId(),request.reviewDate());
                 return ReviewRecordResponse.from(existing, existing.getNextReviewDate() != null);
             }
         }
 
-        StudySettings settings = studySettingsService.get();
-        Integer intervalDays = intervalFor(settings, request.result());
-        LocalDate nextReviewDate = request.nextReviewDate() != null
+        if (item.getStatus()==ReviewStatus.ARCHIVED) throw new BusinessException("REVIEW_ARCHIVED","已归档内容不能记录新复习");
+        if (automatic.managed(item.getId()) && reviewMapper.findRecords(item.getId()).stream().anyMatch(r->r.getReviewDate().equals(request.reviewDate()) && r.getResult()!=null))
+            throw new BusinessException("REVIEW_ALREADY_COMPLETED","当天已完成该内容，请勿重复反馈");
+        if (automatic.managed(item.getId()) && (request.clientToken()==null || request.clientToken().isBlank()))
+            throw new BusinessException("TOKEN_REQUIRED","自动复习反馈需要提交令牌，请刷新后重试");
+        if (automatic.managed(item.getId()) && !item.getVersion().equals(request.version()))
+            throw new ConflictException("REVIEW_ITEM_STALE","复习内容已变化，请刷新后重新反馈");
+        var autoNext=automatic.feedback(item,request.reviewDate(),request.result(),request.nextReviewDate());
+        Integer intervalDays = autoNext!=null ? Integer.valueOf(autoNext.intervalDays()) : intervalFor(studySettingsService.get(), request.result());
+        LocalDate nextReviewDate = autoNext!=null ? autoNext.date() : request.nextReviewDate() != null
                 ? request.nextReviewDate()
                 : (intervalDays == null ? null : request.reviewDate().plusDays(intervalDays));
 
         ReviewRecord record = new ReviewRecord();
+        record.setSubmissionHash(hash);
         record.setReviewItemId(item.getId());
         record.setReviewDate(request.reviewDate());
         record.setResult(request.result());
@@ -184,6 +201,9 @@ public class ReviewService {
         } catch (DuplicateKeyException ex) {
             ReviewRecord existing = reviewMapper.findRecordByToken(request.clientToken());
             if (existing != null) {
+                verifyRetry(existing,hash,request.reviewItemId(),request.reviewDate());
+                // Roll back any calculated memory state; the committed retry is returned on the next request.
+                if (autoNext!=null) throw new ConflictException("REVIEW_RETRY","反馈已提交，请刷新后重试");
                 return ReviewRecordResponse.from(existing, existing.getNextReviewDate() != null);
             }
             throw ex;
@@ -193,6 +213,8 @@ public class ReviewService {
                 nextReviewDate, item.getVersion()) == 0) {
             throw new ConflictException("REVIEW_ITEM_STALE", "该复习内容已在其他设备上修改，请刷新后重试");
         }
+        if (autoNext!=null && reviewMapper.updateAutomaticDue(item.getId(),nextReviewDate,item.getVersion()+1)!=1)
+            throw new ConflictException("REVIEW_ITEM_STALE","下一轮复习安排已变化，请刷新后重试");
         return ReviewRecordResponse.from(record, nextReviewDate != null);
     }
 
@@ -200,23 +222,35 @@ public class ReviewService {
         return reviewMapper.findDayTasks(date);
     }
 
+    public List<QueuedReviewTask> todayTasks(LocalDate date) {
+        if (!date.equals(studyDay.today())) return dayTasks(date).stream().map(t->new QueuedReviewTask(t,null)).toList();
+        var result=new ArrayList<>(dayTasks(date).stream().filter(t->!automatic.managed(t.id())).map(t->new QueuedReviewTask(t,null)).toList());
+        result.addAll(automatic.dayQueue(date));
+        return result;
+    }
+
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public ReviewRecordResponse recordDayProgress(ReviewDayProgressRequest request) {
+        automatic.lockSource(request.reviewItemId());
+        String hash=submissionHash(request.toString());
         var item = reviewMapper.findItemByIdForUpdate(request.reviewItemId());
         if (item == null) throw new NotFoundException("复习项不存在");
         var retry = reviewMapper.findRecordByToken(request.clientToken());
         if (retry != null) {
-            if (!request.reviewItemId().equals(retry.getReviewItemId()) || !request.date().equals(retry.getReviewDate()))
-                throw new ConflictException("TOKEN_REUSED", "提交令牌已被其他记录使用");
+            verifyRetry(retry,hash,request.reviewItemId(),request.date());
             return ReviewRecordResponse.from(retry, retry.getNextReviewDate() != null);
         }
         if (!item.getVersion().equals(request.version()))
             throw new ConflictException("REVIEW_ITEM_STALE", "复习内容已变化，请刷新后重试");
-        if (item.getStatus() != ReviewStatus.SCHEDULED || !request.date().equals(item.getScheduledDate()))
+        boolean dueAutomatic=automatic.managed(item.getId()) && request.date().equals(studyDay.today())
+                && item.getScheduledDate()!=null && !item.getScheduledDate().isAfter(request.date());
+        if (item.getStatus() != ReviewStatus.SCHEDULED || !(request.date().equals(item.getScheduledDate()) || dueAutomatic))
             throw new BusinessException("REVIEW_NOT_SCHEDULED", "该复习内容未安排在所选日期");
-        var snapshot = dayTasks(request.date()).stream().filter(x -> x.id().equals(item.getId())).findFirst().orElseThrow();
+        automatic.requireProgress(item,request.date());
+        var completed=reviewMapper.findRecords(item.getId()).stream().filter(r->r.getReviewDate().equals(request.date()))
+                .map(ReviewRecord::getProgressDelta).reduce(BigDecimal.ZERO,BigDecimal::add).min(BigDecimal.valueOf(100));
         var target = BigDecimal.valueOf(request.completionPercent());
-        var delta = target.subtract(snapshot.completionPercent());
+        var delta = target.subtract(completed);
         if (delta.signum() < 0)
             throw new BusinessException("PROGRESS_DECREASE", "累计完成比例不能降低");
         if (delta.signum() == 0 && (request.durationMinutes()==null || request.durationMinutes() == 0))
@@ -224,9 +258,10 @@ public class ReviewService {
         if (request.completionPercent() == 100) {
             if (request.result() == null) throw new BusinessException("MASTERY_REQUIRED", "完成复习时请选择掌握情况");
             return recordReview(new ReviewRecordCreateRequest(item.getId(), request.date(), request.result(),
-                    request.durationMinutes(), null, null, request.clientToken()));
+                    request.durationMinutes(), null, null, request.clientToken(),item.getVersion()),hash);
         }
         ReviewRecord record = new ReviewRecord();
+        record.setSubmissionHash(hash);
         record.setReviewItemId(item.getId()); record.setReviewDate(request.date());
         record.setProgressDelta(delta); record.setEstimatedMinutes(item.getEstimatedMinutes());
         record.setDurationMinutes(request.durationMinutes()); record.setClientToken(request.clientToken());
@@ -280,6 +315,7 @@ public class ReviewService {
      */
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public ReviewConfirmResponse confirm(ReviewConfirmRequest request) {
+        automatic.lockSources(request.items().stream().map(ReviewConfirmRequest.Item::reviewItemId).toList());
         StudySettings settings = studySettingsService.lockForReviewScheduling();
         Integer quota = settings.getDailyReviewMinutes();
         if (!request.manualSelection() && quota == null) {
@@ -297,6 +333,10 @@ public class ReviewService {
             if (item == null) {
                 throw new NotFoundException("复习项不存在");
             }
+            if (automatic.managed(item.getId()))
+                throw new BusinessException("REVIEW_AUTO_VERSION_REQUIRED","自动复习请通过带版本的日期调整入口安排");
+            if (item.getStatus()==ReviewStatus.ARCHIVED) throw new BusinessException("REVIEW_ARCHIVED","已归档内容不能安排复习");
+            automatic.requireSource(item);
             if (item.getStatus() == ReviewStatus.SCHEDULED && request.date().equals(item.getScheduledDate())) {
                 scheduled.add(ReviewItemResponse.from(item));
                 continue;
@@ -321,6 +361,7 @@ public class ReviewService {
                 continue;
             }
 
+            automatic.manualSchedule(item,request.date());
             if (reviewMapper.updateItemSchedule(item.getId(), ReviewStatus.SCHEDULED,
                     request.date(), estimated, item.getVersion()) == 0) {
                 rejected.add(new ReviewConfirmResponse.Rejected(item.getId(), item.getTitle(),
@@ -337,7 +378,9 @@ public class ReviewService {
     /** 归档复习项：不再提醒，但历史复习记录保留。 */
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public void archive(Long id, Long version) {
-        ReviewItem item = get(id);
+        automatic.lockSource(id);
+        ReviewItem item = reviewMapper.findItemByIdForUpdate(id);
+        if (item==null) throw new NotFoundException("复习项不存在");
         if (!item.getVersion().equals(version)) {
             throw new ConflictException("REVIEW_ITEM_STALE", "该复习内容已在其他设备上修改，请刷新后重试");
         }
@@ -367,5 +410,14 @@ public class ReviewService {
             case VAGUE -> settings.getReviewIntervalVagueDays();
             case MASTERED -> settings.getReviewIntervalMasteredDays();
         };
+    }
+
+    private static String submissionHash(String value) {
+        return com.kaoyan.study.plan.service.PlanImportService.digest(value);
+    }
+    private void verifyRetry(ReviewRecord record,String hash,Long itemId,LocalDate date) {
+        if (!itemId.equals(record.getReviewItemId()) || !date.equals(record.getReviewDate())
+                || record.getSubmissionHash()!=null && !hash.equals(record.getSubmissionHash()))
+            throw new ConflictException("TOKEN_REUSED","提交令牌已被不同复习内容使用，请刷新后重试");
     }
 }

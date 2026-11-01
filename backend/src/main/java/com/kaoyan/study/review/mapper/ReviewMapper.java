@@ -50,10 +50,16 @@ public interface ReviewMapper {
 
     List<ReviewRecord> findRecords(@Param("reviewItemId") Long reviewItemId);
 
+    List<com.kaoyan.study.review.dto.ReviewWorkspaceResponse.Trace> findHistory(
+            @Param("from") LocalDate from, @Param("to") LocalDate to,
+            @Param("subjectId") Long subjectId, @Param("taskId") Long taskId);
+
     ReviewRecord findRecordByToken(@Param("clientToken") String clientToken);
 
     int insertRecord(ReviewRecord record);
     int touchItem(@Param("id") Long id, @Param("version") Long version);
+    int updateAutomaticDue(@Param("id") Long id, @Param("date") LocalDate date, @Param("version") Long version);
+    int updateAutomaticReminder(@Param("id") Long id, @Param("date") LocalDate date, @Param("version") Long version);
     List<DayReviewTaskView> findDayTasks(@Param("date") LocalDate date);
 
     /** 某天已确认安排的复习预计用时合计（分钟），用于额度校验。 */

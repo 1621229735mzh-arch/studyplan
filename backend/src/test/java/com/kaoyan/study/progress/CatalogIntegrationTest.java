@@ -36,6 +36,8 @@ class CatalogIntegrationTest {
     @Autowired SubjectService subjects;
     @Autowired StudyUnitService units;
     @Autowired JdbcTemplate jdbc;
+    @Autowired com.kaoyan.study.review.service.ReviewService reviews;
+    @Autowired StudyDay studyDay;
     Long subjectId,unitId,taskId;
     String courseKey;
     final JsonMapper json=JsonMapper.builder().build();
@@ -58,6 +60,35 @@ class CatalogIntegrationTest {
     CourseView course() {return catalog.library().courses().stream().filter(c->c.key().equals(courseKey)).findFirst().orElseThrow();}
     StudyRecordView record(Long task,String amount,Integer minutes,LocalDate day) {
         return records.create(new StudyRecordCreateRequest(task,task==null?subjectId:null,task==null?unitId:null,day,new BigDecimal(amount),minutes,"学习内容",null,UUID.randomUUID().toString()));
+    }
+
+    @Test void reviewProgressFollowsExactBranchLinksWithoutDuplicatingSharedSubjects() {
+        var second=tasks.create(new TaskCreateRequest(subjectId,null,"线代内容",unitId,new BigDecimal("20"))).getId();
+        var unlinked=tasks.create(new TaskCreateRequest(subjectId,null,"待归类内容",unitId,new BigDecimal("20"))).getId();
+        var day=studyDay.today();
+        record(taskId,"10",null,day.minusDays(2));record(second,"10",null,day.minusDays(2));record(unlinked,"10",null,day.minusDays(2));
+        apply(new Document(1,List.of(doc(leaf("math","20",List.of(taskId))).courses().getFirst(),
+                new CourseInput(courseKey+"-linear","MATH","线性代数","线代课程",subjectId,unitId,List.of(leaf("linear","20",List.of(second)))))));
+        var firstReview=reviews.addToReview(new com.kaoyan.study.review.dto.ReviewItemCreateRequest(taskId,null,null,null));
+        reviews.addToReview(new com.kaoyan.study.review.dto.ReviewItemCreateRequest(second,null,null,null));
+        reviews.addToReview(new com.kaoyan.study.review.dto.ReviewItemCreateRequest(unlinked,null,null,null));
+        reviews.recordReview(new com.kaoyan.study.review.dto.ReviewRecordCreateRequest(firstReview.getId(),day,
+                com.kaoyan.study.review.entity.MasteryResult.MASTERED,null,null,null,UUID.randomUUID().toString()));
+        var branches=catalog.library().branchReviews().stream().filter(r->r.subjectId().equals(subjectId)).toList();
+        assertThat(branches).hasSize(3);
+        assertThat(branches.stream().mapToInt(r->r.totals().itemCount()).sum()).isEqualTo(3);
+        assertThat(branches.stream().filter(r->r.branch().equals("高等数学"))).singleElement().satisfies(r->{
+            assertThat(r.totals().itemCount()).isEqualTo(1);assertThat(r.totals().completedReviews()).isEqualTo(1);
+        });
+        assertThat(branches.stream().filter(r->r.branch().equals("线性代数"))).singleElement().satisfies(r->assertThat(r.totals().completedReviews()).isZero());
+        assertThat(branches.stream().filter(r->r.branch().equals("待归类复习"))).singleElement().satisfies(r->assertThat(r.totals().itemCount()).isEqualTo(1));
+        var extra=record(null,"1",null,day.minusDays(1));
+        catalog.assign(extra.id(),new AssignRequest(course().nodes().getFirst().id(),extra.version(),catalog.library().revision()));
+        var extraReview=reviews.addToReview(new com.kaoyan.study.review.dto.ReviewItemCreateRequest(null,subjectId,"计划外高数复习",null,extra.id()));
+        reviews.recordReview(new com.kaoyan.study.review.dto.ReviewRecordCreateRequest(extraReview.getId(),day,
+                com.kaoyan.study.review.entity.MasteryResult.VAGUE,null,null,null,UUID.randomUUID().toString()));
+        assertThat(catalog.library().branchReviews().stream().filter(r->r.subjectId().equals(subjectId) && r.branch().equals("高等数学")))
+                .singleElement().satisfies(r->{assertThat(r.totals().itemCount()).isEqualTo(2);assertThat(r.totals().reviewDays()).isEqualTo(1);});
     }
 
     @Test void completedProblemNumbersUseCurrentCompletedRecordsAndTheirResolvedCourse() {

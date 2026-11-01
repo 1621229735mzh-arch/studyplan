@@ -32,7 +32,7 @@ function archiveFixture(record: LearningRecord = learningRecordFixture): RecordA
 const library: CatalogLibrary = { revision: 3, courses: [{ id: 1, key: 'os', direction: 'CS408', branch: '操作系统', title: '操作系统课程', subjectId: 2, unitId: 3, unitName: '讲', totalAmount: 3, completedAmount: 2, recordedAmount: 2, nodes: [{ id: 1, key: 'lesson1', parentKey: null, title: '第一讲', totalAmount: 3, completedAmount: 2, taskIds: [11], sortOrder: 0 }] }], cumulative: [{ direction: 'CS408', subjectId: 2, subjectName: '操作系统', unitId: 3, unitName: '讲', amount: 2 }], unclassified: [] }
 const wrappers: ReturnType<typeof mount>[] = []
 async function render(component: object, path = '/learning') {
-  const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/learning', component: { template: '<div />' } }, { path: '/progress', component: { template: '<div />' } }, { path: '/progress/:direction', component: { template: '<div />' } }, { path: '/', component: { template: '<div />' } }] })
+  const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/review', component: { template: '<div />' } }, { path: '/learning', component: { template: '<div />' } }, { path: '/progress', component: { template: '<div />' } }, { path: '/progress/:direction', component: { template: '<div />' } }, { path: '/', component: { template: '<div />' } }] })
   await router.push(path); await router.isReady()
   const w = mount(component, { global: { plugins: [ElementPlus, router], stubs: { teleport: true, ElDialog: { props: ['modelValue'], template: '<section v-if="modelValue"><slot /></section>' } } } })
   wrappers.push(w); await flushPromises(); return w
@@ -42,6 +42,35 @@ beforeEach(() => { vi.clearAllMocks(); vi.mocked(listPlanTasks).mockResolvedValu
 afterEach(() => { wrappers.splice(0).forEach(w => w.unmount()) })
 
 describe('月周日学习记录与目录进度', () => {
+  it('复习概览独立保存到进度快照，离线可回看，旧快照不伪装为零', async () => {
+    const value = structuredClone(library)
+    value.reviews = [{ direction: 'CS408', subjectId: 2, subjectName: '操作系统', totals: { itemCount: 5, reviewedItems: 3, completedReviews: 7, reviewDays: 4, recordCount: 9 } }]
+    value.branchReviews = value.reviews.map(r => ({ ...r, branch: '操作系统' }))
+    mocks.get.mockResolvedValue(value)
+    const w = await render(DirectionView, '/progress/CS408?branch=操作系统')
+    expect(w.get('[aria-label="复习进度"]').text()).toContain('已完整复习过')
+    const saved = mocks.save.mock.calls[0][0].progress.catalog
+    expect(saved.reviews).toEqual(value.reviews); expect(saved).not.toHaveProperty('unclassified')
+    mocks.online = false; mocks.cache = { planningBasis: 'catalog', catalog: saved }
+    const offlineView = await render(DirectionView, '/progress/CS408?branch=操作系统')
+    expect(offlineView.get('[aria-label="复习概览"]').text()).toContain('7次')
+    delete saved.branchReviews
+    const oldView = await render(DirectionView, '/progress/CS408?branch=操作系统')
+    expect(oldView.get('[aria-label="复习进度"]').text()).toContain('尚未同步复习概览')
+  })
+  it('复习只放在高数或操作系统等分科下，方向页不直接显示，分科之间不串数据',async()=>{
+    const value=structuredClone(library)
+    value.reviews=[{direction:'CS408',subjectId:2,subjectName:'操作系统',totals:{itemCount:5,reviewedItems:3,completedReviews:7,reviewDays:4,recordCount:9}}]
+    value.branchReviews=value.reviews.map(r=>({...r,branch:'操作系统'}))
+    mocks.get.mockResolvedValue(value)
+    const w=await render(DirectionView,'/progress/CS408')
+    expect(w.find('[aria-label="复习进度"]').exists()).toBe(false)
+    const branch=await render(DirectionView,'/progress/CS408?branch=操作系统')
+    expect(branch.get('[aria-label="复习进度"]').text()).toContain('操作系统')
+    expect(branch.html().indexOf('course-grid')).toBeLessThan(branch.html().indexOf('review-progress'))
+    const other=await render(DirectionView,'/progress/CS408?branch=计算机网络')
+    expect(other.get('[aria-label="复习进度"]').text()).not.toContain('操作系统')
+  })
   it('内容目录显示原百分比与内容项数，不转换为讲数或生成整体环形百分比',async()=>{
     const value=structuredClone(library)
     const course=value.courses[0]

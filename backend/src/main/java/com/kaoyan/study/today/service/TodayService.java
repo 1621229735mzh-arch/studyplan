@@ -108,7 +108,8 @@ public class TodayService {
             actual.merge(group, record.durationMinutes() == null ? 0 : record.durationMinutes(), Integer::sum);
             if (record.durationMinutes() == null && !"CHECK_ONLY".equals(record.activityMode())) missingDurations.merge(group, 1, Integer::sum);
         }
-        for (var task : reviewService.dayTasks(planDate)) {
+        for (var queued : reviewService.todayTasks(planDate)) {
+            var task=queued.task();
             if (task.actualMinutes() > 0 || task.missingDurations() > 0)
                 startedReviewTaskIds.add(task.id());
             String group = sectionName(subjectNames.get(task.subjectId()));
@@ -119,7 +120,7 @@ public class TodayService {
             if (task.actionable() || task.completionPercent().compareTo(new BigDecimal("100")) >= 0)
                 groups.computeIfAbsent(group, x -> new ArrayList<>()).add(new TodayChecklistTask(
                     "REVIEW", task.id(), task.title(), task.completionPercent(), task.estimatedMinutes(),
-                    remaining, null, task.version(), task.actionable()));
+                    remaining, null, task.version(), task.actionable(),null,null,null,null,null,queued.automaticReview()));
             groups.computeIfAbsent(group, x -> new ArrayList<>());
             actual.merge(group, task.actualMinutes(), Integer::sum);
             missingDurations.merge(group, task.missingDurations(), Integer::sum);
@@ -158,7 +159,8 @@ public class TodayService {
                 new TodayTaskCounts(completed, inProgress, remaining));
     }
     private boolean optionalContinuation(TodayChecklistTask task) {
-        return task.continuation()!=null && task.continuation().optional();
+        return task.continuation()!=null && task.continuation().optional()
+                || task.automaticReview()!=null && task.automaticReview().optional();
     }
     private String sectionName(String subject) {
         if (subject == null) return "未分类";

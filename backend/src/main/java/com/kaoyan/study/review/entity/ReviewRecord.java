@@ -4,6 +4,9 @@ import java.time.LocalDate;
 
 /** 复习记录：一次复习的反馈与据此得到的下次日期。 */
 public class ReviewRecord {
+    private String submissionHash;
+    public String getSubmissionHash() { return submissionHash; }
+    public void setSubmissionHash(String value) { submissionHash = value; }
 
     private java.math.BigDecimal progressDelta = new java.math.BigDecimal("100");
     private Integer estimatedMinutes;

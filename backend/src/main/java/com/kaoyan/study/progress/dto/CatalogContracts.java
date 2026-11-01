@@ -38,8 +38,13 @@ public final class CatalogContracts {
                                   Long subjectId, String subjectName, Long unitId, String unitName,
                                   BigDecimal recordedAmount, int recordCount, long learningDays,
                                   long unknownQuantityRecords) {}
+    public record ReviewProgress(String direction, Long subjectId, String subjectName,
+                                 com.kaoyan.study.review.dto.ReviewWorkspaceResponse.Totals totals) {}
+    public record BranchReviewProgress(String direction, String branch, Long subjectId, String subjectName,
+                                 com.kaoyan.study.review.dto.ReviewWorkspaceResponse.Totals totals) {}
     public record Library(long revision, List<CourseView> courses, List<Quantity> cumulative,
-                           List<StudyRecordView> unclassified, List<CountedProgress> activities) {}
+                           List<StudyRecordView> unclassified, List<CountedProgress> activities,
+                           List<ReviewProgress> reviews, List<BranchReviewProgress> branchReviews) {}
     public record TaskCandidate(Long id, String title, Long subjectId, Long unitId,
                                 BigDecimal plannedAmount, Long version, Long nodeId) {}
 }

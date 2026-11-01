@@ -127,9 +127,9 @@ export interface LearningRecordFormSubmission {
 }
 
 export interface ArchiveAmount { subjectId: number; subjectName: string; unitId: number; unitName: string; amount: number }
-export interface ArchiveStats { learningDays: number; recordCount: number; studyMinutes: number | null; missingDurationRecords: number; amounts: ArchiveAmount[] }
+export interface ArchiveStats { learningDays: number; recordCount: number; studyMinutes: number | null; missingDurationRecords: number; amounts: ArchiveAmount[]; reviewRecordCount?: number }
 export interface ArchiveGroup { reviewAmount?: number | null; key: string; subjectId: number | null; subjectName: string | null; courseId: number | null; title: string; unitId: number | null; unitName: string | null; amount: number | null; studyMinutes: number | null; missingDurationRecords: number; records: LearningRecord[] }
-export interface ArchiveDay { date: string; stats: ArchiveStats; groups: ArchiveGroup[] }
+export interface ArchiveDay { date: string; stats: ArchiveStats; groups: ArchiveGroup[]; reviews?: import('@/features/review/workspace').ReviewTrace[] }
 export interface ArchiveWeek { weekStart: string; from: string; to: string; stats: ArchiveStats; days: ArchiveDay[] }
 export interface ArchiveMonth { month: string; stats: ArchiveStats; weeks: ArchiveWeek[] }
 export interface RecordArchive { stats: ArchiveStats; months: ArchiveMonth[] }

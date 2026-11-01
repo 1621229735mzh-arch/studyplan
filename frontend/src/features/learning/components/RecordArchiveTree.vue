@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { ElButton } from 'element-plus'
-import { amountText, formatIsoDate, formatMinutes, todayIso, weekStartOf } from '@/composables/useFormat'
+import { amountText, formatIsoDate, formatMinutes, masteryLabel, todayIso, weekStartOf } from '@/composables/useFormat'
 import type { ArchiveMonth, LearningRecord } from '../types'
 defineProps<{ months: ArchiveMonth[]; readonly?: boolean }>()
 defineEmits<{ edit: [record: LearningRecord]; delete: [record: LearningRecord]; classify: [record: LearningRecord] }>()
@@ -16,13 +16,13 @@ function monthTitle(value: string) { return `${value.slice(0,4)} 年 ${Number(va
 <template>
   <div class="record-archive">
     <details v-for="month in months" :key="month.month" class="archive-month" :open="openMonths.has(month.month)" @toggle="remember($event, openMonths, month.month)">
-      <summary class="archive-heading"><strong>{{ monthTitle(month.month) }}</strong><span>{{ month.stats.learningDays }} 天学习</span></summary>
+      <summary class="archive-heading"><strong>{{ monthTitle(month.month) }}</strong><span>{{ month.stats.learningDays }} 天学习<template v-if="month.stats.reviewRecordCount">与复习 · {{ month.stats.reviewRecordCount }} 次复习记录</template></span></summary>
       <div class="month-content">
         <details v-for="week in month.weeks" :key="week.weekStart" class="archive-week" :open="openWeeks.has(week.weekStart)" @toggle="remember($event, openWeeks, week.weekStart)">
           <summary class="archive-heading"><strong>{{ week.from.slice(5) }} — {{ week.to.slice(5) }}</strong><span>{{ week.stats.learningDays }} 天</span></summary>
           <div class="week-content">
             <details v-for="day in week.days" :key="day.date" class="archive-day">
-              <summary><div class="day-heading"><strong>{{ formatIsoDate(day.date) }}</strong></div><div class="day-amounts"><span v-for="amount in day.stats.amounts" :key="amount.subjectId + ':' + amount.unitId">{{ amount.subjectName }} · {{ amountText(amount.amount, amount.unitName) }}</span></div></summary>
+              <summary><div class="day-heading"><strong>{{ formatIsoDate(day.date) }}</strong></div><div class="day-amounts"><span v-for="amount in day.stats.amounts" :key="amount.subjectId + ':' + amount.unitId">{{ amount.subjectName }} · {{ amountText(amount.amount, amount.unitName) }}</span><span v-if="day.reviews?.length">复习记录 {{ day.reviews.length }} 次</span></div></summary>
               <div class="day-content">
                 <details v-for="group in day.groups" :key="group.key" class="archive-group">
                   <summary><span class="group-subject">{{ group.subjectName || '自主学习' }}</span><strong>{{ group.title }}</strong><span><template v-if="group.records.every(r => r.activityMode === 'CHECK_ONLY')">已确认完成</template><template v-else-if="group.records.every(r => r.activityMode === 'COUNT_REVIEW')">复习 {{ group.reviewAmount == null ? '数量未记录' : amountText(group.reviewAmount, group.unitName) }}</template><template v-else>{{ amountText(group.amount, group.unitName) }} · {{ group.records.length }} 次</template></span></summary>
@@ -31,6 +31,12 @@ function monthTitle(value: string) { return `${value.slice(0,4)} 年 ${Number(va
                     <div class="record-actions"><ElButton v-if="record.amount != null" text :disabled="readonly" @click="$emit('classify', record)">课程归属</ElButton><ElButton v-if="record.activityMode !== 'CHECK_ONLY'" text :disabled="readonly" @click="$emit('edit', record)">修改</ElButton><ElButton text type="danger" :disabled="readonly" @click="$emit('delete', record)">删除</ElButton></div>
                   </article>
                 </details>
+                <section v-if="day.reviews?.length" class="archive-reviews" aria-label="当日复习痕迹">
+                  <h3>复习痕迹</h3>
+                  <article v-for="review in day.reviews" :key="review.id" class="archive-record">
+                    <div><span class="group-subject">{{ review.subjectName }} · 复习</span><h4>{{ review.title }}</h4><p>{{ review.result ? `完成复习 · ${masteryLabel(review.result)}` : `部分复习 · 本次增加 ${review.progressDelta}%` }}</p><p v-if="review.durationMinutes != null">历史用时：{{ formatMinutes(review.durationMinutes) }}</p><p v-if="review.note" class="record-note">{{ review.note }}</p></div>
+                  </article>
+                </section>
               </div>
             </details>
           </div>
@@ -40,6 +46,7 @@ function monthTitle(value: string) { return `${value.slice(0,4)} 年 ${Number(va
   </div>
 </template>
 <style scoped>
+.archive-reviews { border-top:1px solid var(--kaoyan-border); padding-top:12px; }.archive-reviews h3 { font-size:14px; font-weight:500; }.archive-reviews h4 { margin-top:10px; }
 details { min-width:0; } summary { cursor:pointer; list-style:none; } summary::-webkit-details-marker { display:none; }
 summary::before { content:'›'; float:left; margin-right:10px; color:var(--kaoyan-text-secondary); font-size:20px; line-height:22px; transition:transform .15s; } details[open] > summary::before { transform:rotate(90deg); }
 .archive-month { background:var(--kaoyan-card); border:1px solid var(--kaoyan-border); border-radius:14px; margin:16px 0; overflow:hidden; }.archive-heading { padding:22px 24px; display:flex; align-items:center; gap:12px; }.archive-heading strong { font-size:19px; }.archive-heading span { margin-left:auto; color:var(--kaoyan-text-secondary); font-size:13px; }

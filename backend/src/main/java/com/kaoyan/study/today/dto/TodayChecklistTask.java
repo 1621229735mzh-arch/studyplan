@@ -4,7 +4,11 @@ public record TodayChecklistTask(String kind, Long id, String title, BigDecimal 
     Integer estimatedMinutes, BigDecimal remainingMinutes, String revision, Long version, boolean actionable,
     com.kaoyan.study.learning.service.SequenceLearningService.State sequence,
     com.kaoyan.study.plan.service.TaskActivityService.Activity activity,String unitName,
-    com.kaoyan.study.learning.service.ContinuationLearningService.Context continuation, BigDecimal recordedAmount) {
+    com.kaoyan.study.learning.service.ContinuationLearningService.Context continuation, BigDecimal recordedAmount,
+    com.kaoyan.study.review.dto.AutomaticReviewContext automaticReview) {
+    public TodayChecklistTask(String kind,Long id,String title,BigDecimal completionPercent, Integer estimatedMinutes,BigDecimal remainingMinutes,String revision,Long version,boolean actionable, com.kaoyan.study.learning.service.SequenceLearningService.State sequence, com.kaoyan.study.plan.service.TaskActivityService.Activity activity,String unitName, com.kaoyan.study.learning.service.ContinuationLearningService.Context continuation,BigDecimal recordedAmount) {
+        this(kind,id,title,completionPercent,estimatedMinutes,remainingMinutes,revision,version,actionable,sequence,activity,unitName,continuation,recordedAmount,null);
+    }
     public TodayChecklistTask(String kind,Long id,String title,BigDecimal completionPercent, Integer estimatedMinutes,BigDecimal remainingMinutes,String revision,Long version,boolean actionable, com.kaoyan.study.learning.service.SequenceLearningService.State sequence, com.kaoyan.study.plan.service.TaskActivityService.Activity activity,String unitName, com.kaoyan.study.learning.service.ContinuationLearningService.Context continuation) {
         this(kind,id,title,completionPercent,estimatedMinutes,remainingMinutes,revision,version,actionable,sequence,activity,unitName,continuation,null);
     }

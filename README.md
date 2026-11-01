@@ -1,5 +1,13 @@
 # 考研学习工作台
 
+2026-11-01 17:29:25 CST已发布：今日对应学科内按教材逐项复习，优先继续部分完成，再处理逾期／当日到期项；完成后可“继续复习下一项”，保留原到期日，复习不增加学习量。进度复习概览移至高等数学／操作系统等分科内，按原课程来源归属，方向页不直接展示。仍V24、启动命令不变，33张业务表和25条原学习记录保留，公网44文件及正式PWA桌面／手机验收通过。见[验证](docs/testing/today-review-queue-20261101.md)与[发布记录](docs/operations/today-review-queue-release-20261101.md)。
+
+2026-11-01 15:56:45 CST已发布[按教材自动复习](docs/business/automatic-review.md)：复习页按教材启用一次，原内容段实际学完后次日首轮，后续FSRS按真实反馈排期；支持教材分组、逾期、暂停及来源删除重验。正式V24、原表与25条学习记录保护及公网44文件核验通过；已通过正常UI仅启用《基础30讲》，1段纳入（10月29日学完、10月30日首轮），桌面／手机页面验收及预期数据变化审计通过。启动命令保持不变；旧手动项和学习计划保留。见[实现验证](docs/testing/automatic-review-20261101.md)与[发布记录](docs/operations/automatic-review-release-20261101.md)。
+
+2026-10-31：复习框架已于09:25:24 CST发布，页面沿用计划的整体／月／周／日布局，连接今日学科清单、记录树复习痕迹与进度方向页概览；具体复习内容尚未录入。无新增迁移，仍V23，启动命令保持不变。隔离发布包后端45项、前端148项及构建通过，MySQL8.4候选、31张业务表与24条原记录保护、公网44个静态文件和正式PWA桌面验收通过；本轮正式手机尺寸检查未完成，原因见[发布记录](docs/operations/review-workspace-release-20261031.md)。规则见 [复习工作区](docs/business/review-workspace.md)，原完整工作区150项前端结果见 [验证记录](docs/testing/review-workspace-20261030.md)。
+
+同日后续：已制定 [复习导入标准v1](docs/business/review-import-guide.md)、[JSON Schema](docs/business/review-import.schema.json)、[带明确安排的格式示例](docs/business/review-import-example.json) 和 [仅加入清单的格式示例](docs/business/review-import-pending-example.json)。复习只引用实际已完成来源，日期建议与日安排分别确认；目前是格式规范，网站导入／完成来源导出及严格完成校验尚未实现，不要使用现有学习计划导入入口提交这些文件。启动命令与运行代码不变。
+
 面向 2027 年底初试、2028 年入学的个人学习工作台。核心流程：
 
 **整体目标 → 按日安排（周、月汇总）→ 今日执行 → 学习结果记录 → 进度反馈 → 手动调整**

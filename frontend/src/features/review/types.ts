@@ -43,6 +43,8 @@ export interface ReviewItemCreateRequest {
 
 /** 提交复习反馈（后端 ReviewRecordCreateRequest）。 */
 export interface ReviewRecordCreateRequest {
+  /** 自动复习反馈必须检查原复习项版本。 */
+  version?: number | null
   reviewItemId: number
   /** 复习日期（后端字段名为 reviewDate，不是 reviewedOn） */
   reviewDate: string
