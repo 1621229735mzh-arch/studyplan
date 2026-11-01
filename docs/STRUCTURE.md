@@ -71,6 +71,8 @@
 
 ## 业务模块归属
 
+2026-11-01 外部规划上下文导出归原`plan`模块：`PlanningContextExportService`通过原业务服务只读组合课程、任务、参考日安排、学习／复习历史及备忘录；`PlanningContextExport`为明确导出DTO，`PlanningContextMarkdown`负责同快照的可读格式。认证接口为`GET /api/plan/context-export`，响应禁止缓存，不写数据库或调度复习。前端`PlanningContextExportDialog.vue`及`api/contextExport.ts`位于原计划功能内，下载复用原Blob工具，仅在弹窗内存持有快照，关闭或断网后丢弃，不新增offline切片。无独立服务、模型SDK或迁移；合同见[business/planning-context-export.md](business/planning-context-export.md)。
+
 2026-10-30 复习框架：`review/views/ReviewView.vue` 沿用计划工作区四种时间视图，复用计划的 `workspace.css` 和日期工具；`ReviewScheduleDialog` 用于带版本的手动安排与日期调整。后端 `ReviewWorkspaceService` 只读组合原复习项／记录，并通过本模块原 Mapper 更新待执行日期，不增加迁移。`RecordArchiveService` 在原日期树附加复习痕迹；`CatalogService` 在原进度响应及只读概览快照附加按科目的复习统计。共用响应类型位于 `review/dto/ReviewWorkspaceResponse`，前端类型位于 `review/workspace.ts`。规则与当前单个待执行日期边界见 [复习工作区](business/review-workspace.md)。
 
 同日后续复习导入规范统一放在 `docs/business/review-import*`：`review-import-guide.md` 为业务与字段说明，`review-import.schema.json` 为Draft2020-12合同，`review-import-example.json` 和 `review-import-pending-example.json` 为虚构来源ID的格式示例。当前仅规范文件，未接入Vite下载、前端导入按钮或后端导入服务；将来实现归原review模块，不使用plan导入接口，不新建独立服务。

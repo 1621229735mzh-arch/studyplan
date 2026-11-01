@@ -16,6 +16,7 @@ import DayScheduleEditor from '../components/DayScheduleEditor.vue'
 import PlanImportDialog from '../components/PlanImportDialog.vue'
 import TaskPanel from '../components/TaskPanel.vue'
 import StageGoalPanel from '../components/StageGoalPanel.vue'
+import PlanningContextExportDialog from '../components/PlanningContextExportDialog.vue'
 
 const catalog = useCatalogStore()
 const offline = useOfflineSnapshotStore()
@@ -37,6 +38,7 @@ const editorOpen = ref(false)
 const editDate = ref(todayIso())
 const editItem = ref<DailyPlanItemView | null>(null)
 const importOpen = ref(false)
+const contextExportOpen = ref(false)
 const library = ref<'tasks' | 'goals' | null>(null)
 let loadRequest = 0
 let dayRequest = 0
@@ -146,7 +148,7 @@ onMounted(async () => { if (online.value) await catalog.load(); await load() })
   <div class="plan-workspace" :aria-busy="loading">
     <header class="plan-header">
       <div><span class="plan-eyebrow">每一步，都有方向</span><h1>学习计划</h1><p>看清整体节奏，再把目标安排到每一天。</p></div>
-      <div class="plan-actions"><ElButton :disabled="!online" @click="importOpen = true">导入外部方案</ElButton><ElButton type="primary" :disabled="!online" @click="openEditor()">＋ 添加安排</ElButton></div>
+      <div class="plan-actions"><ElButton class="context-export-trigger" :disabled="!online" @click="contextExportOpen = true">导出规划上下文</ElButton><ElButton :disabled="!online" @click="importOpen = true">导入外部方案</ElButton><ElButton type="primary" :disabled="!online" @click="openEditor()">＋ 添加安排</ElButton></div>
     </header>
     <div class="plan-navigation">
       <nav aria-label="计划时间视图"><button v-for="view in modes" :key="view.key" :class="{ selected: mode === view.key }" :aria-current="mode === view.key ? 'page' : undefined" @click="mode = view.key">{{ view.label }}</button></nav>
@@ -205,7 +207,14 @@ onMounted(async () => { if (online.value) await catalog.load(); await load() })
     <footer class="plan-footer"><span>按日安排，逐层看清全貌</span><div><ElButton text @click="library = 'tasks'">任务库</ElButton><ElButton text @click="library = 'goals'">阶段目标</ElButton><ElButton text :disabled="loading" @click="refresh">刷新</ElButton></div></footer>
     <DayScheduleEditor v-model="editorOpen" :date="editDate" :item="editItem" :tasks="tasks" @saved="saved" />
     <PlanImportDialog v-model="importOpen" @imported="refresh" />
+    <PlanningContextExportDialog v-model="contextExportOpen" />
     <ElDialog :model-value="library !== null" :title="library === 'tasks' ? '任务库' : '阶段目标'" width="min(1100px, calc(100vw - 24px))" @update:model-value="library = null" @closed="refresh"><TaskPanel v-if="library === 'tasks'" /><StageGoalPanel v-if="library === 'goals'" /></ElDialog>
   </div>
 </template>
 <style scoped src="../workspace.css"></style>
+<style scoped>
+.plan-actions { flex-wrap: wrap; }
+@media (max-width: 600px) {
+  .plan-actions :deep(.context-export-trigger) { flex: 1 0 100%; }
+}
+</style>
