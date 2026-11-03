@@ -39,3 +39,10 @@ export function getReviewSuggestions(date?: string): Promise<ReviewSuggestionRes
 export function confirmReviewSuggestions(payload: ReviewConfirmRequest): Promise<ReviewConfirmResponse> {
   return post<ReviewConfirmResponse>('/review/suggestions/confirm', payload)
 }
+
+export function getLatestReviewFeedback(id: number): Promise<import('../types').ReviewFeedbackContext> {
+  return get(`/review/items/${id}/latest-feedback`)
+}
+export function correctReviewFeedback(id: number, payload: import('../types').ReviewFeedbackCorrectionRequest): Promise<unknown> {
+  return post(`/review/items/${id}/latest-feedback/correct`, payload)
+}

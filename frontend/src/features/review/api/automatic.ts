@@ -5,6 +5,7 @@ export interface AutoReviewBook {
   segmentCount: number; reviewCount: number; overdueCount: number; suspendedCount: number
 }
 export interface AutoReviewSegment {
+  dateSource?: string | null
   reviewItemId: number; streamId: number; title: string; completedOn: string
   sourceValid: boolean; paused: boolean; enabled: boolean; status: string
   scheduledDate: string | null; nextReviewDate: string | null; repetitions: number; version: number

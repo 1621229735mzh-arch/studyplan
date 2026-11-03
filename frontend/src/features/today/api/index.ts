@@ -9,7 +9,7 @@ import type { TodayResponse } from '../types'
 
 /** 读取指定日期的今日安排。 */
 export function fetchToday(date: string, signal?: AbortSignal): Promise<TodayResponse> {
-  return get<TodayResponse>('/today', { params: { date }, signal })
+  return get<TodayResponse>('/today', { params: { date }, signal, timeout: 15000 })
 }
 
 export interface DayProgressPayload {

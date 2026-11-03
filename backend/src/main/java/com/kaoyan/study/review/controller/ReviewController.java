@@ -38,9 +38,11 @@ import java.util.List;
 @Tag(name = "复习")
 public class ReviewController {
 
+    private final com.kaoyan.study.review.service.ReviewFeedbackService feedback;
     private final ReviewService reviewService;
 
-    public ReviewController(ReviewService reviewService) {
+    public ReviewController(ReviewService reviewService, com.kaoyan.study.review.service.ReviewFeedbackService feedback) {
+        this.feedback=feedback;
         this.reviewService = reviewService;
     }
 
@@ -103,5 +105,14 @@ public class ReviewController {
     @Operation(summary = "确认把建议排入某一天（超出额度的留在待安排列表）")
     public ReviewConfirmResponse confirm(@Valid @RequestBody ReviewConfirmRequest request) {
         return reviewService.confirm(request);
+    }
+    @GetMapping("/items/{id}/latest-feedback")
+    public com.kaoyan.study.review.dto.ReviewFeedbackCorrection.Context latestFeedback(@PathVariable Long id) {
+        return feedback.latest(id);
+    }
+    @PostMapping("/items/{id}/latest-feedback/correct")
+    public com.kaoyan.study.review.dto.ReviewFeedbackCorrection.Result correctFeedback(@PathVariable Long id,
+            @Valid @RequestBody com.kaoyan.study.review.dto.ReviewFeedbackCorrection.Request request) {
+        return feedback.correct(id,request);
     }
 }

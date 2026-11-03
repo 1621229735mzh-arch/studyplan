@@ -2,6 +2,8 @@
 import { ref, watch, onBeforeUnmount } from 'vue'
 import { ElAlert, ElButton, ElMessageBox } from 'element-plus'
 import { toApiError } from '@/api/http'
+import ReviewFeedbackCorrectionDialog from './ReviewFeedbackCorrectionDialog.vue'
+import { reviewDateExplanation } from '../dateExplanation'
 import { todayIso } from '@/composables/useFormat'
 import { getAutoReviewBooks, getAutoReviewSegments, setAutoReviewPolicy, type AutoReviewBook, type AutoReviewSegment } from '../api/automatic'
 
@@ -9,6 +11,7 @@ const props = defineProps<{ online: boolean; subjectId?: number; workspace: unkn
 const emit = defineEmits<{ changed: []; schedule: [date: string, itemId: number] }>()
 const books = ref<AutoReviewBook[]>([]); const segments = ref<AutoReviewSegment[]>([])
 const loading = ref(false); const writing = ref(false); const error = ref('')
+const correction = ref<{ id: number; title: string } | null>(null)
 let generation = 0
 async function load() {
   const id = ++generation
@@ -60,11 +63,13 @@ onBeforeUnmount(() => { generation++ })
       <p v-if="!segments.some(s => s.streamId === book.streamId)" class="automatic-hint">{{ book.enabled ? '等待内容段完整学完；已有手动复习项请在内容库查看。' : '启用后，按实际学完的小段逐步建立复习。' }}</p>
       <ul class="automatic-segments">
         <li v-for="segment in segments.filter(s => s.streamId === book.streamId)" :key="segment.reviewItemId">
-          <div><strong>{{ segment.title }}</strong><small>学完于 {{ segment.completedOn }} · 已完整复习 {{ segment.repetitions }} 次</small><span>{{ state(segment) }}</span></div>
+          <div><strong>{{ segment.title }}</strong><small>学完于 {{ segment.completedOn }} · 已完整复习 {{ segment.repetitions }} 次</small><span>{{ state(segment) }}</span><small v-if="segment.nextReviewDate">{{ reviewDateExplanation(segment.dateSource) }}</small></div>
+          <ElButton v-if="segment.repetitions > 0" text :disabled="writing || !online" @click="correction = { id: segment.reviewItemId, title: segment.title }">更正最近反馈</ElButton>
           <ElButton v-if="book.enabled && segment.sourceValid && segment.status !== 'ARCHIVED'" text :disabled="writing || !online" @click="emit('schedule', todayIso(), segment.reviewItemId)">{{ segment.scheduledDate ? '调整日期' : '恢复安排' }}</ElButton>
         </li>
       </ul>
     </details>
+    <ReviewFeedbackCorrectionDialog :model-value="correction !== null" :item-id="correction?.id ?? null" :title="correction?.title ?? ''" @update:model-value="value => { if (!value) correction = null }" @saved="emit('changed'); load()" />
   </section>
 </template>
 

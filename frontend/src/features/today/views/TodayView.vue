@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ElAlert, ElButton, ElDatePicker, ElDialog, ElInput, ElInputNumber, ElMessage, ElRadioGroup, ElRadioButton } from 'element-plus'
+import { todayReadFailure } from '../readFailure'
 import { toApiError } from '@/api/http'
 import AppIcon from '@/components/AppIcon.vue'
 import ArchiveArtwork from '@/components/ArchiveArtwork.vue'
@@ -37,12 +38,18 @@ function syncStudyDay(): boolean {
 const today = ref<TodayResponse | null>(null)
 const loading = ref(false)
 const errorMessage = ref<string | null>(null)
+const readFailure = ref<ReturnType<typeof todayReadFailure> | null>(null)
 const dataFromCache = ref(false)
-const readonly = computed(() => !online.value || dataFromCache.value || loading.value)
+const readonly = computed(() => !online.value || dataFromCache.value || loading.value || !!readFailure.value)
 const lastSyncText = computed(() => offline.syncedAt ? formatDateTime(offline.syncedAt) : '尚未同步')
 let loadSequence = 0
-async function loadFromCache(): Promise<boolean> {
-  await offline.load()
+async function loadFromCache(requestId: number, requestedDate: string): Promise<boolean> {
+  try { await offline.load() }
+  catch {
+    if (requestId === loadSequence) { dataFromCache.value = true; today.value = null }
+    return false
+  }
+  if (requestId !== loadSequence || requestedDate !== date.value) return false
   dataFromCache.value = true
   if (date.value !== todayIso() || offline.today?.date !== date.value) {
     today.value = null
@@ -57,9 +64,12 @@ async function loadToday(): Promise<void> {
   const requestId = ++loadSequence
   const requestedDate = date.value
   errorMessage.value = null
+  readFailure.value = null
+  loading.value = false
   if (!online.value) {
-    const cached = await loadFromCache()
-    if (!cached) {
+    readFailure.value = todayReadFailure(null, false)
+    const cached = await loadFromCache(requestId, requestedDate)
+    if (requestId === loadSequence && !cached) {
       errorMessage.value = '离线状态且本地没有今天的数据快照，请联网后刷新。'
     }
     return
@@ -72,15 +82,20 @@ async function loadToday(): Promise<void> {
     dataFromCache.value = false
     if (session.username && response.date === todayIso()) {
       // 只缓存今日切片；其它数据不在离线范围内。
-      await offline.save({ userName: session.username, today: response })
+      await offline.save({ userName: session.username, today: response }).catch(() => {
+        if (requestId === loadSequence) errorMessage.value = '今日数据已读取，但本地快照保存失败。下次离线可能无法查看。'
+      })
     }
   } catch (caught) {
     if (requestId !== loadSequence) return
     const apiError = toApiError(caught)
-    const cached = await loadFromCache()
-    if (!cached) {
-      errorMessage.value = apiError.message
+    readFailure.value = todayReadFailure(apiError, online.value)
+    if (apiError.status === 401 || apiError.code === 'UNAUTHORIZED' || apiError.status === 403) {
+      today.value = null; dataFromCache.value = true
+      return
     }
+    const cached = await loadFromCache(requestId, requestedDate)
+    if (requestId === loadSequence && !cached) errorMessage.value = '本地没有所选学习日的数据快照。'
   } finally {
     if (requestId === loadSequence) loading.value = false
   }
@@ -222,6 +237,7 @@ async function saveExtraRecord(payload: LearningRecordFormSubmission): Promise<v
     recordFormRef.value?.setServerError(error.message, error.fieldErrors)
   } finally { recording.value = false }
 }
+watch(() => online.value, value => { if (!value) readFailure.value = todayReadFailure(null, false) })
 let dayTimer: ReturnType<typeof setInterval> | undefined
 function checkStudyDay(): void {
   // 正在填写的记录保留原日期与输入；关闭后再切换今日。
@@ -235,6 +251,7 @@ onMounted(() => {
   document.addEventListener('visibilitychange', checkStudyDay)
 })
 onUnmounted(() => {
+  loadSequence++
   clearInterval(dayTimer)
   window.removeEventListener('focus', checkStudyDay)
   document.removeEventListener('visibilitychange', checkStudyDay)
@@ -254,8 +271,12 @@ onUnmounted(() => {
         </div>
       </div>
     </header>
-    <ElAlert v-if="dataFromCache" type="info" :closable="false" show-icon
-      :title="`只读快照 · 同步于 ${lastSyncText}`" description="联网后刷新即可记录进度。" />
+    <ElAlert v-if="readFailure" type="warning" :closable="false" show-icon :title="readFailure.title">
+      <p>{{ readFailure.recovery }}</p>
+      <p>{{ dataFromCache && today ? `只读快照 · 同步于 ${lastSyncText}` : '尚未读取最新数据，暂时不能记录。' }}</p>
+      <ElButton :disabled="loading || !online" @click="loadToday">重新读取今日</ElButton>
+    </ElAlert>
+    <ElAlert v-else-if="dataFromCache" type="info" :closable="false" show-icon :title="`只读快照 · 同步于 ${lastSyncText}`" description="点击刷新，成功读取服务器数据后即可记录。" />
     <ElAlert v-if="errorMessage" type="error" :closable="false" :title="errorMessage" />
     <ElAlert v-if="today && !today.sections" type="info" :closable="false" title="当前数据是旧版快照，请联网更新今日清单。" />
     <template v-if="today?.sections">

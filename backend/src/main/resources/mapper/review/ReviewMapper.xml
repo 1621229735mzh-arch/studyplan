@@ -17,6 +17,7 @@
         <result property="scheduledDate" column="scheduled_date"/>
         <result property="addedAt" column="added_at"/>
         <result property="version" column="version"/>
+        <result property="dateSource" column="date_source"/>
     </resultMap>
 
     <resultMap id="reviewRecordResultMap" type="com.kaoyan.study.review.entity.ReviewRecord">
@@ -36,7 +37,7 @@
 
     <sql id="itemColumns">
         id, subject_id, task_id, title, source_record_id, status, next_review_date, last_result,
-        interval_days, estimated_minutes, scheduled_date, added_at, version
+        interval_days, estimated_minutes, scheduled_date, added_at, version, date_source
     </sql>
 
     <select id="findItems" resultMap="reviewItemResultMap">
@@ -109,6 +110,7 @@
         UPDATE review_item
         SET status = #{status},
             scheduled_date = #{scheduledDate},
+            date_source = CASE WHEN #{scheduledDate} IS NOT NULL THEN 'MANUAL' ELSE date_source END,
             estimated_minutes = #{estimatedMinutes},
             version = version + 1
         WHERE id = #{id} AND version = #{version}

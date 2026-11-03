@@ -56,6 +56,7 @@ async function handleSubmit(): Promise<void> {
       <h1 class="login-page__title">学习工作台</h1>
       <p class="login-page__subtitle">预设账号登录，不开放注册。登录后学习数据在电脑与手机之间同步。</p>
 
+      <ElAlert v-if="route.query.reason === 'expired'" class="login-page__error" type="warning" show-icon :closable="false" title="登录已失效，请重新登录。登录成功后将返回原页面并读取最新数据。" />
       <ElAlert
         v-if="session.errorMessage"
         class="login-page__error"

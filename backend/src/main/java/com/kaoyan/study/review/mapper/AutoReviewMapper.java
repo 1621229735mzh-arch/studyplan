@@ -11,7 +11,7 @@ public interface AutoReviewMapper {
     record QueueRow(Long id, Long subjectId, String title, Long streamId, String bookTitle,
             LocalDate dueDate, Integer intervalDays, String lastResult, int repetitions,
             BigDecimal completionPercent, Integer estimatedMinutes, int actualMinutes,
-            int missingDurations, Long version, boolean eligible, boolean completed) {}
+            int missingDurations, Long version, boolean eligible, boolean completed, String dateSource) {}
 
     @Select("""
         SELECT i.id,i.subject_id,i.title,f.stream_id,s.title AS book_title,i.scheduled_date AS due_date,
@@ -21,7 +21,7 @@ public interface AutoReviewMapper {
                COALESCE(r.minutes,0) AS actual_minutes,COALESCE(r.missing_durations,0) AS missing_durations,i.version,
                (p.enabled AND f.source_valid AND NOT f.paused AND t.status='ACTIVE'
                 AND i.status='SCHEDULED' AND i.scheduled_date<=#{date}) AS eligible,
-               COALESCE(r.completed,FALSE) AS completed
+               COALESCE(r.completed,FALSE) AS completed,i.date_source
         FROM review_item i JOIN review_fsrs_state f ON f.review_item_id=i.id
         JOIN review_auto_policy p ON p.stream_id=f.stream_id
         JOIN study_continuation_stream s ON s.id=f.stream_id JOIN task t ON t.id=i.task_id
@@ -59,7 +59,7 @@ public interface AutoReviewMapper {
     State state(Long id);
     @Select("""
         SELECT f.review_item_id,f.stream_id,i.title,f.completed_on,f.source_valid,f.paused,p.enabled,
-               i.status,i.scheduled_date,i.next_review_date,f.repetitions,i.version
+               i.status,i.scheduled_date,i.next_review_date,f.repetitions,i.version,i.date_source
         FROM review_fsrs_state f JOIN review_item i ON i.id=f.review_item_id
         JOIN review_auto_policy p ON p.stream_id=f.stream_id
         JOIN task_continuation c ON c.task_id=i.task_id
@@ -77,4 +77,10 @@ public interface AutoReviewMapper {
         repetitions=repetitions+1 WHERE review_item_id=#{id}
         """)
     void memory(@Param("id") Long id,@Param("stability") double stability,@Param("difficulty") double difficulty,@Param("date") LocalDate date);
+    @Update("""
+        UPDATE review_fsrs_state SET stability=#{stability},difficulty=#{difficulty},last_review_date=#{date},
+        repetitions=#{repetitions} WHERE review_item_id=#{id}
+        """)
+    void replaceMemory(@Param("id") Long id,@Param("stability") double stability,@Param("difficulty") double difficulty,
+                       @Param("date") LocalDate date,@Param("repetitions") int repetitions);
 }

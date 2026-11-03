@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ref } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import ElementPlus, { ElButton, ElDatePicker, ElInputNumber, ElRadioGroup } from 'element-plus'
 import { HttpApiError } from '@/api/http'
@@ -21,7 +22,7 @@ function fixture(): TodayResponse {
 const wrappers: ReturnType<typeof mount>[] = []
 async function page() {const wrapper=mount(TodayView,{global:{plugins:[ElementPlus], stubs:{teleport:true, ElDialog:{props:['modelValue'],template:'<div v-if="modelValue"><slot /><slot name="footer" /></div>'}}},attachTo:document.body});wrappers.push(wrapper);await flushPromises();return wrapper}
 function button(wrapper: ReturnType<typeof mount>, text: string, index=0) {return wrapper.findAllComponents(ElButton).filter(b=>b.text()===text)[index]}
-beforeEach(()=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-10-01T12:00:00+08:00'));mocks.online.value=true;mocks.snapshot=null;vi.clearAllMocks();mocks.fetch.mockResolvedValue(fixture());mocks.learning.mockResolvedValue({id:1});mocks.problems.mockResolvedValue([]);mocks.review.mockResolvedValue({id:2});mocks.cache.mockResolvedValue(undefined)})
+beforeEach(()=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-10-01T12:00:00+08:00'));mocks.online=ref(true);mocks.snapshot=null;vi.clearAllMocks();mocks.fetch.mockResolvedValue(fixture());mocks.learning.mockResolvedValue({id:1});mocks.problems.mockResolvedValue([]);mocks.review.mockResolvedValue({id:2});mocks.cache.mockResolvedValue(undefined)})
 afterEach(()=>{wrappers.splice(0).forEach(w=>w.unmount());document.body.innerHTML='';vi.useRealTimers()})
 describe('今日清单操作',()=>{
  it('页面保持打开时九点自动刷新，且不会在截止瞬间用旧清单提交',async()=>{
@@ -375,5 +376,39 @@ describe('按教材逐项复习',()=>{
   const offline=await page();expect(button(offline,'继续复习下一项').attributes('disabled')).toBeDefined()
   await button(offline,'继续复习下一项').trigger('click');await flushPromises()
   expect(offline.find('.review-current').exists()).toBe(false);expect(mocks.review).not.toHaveBeenCalled()
+ })
+})
+
+describe('今日读取失败的恢复', () => {
+ it.each([
+  ['TIMEOUT',0,'请求超时'],['HTTP_503',503,'服务暂时异常'],['NETWORK_ERROR',0,'无法连接学习服务']
+ ])('缓存命中仍保留 %s 原因，重读成功后才恢复记录',async(code,status,label)=>{
+  mocks.snapshot=fixture();mocks.fetch.mockRejectedValueOnce(new HttpApiError({code,status,message:'原始错误'}))
+  const w=await page();expect(w.text()).toContain(label);expect(w.text()).toContain('只读快照')
+  expect(button(w,'完成').attributes('disabled')).toBeDefined()
+  await button(w,'重新读取今日').trigger('click');await flushPromises()
+  expect(w.text()).not.toContain(label);expect(button(w,'完成').attributes('disabled')).toBeUndefined()
+ })
+ it('离线说明先连接网络，登录失效不回退到个人快照',async()=>{
+  mocks.online.value=false;mocks.snapshot=fixture();const offline=await page()
+  expect(offline.text()).toContain('设备已离线');expect(offline.text()).toContain('请连接网络')
+  expect(button(offline,'重新读取今日').attributes('disabled')).toBeDefined()
+  mocks.online.value=true;mocks.fetch.mockRejectedValueOnce(new HttpApiError({code:'UNAUTHORIZED',status:401,message:'登录失效'}))
+  const expired=await page();expect(expired.text()).toContain('登录已失效');expect(expired.text()).not.toContain('高数第三讲')
+ })
+ it('没有快照时仍显示原请求错误与恢复入口',async()=>{
+  mocks.fetch.mockRejectedValueOnce(new HttpApiError({code:'TIMEOUT',message:'请求超时'}))
+  const w=await page();expect(w.text()).toContain('服务器请求超时');expect(w.text()).toContain('本地没有所选学习日')
+  expect(button(w,'重新读取今日')).toBeDefined()
+ })
+ it('快照保存失败不把成功读取的服务器数据降级成只读',async()=>{
+  mocks.cache.mockRejectedValueOnce(new Error('磁盘写入失败'))
+  const w=await page();expect(w.text()).toContain('本地快照保存失败');expect(button(w,'完成').attributes('disabled')).toBeUndefined()
+ })
+ it('推荐原因和手动日期来源在当前复习项展示',async()=>{
+  const data=fixture();data.sections![1].tasks[0].automaticReview={streamId:1,title:'基础30讲',dueDate:'2026-09-29',overdueDays:2,round:2,optional:false,remainingCount:2,selectionReason:'今天已部分复习，优先继续',dateSource:'MANUAL'}
+  mocks.fetch.mockResolvedValue(data);const w=await page()
+  expect(w.get('.review-current').text()).toContain('今天已部分复习，优先继续')
+  expect(w.get('.review-current').text()).toContain('本次日期由手动修改')
  })
 })

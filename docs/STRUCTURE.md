@@ -1,5 +1,7 @@
 # 目录与模块落点
 
+2026-11-02流程补强：`review/service/ReviewFeedbackService`在原复习模块实现带版本和审计的最近反馈更正，复用原记录和FSRS纯计算；`ReviewFeedbackMapper`只写本模块数据，V25增加日期来源与审计表。`ReviewFeedbackCorrectionDialog.vue`由教材列表及内容库共用，接口归原`review/api`。`today/readFailure.ts`组织今日读取失败说明，日期来源文案归`review/dateExplanation.ts`，不新增缓存层或模块。合同见[business/review-feedback-correction.md](business/review-feedback-correction.md)。
+
 本文件说明现有骨架及后续文件放置位置，不定义数据库表结构或 API 合同。需求依据为根目录 `PLAN.md`。
 
 ## 顶层结构

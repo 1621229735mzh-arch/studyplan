@@ -6,6 +6,9 @@ import java.time.LocalDateTime;
 /** 复习项：只能基于已经学过并主动加入复习的内容。 */
 public class ReviewItem {
 
+    private String dateSource = "UNKNOWN";
+    public String getDateSource() { return dateSource; }
+    public void setDateSource(String value) { dateSource=value; }
     private Long id;
     private Long subjectId;
     private Long taskId;

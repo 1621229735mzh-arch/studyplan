@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { ElButton } from 'element-plus'
+import { reviewDateExplanation } from '@/features/review/dateExplanation'
 import ChecklistTask from './ChecklistTask.vue'
 import type { TodayChecklistTask } from '../types'
 
@@ -20,6 +21,8 @@ const completed = computed(() => props.tasks.filter(t => t.completionPercent >= 
       <p class="review-queue-note">待复习 {{ current.automaticReview?.remainingCount }} 段 · 先逾期，再今天到期</p>
       <div v-if="visible" class="review-current">
         <p class="review-due">{{ current.automaticReview!.overdueDays > 0 ? `逾期 ${current.automaticReview!.overdueDays} 天` : '今天到期' }} · 原到期日 {{ current.automaticReview?.dueDate }} · 第{{ current.automaticReview?.round }}次复习</p>
+        <p v-if="current.automaticReview?.selectionReason" class="review-queue-note">{{ current.automaticReview.selectionReason }}</p>
+        <p class="review-queue-note">{{ reviewDateExplanation(current.automaticReview?.dateSource) }}</p>
         <ul><ChecklistTask :task="current" :readonly="readonly" @action="(task, complete) => $emit('action', task, complete)" /></ul>
       </div>
       <div v-else class="continue-review">

@@ -41,6 +41,8 @@ import type { LearningRecord } from '@/features/learning/types'
 import { useCatalogStore } from '@/stores/catalog'
 import type { MasteryLevel } from '@/types/domain'
 import { createReviewItem, createReviewRecord, listReviewItems } from '../api'
+import ReviewFeedbackCorrectionDialog from './ReviewFeedbackCorrectionDialog.vue'
+import { reviewDateExplanation } from '../dateExplanation'
 import type { ReviewItem } from '../types'
 
 const catalog = useCatalogStore()
@@ -67,6 +69,7 @@ const form = reactive<{
 })
 const fieldErrors = ref<{ sourceRecordId?: string; title?: string }>({})
 
+const correction = ref<ReviewItem | null>(null)
 const feedbackVisible = ref(false)
 const feedbackTarget = ref<ReviewItem | null>(null)
 const feedback = reactive<{
@@ -258,6 +261,7 @@ onMounted(() => {
 
 <template>
   <div>
+    <ReviewFeedbackCorrectionDialog :model-value="correction !== null" :item-id="correction?.id ?? null" :title="correction?.title ?? ''" @update:model-value="value => { if (!value) correction = null }" @saved="load" />
     <ElAlert v-if="errorMessage" type="error" show-icon :closable="false" :title="errorMessage" />
     <ElAlert v-if="noticeMessage" type="warning" show-icon :closable="false" :title="noticeMessage" />
     <ElAlert
@@ -331,6 +335,7 @@ onMounted(() => {
       <ElTableColumn label="下次复习日期" width="150">
         <template #default="{ row }">
           {{ formatIsoDate(row.nextReviewDate) }}
+          <div v-if="row.nextReviewDate" class="hint-text">{{ reviewDateExplanation(row.dateSource) }}</div>
           <div v-if="!row.nextReviewDate" class="hint-text">间隔未配置时不生成日期</div>
         </template>
       </ElTableColumn>
@@ -343,9 +348,10 @@ onMounted(() => {
       <ElTableColumn label="已安排到" width="130">
         <template #default="{ row }">{{ formatIsoDate(row.scheduledDate) }}</template>
       </ElTableColumn>
-      <ElTableColumn label="操作" width="120" fixed="right">
+      <ElTableColumn label="操作" width="150" fixed="right">
         <template #default="{ row }">
-          <ElButton size="small" text type="primary" @click="openFeedback(row)">记录反馈</ElButton>
+          <ElButton size="small" text type="primary" :disabled="!online || submitting" @click="openFeedback(row)">记录反馈</ElButton>
+          <ElButton v-if="row.lastResult" size="small" text :disabled="!online || submitting" @click="correction = row">更正最近反馈</ElButton>
         </template>
       </ElTableColumn>
     </ElTable>

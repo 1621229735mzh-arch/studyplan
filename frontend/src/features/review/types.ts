@@ -13,6 +13,7 @@ export type ReviewStatus = 'PENDING' | 'SCHEDULED' | 'ARCHIVED'
 
 /** 复习项（对应后端 ReviewItemResponse）。 */
 export interface ReviewItem {
+  dateSource?: string | null
   id: number
   subjectId?: number | null
   taskId?: number | null
@@ -139,3 +140,6 @@ export interface ReviewConfirmResponse {
   scheduled: ReviewItem[]
   rejected: ReviewConfirmRejected[]
 }
+
+export interface ReviewFeedbackContext { version: number; record: ReviewRecordResponse | null; allowed: boolean; reason: string; currentNextReviewDate?: string | null; scheduledDate?: string | null }
+export interface ReviewFeedbackCorrectionRequest { version: number; recordId: number; result: MasteryLevel; clientToken: string }

@@ -53,6 +53,7 @@ import java.util.List;
 @Service
 public class ReviewService {
 
+    private final com.kaoyan.study.review.mapper.ReviewFeedbackMapper feedbackDates;
     private final ReviewMapper reviewMapper;
     private final TaskService taskService;
     private final SubjectService subjectService;
@@ -65,7 +66,8 @@ public class ReviewService {
                          TaskService taskService,
                          SubjectService subjectService,
                          StudyRecordService studyRecordService,
-                         StudySettingsService studySettingsService, StudyDay studyDay, AutoReviewService automatic) {
+                         StudySettingsService studySettingsService, StudyDay studyDay, AutoReviewService automatic, com.kaoyan.study.review.mapper.ReviewFeedbackMapper feedbackDates) {
+        this.feedbackDates = feedbackDates;
         this.automatic = automatic;
         this.reviewMapper = reviewMapper;
         this.taskService = taskService;
@@ -172,7 +174,7 @@ public class ReviewService {
             throw new BusinessException("REVIEW_ALREADY_COMPLETED","当天已完成该内容，请勿重复反馈");
         if (automatic.managed(item.getId()) && (request.clientToken()==null || request.clientToken().isBlank()))
             throw new BusinessException("TOKEN_REQUIRED","自动复习反馈需要提交令牌，请刷新后重试");
-        if (automatic.managed(item.getId()) && !item.getVersion().equals(request.version()))
+        if ((automatic.managed(item.getId()) || request.version()!=null) && !item.getVersion().equals(request.version()))
             throw new ConflictException("REVIEW_ITEM_STALE","复习内容已变化，请刷新后重新反馈");
         var autoNext=automatic.feedback(item,request.reviewDate(),request.result(),request.nextReviewDate());
         Integer intervalDays = autoNext!=null ? Integer.valueOf(autoNext.intervalDays()) : intervalFor(studySettingsService.get(), request.result());
@@ -215,6 +217,7 @@ public class ReviewService {
         }
         if (autoNext!=null && reviewMapper.updateAutomaticDue(item.getId(),nextReviewDate,item.getVersion()+1)!=1)
             throw new ConflictException("REVIEW_ITEM_STALE","下一轮复习安排已变化，请刷新后重试");
+        feedbackDates.dateSource(item.getId(), request.nextReviewDate()!=null ? "MANUAL" : autoNext!=null ? "FSRS" : "SETTINGS");
         return ReviewRecordResponse.from(record, nextReviewDate != null);
     }
 

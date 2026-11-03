@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 
 @Service
 public class AutoReviewService {
+    private final ReviewFeedbackMapper feedbackDates;
     private final AutoReviewMapper auto;
     private final ReviewMapper reviews;
     private final TaskService tasks;
@@ -34,8 +35,8 @@ public class AutoReviewService {
     private final CompletedStudySourceService sources;
     private final StudyDay studyDay;
     public AutoReviewService(AutoReviewMapper auto, ReviewMapper reviews, TaskService tasks,
-            TaskContinuationService continuations, CompletedStudySourceService sources, StudyDay studyDay) {
-        this.auto=auto; this.reviews=reviews; this.tasks=tasks; this.continuations=continuations; this.sources=sources; this.studyDay=studyDay;
+            TaskContinuationService continuations, CompletedStudySourceService sources, StudyDay studyDay, ReviewFeedbackMapper feedbackDates) {
+        this.feedbackDates=feedbackDates; this.auto=auto; this.reviews=reviews; this.tasks=tasks; this.continuations=continuations; this.sources=sources; this.studyDay=studyDay;
     }
     public List<Book> books() { return auto.books(studyDay.today()); }
     public List<Segment> segments() { return auto.segments(); }
@@ -70,7 +71,10 @@ public class AutoReviewService {
                 row.actualMinutes(),row.missingDurations(),row.version(),actionable),
                 new AutomaticReviewContext(row.streamId(),row.bookTitle(),row.completed() ? null : row.dueDate(),
                     row.completed() ? 0 : Math.max(0,ChronoUnit.DAYS.between(row.dueDate(),date)),
-                    row.completed() ? row.repetitions() : row.repetitions()+1,optional,count));
+                    row.completed() ? row.repetitions() : row.repetitions()+1,optional,count,
+                    row.completed() ? null : row.completionPercent().signum()>0 ? "今天已部分复习，优先继续"
+                        : row.dueDate().isBefore(date) ? "优先处理逾期内容；逾期天数／本轮间隔的比值越高越优先，同分先处理上次不会、模糊，再按原到期日和编号排序"
+                        : "今天到期；同分先处理上次不会、模糊，再按原到期日和编号排序",row.dateSource()));
     }
 
     /** Shared order with learning writes: all task locks (sorted), stream, then review items. */
@@ -105,7 +109,7 @@ public class AutoReviewService {
             var task=tasks.get(taskId);
             var item=new ReviewItem(); item.setTaskId(taskId); item.setSubjectId(task.getSubjectId()); item.setTitle(task.getTitle());
             item.setStatus(ReviewStatus.SCHEDULED); item.setNextReviewDate(completed.plusDays(1)); item.setScheduledDate(completed.plusDays(1));
-            reviews.insertItem(item); auto.insert(item.getId(),stream,completed); return;
+            reviews.insertItem(item); feedbackDates.dateSource(item.getId(),"INITIAL"); auto.insert(item.getId(),stream,completed); return;
         }
         // A pre-existing manually managed item is never silently converted or rescheduled.
         var item=reviews.findItemByIdForUpdate(existing.getId());
@@ -123,6 +127,7 @@ public class AutoReviewService {
         // Do not revive old invalid chronology after a source was deleted and completed again later.
         if (due==null || due.isBefore(completed.plusDays(1))) due=completed.plusDays(1);
         if (item.getStatus()!=ReviewStatus.SCHEDULED || changed) {
+            if (changed && state.lastReviewDate()==null) feedbackDates.dateSource(item.getId(),"INITIAL");
             if (reviews.updateAutomaticDue(item.getId(),due,item.getVersion())!=1)
                 throw new ConflictException("REVIEW_ITEM_STALE","复习来源或安排已变化");
         }
@@ -154,6 +159,7 @@ public class AutoReviewService {
                 || state.lastReviewDate()!=null && !date.isAfter(state.lastReviewDate())))
             throw new BusinessException("REVIEW_DATE_INVALID","复习安排必须晚于实际完成日及最近完整复习日");
         auto.pause(item.getId(),date==null);
+        if (date!=null) feedbackDates.dateSource(item.getId(),"MANUAL");
         if (date!=null && reviews.updateAutomaticReminder(item.getId(),date,item.getVersion())!=1)
             throw new ConflictException("REVIEW_ITEM_STALE","复习安排已变化");
     }

@@ -18,11 +18,11 @@ public record ReviewItemResponse(
         Integer intervalDays,
         Integer estimatedMinutes,
         LocalDate scheduledDate,
-        Long version) {
+        Long version, String dateSource) {
 
     public static ReviewItemResponse from(ReviewItem item) {
         return new ReviewItemResponse(item.getId(), item.getSubjectId(), item.getTaskId(), item.getTitle(),
                 item.getStatus(), item.getNextReviewDate(), item.getLastResult(), item.getIntervalDays(),
-                item.getEstimatedMinutes(), item.getScheduledDate(), item.getVersion());
+                item.getEstimatedMinutes(), item.getScheduledDate(), item.getVersion(), item.getDateSource());
     }
 }

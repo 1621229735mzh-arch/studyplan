@@ -14,5 +14,5 @@ public final class AutoReviewContracts {
                         int repetitions, String algorithm) {}
     public record Segment(Long reviewItemId, Long streamId, String title, LocalDate completedOn,
                           boolean sourceValid, boolean paused, boolean enabled, String status,
-                          LocalDate scheduledDate, LocalDate nextReviewDate, int repetitions, Long version) {}
+                          LocalDate scheduledDate, LocalDate nextReviewDate, int repetitions, Long version, String dateSource) {}
 }

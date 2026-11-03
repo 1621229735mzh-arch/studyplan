@@ -51,6 +51,8 @@ class AutoReviewIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired com.kaoyan.study.today.service.TodayService todayService;
     @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
+    @Autowired ReviewFeedbackService feedbackCorrections;
+    @Autowired StudySettingsService studySettings;
     Long subjectId,first,second,other,stream;
     LocalDate start;
 
@@ -292,5 +294,145 @@ class AutoReviewIntegrationTest {
         }
         assertThat(automatic.segments().stream().filter(s->s.streamId().equals(stream))).hasSize(1);
         assertThat(records.list(null,null,first,null)).hasSize(1);
+    }
+
+    ReviewFeedbackCorrection.Request correction(Long record, MasteryResult result) {
+        return new ReviewFeedbackCorrection.Request(record,item().getVersion(),result,UUID.randomUUID().toString());
+    }
+    @Test void correctionReplaysRealHistoryWithoutIncreasingCountsAndIsIdempotent() {
+        enable(); records.recordDayProgress(learning(first,start,100));
+        reviews.recordReview(feedback(start.plusDays(1),MasteryResult.VAGUE));
+        var original=reviews.recordReview(feedback(start.plusDays(6),MasteryResult.MASTERED));
+        var firstMemory=FsrsScheduler.review(null,0,MasteryResult.VAGUE).memory();
+        var expected=FsrsScheduler.review(firstMemory,5,MasteryResult.FORGOT);
+        var request=correction(original.id(),MasteryResult.FORGOT);
+        var result=feedbackCorrections.correct(item().getId(),request);
+        assertThat(result.nextReviewDate()).isEqualTo(start.plusDays(7));
+        assertThat(auto.state(item().getId()).stability()).isEqualTo(expected.memory().stability());
+        assertThat(auto.state(item().getId()).difficulty()).isEqualTo(expected.memory().difficulty());
+        assertThat(auto.state(item().getId()).repetitions()).isEqualTo(2);
+        assertThat(reviews.records(item().getId())).hasSize(2);
+        assertThat(item().getLastResult()).isEqualTo(MasteryResult.FORGOT);
+        assertThat(item().getScheduledDate()).isEqualTo(result.nextReviewDate());
+        assertThat(feedbackCorrections.correct(item().getId(),request)).isEqualTo(result);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM review_feedback_correction WHERE review_item_id=?",Integer.class,item().getId())).isEqualTo(1);
+        assertThat(workspace.workspace(subjectId).totals().completedReviews()).isEqualTo(2);
+        assertThatThrownBy(()->feedbackCorrections.correct(item().getId(),new ReviewFeedbackCorrection.Request(original.id(),request.version(),MasteryResult.VAGUE,request.clientToken())))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("令牌");
+        assertThatThrownBy(()->feedbackCorrections.correct(item().getId(),new ReviewFeedbackCorrection.Request(original.id(),request.version(),MasteryResult.VAGUE,UUID.randomUUID().toString())))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("变化");
+    }
+    @Test void correctionDoesNotResumePausedOrArchivedItemsAndReplacesManualDate() {
+        enable(); records.recordDayProgress(learning(first,start,100));
+        var original=reviews.recordReview(feedback(start.plusDays(1),MasteryResult.MASTERED));
+        workspace.schedule(new ReviewScheduleRequest(item().getId(),start.plusDays(15),item().getVersion()));
+        assertThat(item().getDateSource()).isEqualTo("MANUAL");
+        feedbackCorrections.correct(item().getId(),correction(original.id(),MasteryResult.FORGOT));
+        assertThat(item().getScheduledDate()).isEqualTo(start.plusDays(2));
+        assertThat(item().getDateSource()).isEqualTo("FSRS");
+        workspace.schedule(new ReviewScheduleRequest(item().getId(),null,item().getVersion()));
+        feedbackCorrections.correct(item().getId(),correction(original.id(),MasteryResult.VAGUE));
+        assertThat(item().getStatus()).isEqualTo(ReviewStatus.PENDING);
+        assertThat(auto.state(item().getId()).paused()).isTrue();
+        reviews.archive(item().getId(),item().getVersion());
+        feedbackCorrections.correct(item().getId(),correction(original.id(),MasteryResult.MASTERED));
+        assertThat(item().getStatus()).isEqualTo(ReviewStatus.ARCHIVED);
+        assertThat(item().getScheduledDate()).isNull();
+        assertThat(auto.state(item().getId()).repetitions()).isEqualTo(1);
+    }
+    @Test void laterPartialProgressBlocksCorrectionAndOlderFeedbackCannotBeEdited() {
+        enable(); records.recordDayProgress(learning(first,start,100));
+        var original=reviews.recordReview(feedback(start.plusDays(1),MasteryResult.MASTERED));
+        var latest=reviews.recordReview(feedback(start.plusDays(4),MasteryResult.VAGUE));
+        assertThatThrownBy(()->feedbackCorrections.correct(item().getId(),correction(original.id(),MasteryResult.FORGOT)))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("最近");
+        var next=item().getScheduledDate();
+        reviews.recordDayProgress(new ReviewDayProgressRequest(item().getId(),next,30,null,item().getVersion(),null,UUID.randomUUID().toString()));
+        assertThat(feedbackCorrections.latest(item().getId()).allowed()).isFalse();
+        assertThatThrownBy(()->feedbackCorrections.correct(item().getId(),correction(latest.id(),MasteryResult.FORGOT)))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("后续");
+        assertThat(auto.state(item().getId()).repetitions()).isEqualTo(2);
+    }
+    @Test void queueExplainsPartialPriorityAndManualDatesWithoutChangingSchedule() {
+        enable(); records.recordDayProgress(learning(first,start,100));
+        workspace.schedule(new ReviewScheduleRequest(item().getId(),studyDay.today(),item().getVersion()));
+        reviews.recordDayProgress(new ReviewDayProgressRequest(item().getId(),studyDay.today(),35,null,item().getVersion(),null,UUID.randomUUID().toString()));
+        var selected=automatic.dayQueue(studyDay.today()).stream().filter(q->q.task().id().equals(item().getId())).findFirst().orElseThrow();
+        assertThat(selected.automaticReview().selectionReason()).contains("部分复习");
+        assertThat(selected.automaticReview().dateSource()).isEqualTo("MANUAL");
+        assertThat(item().getScheduledDate()).isEqualTo(studyDay.today());
+        assertThat(auto.state(item().getId()).repetitions()).isZero();
+    }
+    @Test void correctionRoutesRequireAuthenticationCsrfAndValidatedPayload() throws Exception {
+        enable(); records.recordDayProgress(learning(first,start,100));
+        var path="/api/review/items/"+item().getId()+"/latest-feedback";
+        mvc.perform(get(path)).andExpect(status().isUnauthorized());
+        mvc.perform(post(path+"/correct").with(user("fsrs-test")).contentType("application/json").content("{}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(post(path+"/correct").with(user("fsrs-test")).with(csrf()).contentType("application/json").content("{}"))
+                .andExpect(status().isBadRequest());
+        var original=reviews.recordReview(feedback(start.plusDays(1),MasteryResult.MASTERED));
+        mvc.perform(get(path).with(user("fsrs-test"))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.allowed").value(true)).andExpect(jsonPath("$.record.id").value(original.id()));
+        String payload="{\"recordId\":"+original.id()+",\"version\":"+item().getVersion()+",\"result\":\"FORGOT\",\"clientToken\":\""+UUID.randomUUID()+"\"}";
+        mvc.perform(post(path+"/correct").with(user("fsrs-test")).with(csrf()).contentType("application/json").content(payload))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.result").value("FORGOT"))
+                .andExpect(jsonPath("$.requestHash").doesNotExist());
+        assertThat(auto.state(item().getId()).repetitions()).isEqualTo(1);
+    }
+
+    @Test @Transactional(propagation=Propagation.NOT_SUPPORTED)
+    void concurrentCorrectionsFromSameVersionHaveExactlyOneWinner() throws Exception {
+        enable(); records.recordDayProgress(learning(first,start,100));
+        var original=reviews.recordReview(feedback(start.plusDays(1),MasteryResult.MASTERED));
+        var aRequest=correction(original.id(),MasteryResult.FORGOT);
+        var bRequest=correction(original.id(),MasteryResult.VAGUE);
+        var latch=new CountDownLatch(1);
+        try(var pool=Executors.newFixedThreadPool(2)) {
+            var a=pool.submit(()->{latch.await(); try { feedbackCorrections.correct(item().getId(),aRequest); return true; } catch(com.kaoyan.study.common.exception.ConflictException ex) { return false; }});
+            var b=pool.submit(()->{latch.await(); try { feedbackCorrections.correct(item().getId(),bRequest); return true; } catch(com.kaoyan.study.common.exception.ConflictException ex) { return false; }});
+            latch.countDown(); assertThat(List.of(a.get(20,TimeUnit.SECONDS),b.get(20,TimeUnit.SECONDS))).containsExactlyInAnyOrder(true,false);
+        }
+        assertThat(auto.state(item().getId()).repetitions()).isEqualTo(1);
+        assertThat(reviews.records(item().getId())).hasSize(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM review_feedback_correction WHERE review_item_id=?",Integer.class,item().getId())).isEqualTo(1);
+    }
+    @Test void invalidSourceCanBeCorrectedWithoutRestoringItsSchedule() {
+        enable(); records.recordDayProgress(learning(first,start,100));
+        var original=reviews.recordReview(feedback(start.plusDays(1),MasteryResult.MASTERED));
+        var source=records.list(null,null,first,null).getFirst();
+        records.delete(source.id(),source.version());
+        feedbackCorrections.correct(item().getId(),correction(original.id(),MasteryResult.FORGOT));
+        assertThat(auto.state(item().getId()).sourceValid()).isFalse();
+        assertThat(auto.state(item().getId()).repetitions()).isEqualTo(1);
+        assertThat(item().getStatus()).isEqualTo(ReviewStatus.PENDING);
+        assertThat(item().getScheduledDate()).isNull();
+    }
+    @Test void manualFeedbackCorrectionUsesCurrentConfiguredIntervalsWithoutMakingAnArrangement() {
+        records.recordDayProgress(learning(first,start,100));
+        var manual=reviews.addToReview(new ReviewItemCreateRequest(first,null,null,null,null));
+        var original=reviews.recordReview(new ReviewRecordCreateRequest(manual.getId(),start.plusDays(1),MasteryResult.MASTERED,null,null,start.plusDays(10),UUID.randomUUID().toString(),manual.getVersion()));
+        var current=mapper.findItemById(manual.getId());
+        var request=new ReviewFeedbackCorrection.Request(original.id(),current.getVersion(),MasteryResult.FORGOT,UUID.randomUUID().toString());
+        var config=studySettings.get();
+        studySettings.update(new StudySettingsRequest(config.getExamDate(),config.getDailyStudyMinutes(),config.getDailyReviewMinutes(),config.getReviewPhase(),2,4,8,config.getVersion()));
+        var changed=feedbackCorrections.correct(current.getId(),request);
+        assertThat(changed.nextReviewDate()).isEqualTo(start.plusDays(3));
+        assertThat(changed.intervalDays()).isEqualTo(2);
+        assertThat(auto.state(current.getId())).isNull();
+        assertThat(mapper.findItemById(current.getId()).getStatus()).isEqualTo(ReviewStatus.PENDING);
+        assertThat(mapper.findItemById(current.getId()).getLastResult()).isEqualTo(MasteryResult.FORGOT);
+        assertThat(reviews.records(current.getId())).hasSize(1);
+    }
+
+    @Test void correctionCannotScheduleBeforeRecompletedSource() {
+        enable(); records.recordDayProgress(learning(first,start,100));
+        var original=reviews.recordReview(feedback(start.plusDays(1),MasteryResult.MASTERED));
+        var source=records.list(null,null,first,null).getFirst(); records.delete(source.id(),source.version());
+        records.recordDayProgress(learning(first,start.plusDays(10),100));
+        feedbackCorrections.correct(item().getId(),correction(original.id(),MasteryResult.FORGOT));
+        assertThat(item().getScheduledDate()).isEqualTo(start.plusDays(11));
+        assertThat(item().getDateSource()).isEqualTo("SOURCE");
+        assertThat(auto.state(item().getId()).repetitions()).isEqualTo(1);
     }
 }

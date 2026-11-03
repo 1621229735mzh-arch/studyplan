@@ -39,7 +39,7 @@ export interface TodayResponse {
 }
 
 export interface TodayChecklistTask {
-  automaticReview?: { streamId: number; title: string; dueDate: string | null; overdueDays: number; round: number; optional: boolean; remainingCount: number } | null
+  automaticReview?: { streamId: number; title: string; dueDate: string | null; overdueDays: number; round: number; optional: boolean; remainingCount: number; selectionReason?: string | null; dateSource?: string | null } | null
   recordedAmount?: number | null
   continuation?: { streamId: number; title: string; position: number; referenceDate: string; carried: boolean; optional?: boolean } | null
   activity?: { mode: 'TIMED_STUDY' | 'RECAP' | 'CHECK_ONLY' | 'CONTINUED_STUDY' | 'COUNT_STUDY' | 'COUNT_REVIEW'; description: string | null; flexibleMinutes: number } | null

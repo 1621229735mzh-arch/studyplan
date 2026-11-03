@@ -23,7 +23,7 @@ setUnauthorizedHandler(() => {
   session.markAnonymous()
   const current = router.currentRoute.value
   if (current.name !== 'login') {
-    void router.replace({ name: 'login', query: { redirect: current.fullPath } })
+    void router.replace({ name: 'login', query: { redirect: current.fullPath, reason: 'expired' } })
   }
 })
 
