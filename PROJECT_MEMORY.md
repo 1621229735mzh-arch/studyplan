@@ -2,6 +2,10 @@
 
 更新日期：2026-10-18。用于不同电脑及 Windows Codex 接续工作，不代替当前用户要求或 `PLAN.md`。下述最新进展优先于后文标注的历史交付记录。
 
+## 2026-11-10 数学计划校准
+
+- 2026-11-10已完成[数学计划校准与原位同步](docs/operations/releases/math-recalibration-20261110.md)，未来129天至2027-03-18、日均147.8分钟。40条学习记录、1条真实复习记录、5段已学范围与百分比保留，六份资料201段；[导出及页面验证](docs/testing/reports/math-recalibration-20261110.md)通过。本次仅计划和目录数据调整，无程序替换、迁移、重启、提交或推送。私有恢复点在服务器 `/srv/408doing/private/math-recalibration-20261110/`；禁止重复执行已提交脚本或把manifest作为普通追加方案导入。
+
 ## 阅读入口
 
 先读 `PLAN.md`、`docs/STRUCTURE.md`，再读本文件与 [DECISIONS.md](DECISIONS.md)。后续想法见 [IDEAS.md](IDEAS.md)；部署或线上排障必须读 [problem.md](problem.md)。发生需求冲突时明确指出，不静默覆盖。
