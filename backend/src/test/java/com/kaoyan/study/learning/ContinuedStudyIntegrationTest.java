@@ -69,6 +69,38 @@ class ContinuedStudyIntegrationTest {
         var task=snapshot(title,date);
         return new DayProgressRequest(date,task.id(),percent,minutes,task.revision(),UUID.randomUUID().toString());
     }
+    @Test void sessionMinutesStayWithTheirProgressAndRetriesCannotSilentlyChangeTime() {
+        var schedule=workspace.read(start,start.plusDays(2),subjectId).entries();
+        var request=request("教材1",start,40,45);
+        var first=records.recordDayProgress(request);
+        assertThat(first.durationMinutes()).isEqualTo(45);
+        assertThat(first.continuationDelta()).isEqualByComparingTo("40");
+        assertThat(records.recordDayProgress(request).id()).isEqualTo(first.id());
+        assertThatThrownBy(()->records.recordDayProgress(new DayProgressRequest(start,first.taskId(),40,50,
+                request.revision(),request.clientToken()))).isInstanceOf(BusinessException.class).hasMessageContaining("不同用时");
+        var timeOnly=records.recordDayProgress(request("教材1",start,40,10));
+        assertThat(timeOnly.continuationDelta()).isNull();
+        assertThat(snapshot("教材1",start).completionPercent()).isEqualByComparingTo("40");
+        var second=records.recordDayProgress(request("教材1",start,100,70));
+        assertThat(second.continuationDelta()).isEqualByComparingTo("60");
+        assertThat(second.durationMinutes()).isEqualTo(70);
+        var changed=records.update(first.id(),new StudyRecordUpdateRequest(first.taskId(),null,null,start,null,50,
+                null,null,first.version()));
+        assertThat(changed.continuationDelta()).isEqualByComparingTo("40");
+        assertThat(changed.durationMinutes()).isEqualTo(50);
+        assertThat(snapshot("教材1",start).completionPercent()).isEqualByComparingTo("100");
+        assertThatThrownBy(()->records.update(first.id(),new StudyRecordUpdateRequest(first.taskId(),null,null,start,null,20,
+                null,null,first.version()))).isInstanceOf(BusinessException.class);
+        var cleared=records.update(changed.id(),new StudyRecordUpdateRequest(changed.taskId(),null,null,start,null,null,
+                null,null,changed.version()));
+        assertThat(cleared.durationMinutes()).isNull();
+        assertThat(cleared.continuationDelta()).isEqualByComparingTo("40");
+        records.delete(second.id(),second.version());
+        assertThat(snapshot("教材1",start).completionPercent()).isEqualByComparingTo("40");
+        assertThat(workspace.read(start,start.plusDays(2),subjectId).entries().stream()
+                .map(e->List.of(e.date(),e.taskId(),e.estimatedMinutes())).toList())
+                .isEqualTo(schedule.stream().map(e->List.of(e.date(),e.taskId(),e.estimatedMinutes())).toList());
+    }
     @Test void rotationDaysKeepUnscheduledBooksOptionalAndActualRecordsAuthoritative() {
         var baseline=today.today(start).taskCounts();
         Long bookStream=jdbc.queryForObject("SELECT stream_id FROM task_continuation WHERE task_id=?",Long.class,ids.get("教材1"));

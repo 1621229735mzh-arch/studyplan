@@ -7,6 +7,7 @@
  * 这里只做“能不能提交”的判断，数量是否合理（例如进度是否超额）由后端负责。
  */
 import type { LearningRecordFormModel, LearningRecordValidationResult } from './types'
+import { durationError } from './duration'
 
 const MAX_NOTE_LENGTH = 1000
 
@@ -15,8 +16,10 @@ function hasValue(value: number | null | undefined): value is number {
 }
 
 /** 校验记录表单；返回字段级错误与表单级提示。 */
-export function validateLearningRecordForm(model: LearningRecordFormModel, _mode: 'create' | 'edit' = 'create'): LearningRecordValidationResult {
+export function validateLearningRecordForm(model: LearningRecordFormModel, mode: 'create' | 'edit' = 'create'): LearningRecordValidationResult {
   const errors: Partial<Record<keyof LearningRecordFormModel, string>> = {}
+  const timeError = durationError(model.durationMinutes, mode === 'edit')
+  if (timeError) errors.durationMinutes = timeError
 
   if (!model.recordDate) {
     errors.recordDate = '请选择记录日期'

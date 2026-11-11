@@ -66,7 +66,7 @@ final class PlanningContextMarkdown {
         table(b,"纲要类型","日期","标题","说明"); f.referencePlan().outlines().forEach(o->row(b,o.periodType(),o.startDate(),o.title(),o.description())); b.append('\n');
         table(b,"参考日期","任务ID","内容","科目ID","计划量","当日真实首次学习量","单位","模式","来源","原预计分钟","顺序");
         f.referencePlan().entries().forEach(e->row(b,e.date(),e.taskId(),e.taskTitle(),e.subjectId(),e.plannedAmount(),e.completedAmount(),e.unitName(),e.activityMode(),e.source(),e.estimatedMinutes(),e.sortOrder())); b.append('\n');
-        section(b,"完整有效学习记录"); table(b,"记录ID","任务ID","科目ID","单位ID","学习日","首次学习量","复习量","内容百分比增量","学习内容","复盘","版本","题目ID","题名／题号","链接","模式","历史分钟");
+        section(b,"完整有效学习记录"); table(b,"记录ID","任务ID","科目ID","单位ID","学习日","首次学习量","复习量","内容百分比增量","学习内容","复盘","版本","题目ID","题名／题号","链接","模式","本次实际用时（分钟，未填为未知）");
         f.studyRecords().forEach(r->row(b,r.id(),r.taskId(),r.subjectId(),r.unitId(),r.recordDate(),r.amount(),r.reviewAmount(),r.continuationDelta(),r.content(),r.note(),r.version(),r.sequenceItemId(),r.sequenceTitle(),r.sequenceUrl(),r.activityMode(),r.durationMinutes())); b.append('\n');
         section(b,"复习项与来源"); table(b,"复习项ID","任务ID","来源记录ID","科目ID","内容","状态","下次到期","已安排日期","最近反馈","间隔天数","版本");
         f.reviewItems().forEach(x->{var r=x.item(); row(b,r.id(),r.taskId(),x.sourceRecordId(),r.subjectId(),r.title(),r.status(),r.nextReviewDate(),r.scheduledDate(),mastery(r.lastResult()==null?null:r.lastResult().name()),r.intervalDays(),r.version());}); b.append('\n');

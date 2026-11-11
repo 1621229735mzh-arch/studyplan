@@ -28,6 +28,8 @@ import {
 } from 'element-plus'
 
 import SequenceRecordItem from './SequenceRecordItem.vue'
+import LearningDurationInput from './LearningDurationInput.vue'
+import { canRecordMathDuration } from '../duration'
 import AmountUnit from '@/components/AmountUnit.vue'
 import { todayIso } from '@/composables/useFormat'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
@@ -108,6 +110,8 @@ const selectedTask = computed<LearningRecordTaskOption | null>(
 /** 单位来自任务，只读展示。 */
 const unitName = computed(() => selectedTask.value?.unitName ?? props.units.find(unit => unit.id === form.unitId)?.name ?? null)
 const subjectName = computed(() => selectedTask.value?.subjectName ?? props.subjects.find(subject => subject.id === form.subjectId)?.name ?? null)
+const allowDuration = computed(() => canRecordMathDuration(subjectName.value, selectedTask.value?.activityMode))
+watch(allowDuration, allowed => { if (!allowed && props.mode === 'create') form.durationMinutes = null })
 
 const submitLabel = computed(() => (props.mode === 'edit' ? '保存修改' : '记一笔'))
 
@@ -262,6 +266,9 @@ defineExpose({ form, submit, reset, fillFrom, setServerError })
 
       <p v-if="continued" class="record-form__wide">本次增加进度：{{ progressDelta ?? 0 }}%。需要更正进度时删除此记录，再填写正确百分比。</p>
 
+      <ElFormItem v-if="allowDuration" class="record-form__wide" label="本次用时" :error="fieldErrors.durationMinutes">
+        <LearningDurationInput v-model="form.durationMinutes" :disabled="submitting || !online" />
+      </ElFormItem>
       <ElFormItem class="record-form__wide" label="复盘" :error="fieldErrors.note">
         <ElInput
           v-model="form.note"

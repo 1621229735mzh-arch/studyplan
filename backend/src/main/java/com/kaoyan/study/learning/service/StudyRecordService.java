@@ -310,6 +310,8 @@ public class StudyRecordService {
         if (retry != null) {
             if (!request.taskId().equals(retry.getTaskId()) || !request.date().equals(retry.getRecordDate()))
                 throw new ConflictException("TOKEN_REUSED", "提交令牌已被其他记录使用");
+            if (!Objects.equals(request.durationMinutes(), retry.getDurationMinutes()))
+                throw new ConflictException("TOKEN_REUSED", "提交令牌已被不同用时的记录使用，请刷新后重试");
             verifyCountRetry(retry,request.taskId(),request.date(),request.actualAmount());
             sequences.verifyNumberRetry(retry,request.taskId(),request.date(),request.completionPercent()==100 ? BigDecimal.ONE:null,request.problemNumber());
             return get(retry.getId());

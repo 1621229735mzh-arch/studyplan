@@ -69,8 +69,13 @@ class PlanningContextExportIntegrationTest {
         var old=record(date.minusDays(30),BigDecimal.ONE,"旧反馈");
         var recent=record(date.minusDays(29),BigDecimal.valueOf(2),"需要订正 | <script>内容</script>\n第二行");
         daily.addItem(date.plusDays(10),new DailyItemCreateRequest(taskId,BigDecimal.TEN,null));
+        // HTTP/concurrency integration tests may commit fixtures to the shared test schema.
+        // Export must retain those OPEN memos as well as this transaction's new memo.
+        var expectedOpenMemoIds=new ArrayList<>(memos.list("OPEN",null,null).stream().map(m->m.getId()).toList());
         var memo=memos.create(new MemoRequest(subjectId,"待解决：极限的证明",date,"OPEN",0L));
-        memos.create(new MemoRequest(subjectId,"已处理问题",date,"DONE",0L));
+        expectedOpenMemoIds.add(memo.getId());
+        expectedOpenMemoIds.sort(Long::compareTo);
+        var doneMemo=memos.create(new MemoRequest(subjectId,"已处理问题",date,"DONE",0L));
         var document=new Document(1,List.of(new CourseInput("course-test","CS408","操作系统","原课程",subjectId,unitId,
                 List.of(new NodeInput("chapter",null,"目录内容",BigDecimal.TEN,0,List.of(taskId))))));
         catalog.confirm(catalog.preview(json.writeValueAsString(document)).previewToken());
@@ -82,8 +87,9 @@ class PlanningContextExportIntegrationTest {
             assertThat(t.actual().firstStudyAmount()).isEqualByComparingTo("3"); assertThat(t.id()).isEqualTo(taskId);
         });
         assertThat(s.facts().referencePlan().entries()).anyMatch(e->e.taskId().equals(taskId) && e.date().equals(date.plusDays(10)) && e.completedAmount().signum()==0);
-        assertThat(s.facts().openMemos()).extracting(m->m.id()).containsExactly(memo.getId());
-        assertThat(s.facts().progress().courses()).singleElement().satisfies(c->{
+        assertThat(s.facts().openMemos()).extracting(m->m.id())
+                .containsExactlyElementsOf(expectedOpenMemoIds).doesNotContain(doneMemo.getId());
+        assertThat(s.facts().progress().courses()).filteredOn(c->c.key().equals("course-test")).singleElement().satisfies(c->{
             assertThat(c.id()).isPositive(); assertThat(c.completedAmount()).isEqualByComparingTo("3");
             assertThat(c.nodes().getFirst().taskIds()).containsExactly(taskId);
         });
@@ -142,6 +148,30 @@ class PlanningContextExportIntegrationTest {
                 .andExpect(jsonPath("$.snapshot.schemaVersion").value(1))
                 .andExpect(jsonPath("$.snapshot.facts.tasks").isArray()).andExpect(jsonPath("$.markdown").isString())
                 .andExpect(jsonPath("$.snapshot.password").doesNotExist()).andExpect(jsonPath("$.snapshot.clientToken").doesNotExist());
+    }
+    @Test void actualSessionMinutesExportAsFactsAndTimeEditsChangeFingerprintWithoutChangingProgress() {
+        var timed=records.create(new StudyRecordCreateRequest(taskId,null,null,date,BigDecimal.ONE,45,
+                "本次数学阅读",null,UUID.randomUUID().toString()));
+        var unknown=record(date,BigDecimal.ONE,"未计时");
+        var before=databaseFacts(); var first=exports.export();
+        assertThat(databaseFacts()).isEqualTo(before);
+        assertThat(first.snapshot().facts().studyRecords()).filteredOn(r->r.id().equals(timed.id())).singleElement()
+                .satisfies(r->assertThat(r.durationMinutes()).isEqualTo(45));
+        assertThat(first.snapshot().facts().studyRecords()).filteredOn(r->r.id().equals(unknown.id())).singleElement()
+                .satisfies(r->assertThat(r.durationMinutes()).isNull());
+        var serialized=json.readTree(json.writeValueAsString(first.snapshot()));
+        var exportedRecord=java.util.stream.StreamSupport.stream(serialized.path("facts").path("studyRecords").spliterator(),false)
+                .filter(r->r.path("id").asLong()==timed.id()).findFirst().orElseThrow();
+        assertThat(exportedRecord.path("durationMinutes").asInt()).isEqualTo(45);
+        assertThat(first.markdown()).contains("本次实际用时（分钟，未填为未知）", "本次数学阅读", "45", "未记录");
+        var changed=records.update(timed.id(),new StudyRecordUpdateRequest(taskId,null,null,date,BigDecimal.ONE,50,
+                "本次数学阅读",null,timed.version()));
+        var second=exports.export();
+        assertThat(second.snapshot().dataVersion()).isNotEqualTo(first.snapshot().dataVersion());
+        assertThat(second.snapshot().facts().studyRecords()).filteredOn(r->r.id().equals(timed.id())).singleElement()
+                .satisfies(r->{ assertThat(r.durationMinutes()).isEqualTo(50); assertThat(r.amount()).isEqualByComparingTo("1"); });
+        records.delete(changed.id(),changed.version());
+        assertThat(exports.export().snapshot().facts().studyRecords()).noneMatch(r->r.id().equals(timed.id()));
     }
     private Map<String,List<Map<String,Object>>> databaseFacts() {
         var result=new TreeMap<String,List<Map<String,Object>>>();

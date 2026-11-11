@@ -12,6 +12,8 @@ import { useSessionStore } from '@/stores/session'
 import { useCatalogStore } from '@/stores/catalog'
 import { createLearningRecord } from '@/features/learning/api'
 import RecordForm from '@/features/learning/components/RecordForm.vue'
+import LearningDurationInput from '@/features/learning/components/LearningDurationInput.vue'
+import { canRecordMathDuration, durationError } from '@/features/learning/duration'
 import type { LearningRecordFormSubmission } from '@/features/learning/types'
 import type { MasteryLevel } from '@/types/domain'
 import { fetchToday, saveLearningProgress, saveReviewProgress, saveDayConfirmation, saveCompletedProblemNumbers } from '../api'
@@ -127,6 +129,9 @@ function reviewBookGroups(tasks: TodayChecklistTask[]) {
   return [...groups.values()]
 }
 const selected = ref<TodayChecklistTask | null>(null)
+const selectedSubjectName = ref('')
+const mathDurationAction = computed(() => selected.value?.kind === 'LEARNING' && !numberedAction.value &&
+  canRecordMathDuration(selectedSubjectName.value, selected.value?.activity?.mode))
 const numberedAction = computed(() => selected.value?.sequence?.mode === 'SELECT_BY_NUMBER')
 const problemNumbersText = ref('')
 const countedAction = computed(() => selected.value?.activity?.mode === 'COUNT_STUDY' || selected.value?.activity?.mode === 'COUNT_REVIEW')
@@ -135,6 +140,7 @@ const dialogVisible = ref(false)
 const isComplete = ref(false)
 const percent = ref<number | undefined>(0)
 const actualAmount = ref<number | undefined>()
+const durationMinutes = ref<number | null>(null)
 const activityNote = ref('')
 const mastery = ref<MasteryLevel | undefined>()
 const saving = ref(false)
@@ -160,10 +166,12 @@ function openAction(task: TodayChecklistTask, complete: boolean): void {
   if (syncStudyDay()) { void loadToday(); return }
   if (task.activity?.mode==='CHECK_ONLY') { void confirmTask(task,complete); return }
   selected.value = { ...task }
+  selectedSubjectName.value = today.value?.sections?.find(s => s.tasks.some(t => t.kind === task.kind && t.id === task.id))?.name ?? ''
   actionDate = date.value
   isComplete.value = complete
   percent.value = complete ? 100 : Math.ceil(task.completionPercent)
   actualAmount.value = undefined
+  durationMinutes.value = null
   problemNumbersText.value = ''
   activityNote.value = ''
   mastery.value = undefined
@@ -175,6 +183,8 @@ async function saveAction(): Promise<void> {
   const task = selected.value
   if (!task || saving.value) return
   if (readonly.value) { saveError.value = '请联网并刷新后再保存。'; return }
+  const timeError = mathDurationAction.value ? durationError(durationMinutes.value) : null
+  if (timeError) { saveError.value = timeError; return }
   if (!numberedAction.value && (percent.value == null || percent.value < task.completionPercent || percent.value > 100)) {
     saveError.value = '请填写不低于当前进度、且不超过 100 的累计完成百分比。'; return
   }
@@ -187,9 +197,10 @@ async function saveAction(): Promise<void> {
   if (countedAction.value && (!Number.isInteger(actualAmount.value) || actualAmount.value! <= 0 || actualAmount.value! > 99999999)) { saveError.value = '请填写本次实际词数（正整数），未学习无需提交。'; return }
   if (task.activity && actualAmount.value != null && actualAmount.value <= 0) { saveError.value = '新增完成量请填写正数，尚未完成可留空。'; return }
   if (task.kind === 'REVIEW' && percent.value === 100 && !mastery.value) { saveError.value = '请选择本次复习的掌握情况。'; return }
-  const signature = JSON.stringify([percent.value, mastery.value, actualAmount.value, activityNote.value, numberedAction.value ? problemNumbers : null])
+  const recordedMinutes = mathDurationAction.value ? durationMinutes.value : null
+  const signature = JSON.stringify([percent.value, mastery.value, actualAmount.value, activityNote.value, numberedAction.value ? problemNumbers : null, recordedMinutes])
   if (attempt?.signature !== signature) attempt = { signature, token: crypto.randomUUID() }
-  const payload = { date: actionDate, completionPercent: percent.value!, durationMinutes: null, clientToken: attempt!.token,
+  const payload = { date: actionDate, completionPercent: percent.value!, durationMinutes: recordedMinutes, clientToken: attempt!.token,
     ...(task.activity && !task.continuation ? {actualAmount: task.activity.mode === 'RECAP' ? null : actualAmount.value ?? null, note: activityNote.value || null} : {}) }
   saving.value = true
   saveError.value = null
@@ -324,6 +335,10 @@ onUnmounted(() => {
       <label v-if="!isComplete && !selected?.sequence && !timedAction" class="field-label">累计已完成 (%)</label>
       <ElInputNumber v-if="!isComplete && !selected?.sequence && !timedAction" v-model="percent" :min="Math.ceil(selected?.completionPercent ?? 0)" :max="100" :precision="0" :disabled="saving" aria-label="累计已完成百分比" />
       <p v-if="!isComplete && !selected?.sequence && !timedAction" class="section-note">填写 30 表示已完成 30%，剩余 70%。</p>
+      <template v-if="mathDurationAction">
+        <label class="field-label">本次用时（可选）</label>
+        <LearningDurationInput v-model="durationMinutes" :disabled="saving || readonly" />
+      </template>
       <template v-if="selected?.activity?.mode === 'TIMED_STUDY' && !countedAction"><label class="field-label">本次新增完成量（{{ selected.unitName }}，可留空）</label><ElInputNumber v-model="actualAmount" :min="0.000001" :precision="6" :controls="false" :disabled="saving" aria-label="本次新增完成量" /></template>
       <template v-if="countedAction">
         <label class="field-label">{{ selected?.activity?.mode === 'COUNT_REVIEW' ? '本次实际复习词数' : '本次实际背诵新词数' }}</label>

@@ -28,6 +28,8 @@ import {
 } from 'element-plus'
 
 import SequenceRecordItem from './SequenceRecordItem.vue'
+import LearningDurationInput from './LearningDurationInput.vue'
+import { canRecordMathDuration } from '../duration'
 import AmountUnit from '@/components/AmountUnit.vue'
 import { todayIso } from '@/composables/useFormat'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
@@ -92,6 +94,7 @@ function newClientToken(): string {
 
 const clientToken = ref(newClientToken())
 const sequenceReady = ref(true)
+let submittedSignature: string | null = null
 
 const selectedTask = computed<LearningRecordTaskOption | null>(
   () => props.tasks.find((task) => task.id === form.taskId) ?? null
@@ -100,6 +103,8 @@ const selectedTask = computed<LearningRecordTaskOption | null>(
 /** 单位来自任务，只读展示。 */
 const unitName = computed(() => selectedTask.value?.unitName ?? null)
 const subjectName = computed(() => selectedTask.value?.subjectName ?? null)
+const allowDuration = computed(() => canRecordMathDuration(subjectName.value, selectedTask.value?.activityMode))
+watch(allowDuration, allowed => { if (!allowed && props.mode === 'create') form.durationMinutes = null })
 
 const submitLabel = computed(() => (props.mode === 'edit' ? '保存修改' : '记一笔'))
 
@@ -138,7 +143,8 @@ function onAmountChange(value: unknown): void {
 
 /** 提交：先本地校验（同步、可测），再判断离线，最后把载荷交给父组件。 */
 function submit(): void {
-  const result = validateLearningRecordForm(form)
+  if (props.submitting || !sequenceReady.value) return
+  const result = validateLearningRecordForm(form, props.mode)
   fieldErrors.value = result.errors
   formError.value = result.summary
   if (!result.valid) {
@@ -149,6 +155,9 @@ function submit(): void {
     formError.value = '当前处于离线状态，第一版不支持离线提交。已填写的内容会保留，联网后可直接重试。'
     return
   }
+  const signature = JSON.stringify(form)
+  if (submittedSignature !== null && signature !== submittedSignature) clientToken.value = newClientToken()
+  submittedSignature = signature
   emit('submit', { model: { ...form }, clientToken: clientToken.value })
 }
 
@@ -171,6 +180,7 @@ function reset(): void {
   fieldErrors.value = {}
   formError.value = null
   clientToken.value = newClientToken()
+  submittedSignature = null
 }
 
 /** 修改模式：用已有记录填充表单。 */
@@ -237,6 +247,9 @@ defineExpose({ form, submit, reset, fillFrom, setServerError })
       </ElFormItem>
 
 
+      <ElFormItem v-if="allowDuration" label="本次用时" :error="fieldErrors.durationMinutes">
+        <LearningDurationInput v-model="form.durationMinutes" :disabled="submitting || !online" />
+      </ElFormItem>
       <ElFormItem label="复盘" :error="fieldErrors.note">
         <ElInput
           v-model="form.note"
