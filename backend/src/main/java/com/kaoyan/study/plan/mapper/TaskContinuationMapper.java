@@ -19,7 +19,7 @@ public interface TaskContinuationMapper {
     @Select("""
         SELECT c.task_id,c.stream_id,s.title AS stream_title,c.position_index AS position,
                d.plan_date AS reference_date,d.estimated_minutes,a.description,t.subject_id,t.title,u.name AS unit_name,
-               t.version AS task_version,d.version AS plan_version
+               t.version AS task_version,d.version AS plan_version,s.reference_days_only,s.available_from
         FROM task_continuation c JOIN study_continuation_stream s ON s.id=c.stream_id
         JOIN task t ON t.id=c.task_id JOIN study_unit u ON u.id=t.unit_id
         JOIN daily_plan_item d ON d.task_id=c.task_id JOIN task_activity a ON a.task_id=c.task_id

@@ -12,7 +12,7 @@ import java.util.*;
 public class TaskContinuationService {
     public record Definition(Long taskId,Long streamId,String streamTitle,Integer position,
             LocalDate referenceDate,Integer estimatedMinutes,String description,Long subjectId,String title,
-            String unitName,Long taskVersion,Long planVersion) {}
+            String unitName,Long taskVersion,Long planVersion,boolean referenceDaysOnly,LocalDate availableFrom) {}
     private final TaskContinuationMapper mapper;
     public TaskContinuationService(TaskContinuationMapper mapper) { this.mapper=mapper; }
     public List<Definition> all() { return mapper.all(); }

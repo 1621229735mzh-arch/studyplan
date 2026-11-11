@@ -82,7 +82,7 @@ public class PlanningContextExportService {
                 units.list(false).stream().map(StudyUnitResponse::from).sorted(Comparator.comparing(StudyUnitResponse::id)).toList(),
                 goals.list(null,null).stream().map(StageGoalResponse::from).sorted(Comparator.comparing(StageGoalResponse::id)).toList(),
                 taskViews,plans.read(null,null,null),catalog.library(),
-                continuations.all().stream().map(c -> new Continuation(c.taskId(),c.streamId(),c.streamTitle(),c.position(),c.referenceDate(),c.description())).toList(),
+                continuations.all().stream().map(c -> new Continuation(c.taskId(),c.streamId(),c.streamTitle(),c.position(),c.referenceDate(),c.description(),c.referenceDaysOnly(),c.availableFrom())).toList(),
                 study,reviews.list(null,null).stream().sorted(Comparator.comparing(com.kaoyan.study.review.entity.ReviewItem::getId))
                         .map(r -> new ReviewSource(ReviewItemResponse.from(r),r.getSourceRecordId())).toList(),history,
                 automatic.books(),automatic.segments(),memos.list("OPEN",null,null).stream().map(MemoResponse::from).sorted(Comparator.comparing(MemoResponse::id)).toList());

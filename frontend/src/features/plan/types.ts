@@ -100,6 +100,8 @@ export type PlanSource = 'MANUAL' | 'WEEKLY' | 'IMPORT' | 'REVIEW'
  * 当天完成量是 `completedAmount`（不是 actualAmount）。后端不返回剩余量。
  */
 export interface DailyPlanItemView {
+  /** 任务明确关联的接续资料名称，包含原有分科信息；普通任务为空。 */
+  bookTitle?: string | null
   activityMode?: string | null
   /** 外部计划给出的完整预计用时（分钟），缺失不是 0 */
   estimatedMinutes?: number | null

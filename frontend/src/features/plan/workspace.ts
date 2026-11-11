@@ -1,6 +1,8 @@
 /** 时间视图只组织服务端数据，不在浏览器计算学习统计。 */
 export type PlanViewMode = 'overall' | 'month' | 'week' | 'day'
 export interface ScheduleEntry {
+  /** 同日安排与本周离线快照保留任务的真实资料归属。 */
+  bookTitle?: string | null
   activityMode?: string | null
   date: string; taskId: number; taskTitle: string; subjectId: number; unitId: number; unitName: string
   plannedAmount: number | null; completedAmount: number; source: string; estimatedMinutes?: number | null; sortOrder: number

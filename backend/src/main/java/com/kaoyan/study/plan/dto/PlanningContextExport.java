@@ -32,7 +32,7 @@ public record PlanningContextExport(Snapshot snapshot, String markdown) {
     public record Sequence(String mode, LocalDate startDate, LocalDate endDate, List<SequenceItem> items) {}
     public record SequenceItem(Long id, Integer position, String key, String title, String url) {}
     public record Continuation(Long taskId, Long streamId, String bookTitle, Integer position,
-                               LocalDate referenceDate, String description) {}
+                               LocalDate referenceDate, String description, boolean referenceDaysOnly, LocalDate availableFrom) {}
     public record ReviewSource(ReviewItemResponse item, Long sourceRecordId) {}
     public record Feedback(int studyRecordCount, long learningDays, int reviewRecordCount,
                            long completedReviews, List<Quantity> quantities,

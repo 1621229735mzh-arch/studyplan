@@ -27,6 +27,22 @@ beforeEach(() => { vi.clearAllMocks(); vi.mocked(listPlanTasks).mockResolvedValu
 afterEach(() => { wrappers.splice(0).forEach(w => w.unmount()); document.body.innerHTML = ''; vi.useRealTimers() })
 
 describe('计划时间视图', () => {
+  it('日周月用真实资料名区分同名数学内容，普通任务不猜测归属', async () => {
+    const titles = ['线性代数 · 基础30讲', '高等数学 · 1000题基础篇', '概率论 · 基础30讲']
+    const rows = titles.map((bookTitle, index) => ({ date: '2026-10-08', taskId: index + 1, taskTitle: '零基础 · 题4—8', subjectId: 1, unitName: '题', plannedAmount: null, activityMode: 'CONTINUED_STUDY', bookTitle }))
+    mocks.workspace.mockResolvedValue({ ...fixture(), entries: rows })
+    mocks.days.mockResolvedValue([...rows.map((r, i) => ({ ...r, id: i + 1, source: 'IMPORT', version: 0 })), { id: 9, taskId: 9, taskTitle: '普通数学任务', subjectId: 1, unitName: '题', source: 'MANUAL', version: 0, plannedAmount: 1 }])
+    const w = await render(PlanView)
+    await w.findAll('nav button')[1].trigger('click'); await flushPromises()
+    expect(w.findAll('.task-book').map(e => e.text())).toEqual(titles.slice(0, 2))
+    expect(w.get('.mobile-day-books').text()).toContain(titles[2])
+    await w.findAll('nav button')[2].trigger('click'); await flushPromises()
+    expect(w.findAll('.task-book').map(e => e.text())).toEqual(titles)
+    await w.findAll('nav button')[3].trigger('click'); await flushPromises()
+    expect(w.findAll('.daily-book').map(e => e.text())).toEqual(titles)
+    expect(w.findAll('.daily-schedule-item')[3]!.find('.daily-book').exists()).toBe(false)
+    expect(w.findAll('.daily-content h3').slice(0, 3).every(e => e.text() === '零基础 · 题4—8')).toBe(true)
+  })
   it('默认整体时间轴，显示后端按单位返回的进度', async () => { const w = await render(PlanView); expect(w.get('nav button[aria-current="page"]').text()).toBe('整体'); expect(w.text()).toContain('2026 年 10 月'); expect(w.text()).toContain('已学 2 讲'); expect(w.text()).not.toContain('AI 生成'); expect(w.find('.calendar-grid').exists()).toBe(false) })
   it('从月份进入月历，再点击日期进入日安排', async () => { const w = await render(PlanView); await button(w, '查看月计划 ↗').trigger('click'); await flushPromises(); expect(w.findAll('.calendar-cell')).toHaveLength(35); await w.get('[aria-label="查看 2026-10-12 日计划"]').trigger('click'); await flushPromises(); expect(mocks.days).toHaveBeenLastCalledWith('2026-10-12'); expect(w.text()).toContain('这一天还没有学习安排') })
   it('周视图展示同一套日安排，科目过滤交给后端', async () => { const w = await render(PlanView); await w.findAll('nav button')[2].trigger('click'); await flushPromises(); expect(w.findAll('.calendar-cell')).toHaveLength(7); w.findComponent(ElSelect).vm.$emit('update:modelValue', 1); await flushPromises(); expect(mocks.workspace).toHaveBeenLastCalledWith(1) })

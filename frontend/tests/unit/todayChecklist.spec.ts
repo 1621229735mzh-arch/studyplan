@@ -222,6 +222,37 @@ describe('每日完成确认',()=>{
 })
 
 describe('按书接续学习',()=>{
+ it('轮换日保留此前未完成项并明确提示，后续自选不遮住旧内容',async()=>{
+  const data=fixture();data.taskCounts={completed:0,inProgress:1,remaining:0}
+  const base={kind:'LEARNING' as const,estimatedMinutes:60,remainingMinutes:36,version:null,actionable:true,
+   activity:{mode:'CONTINUED_STUDY' as const,description:'昨天未完成的教材内容',flexibleMinutes:0}}
+  data.sections![0].tasks=[{...base,id:71,title:'线代当前内容',completionPercent:40,revision:'carry1',
+   continuation:{streamId:7,title:'线代教材',position:1,referenceDate:'2026-10-01',carried:true,optional:false,referenceDay:false}},
+   {...base,id:72,title:'线代后续内容',completionPercent:0,revision:'carry2',
+   continuation:{streamId:7,title:'线代教材',position:2,referenceDate:'2026-10-10',carried:false,optional:true,referenceDay:false}}]
+  mocks.fetch.mockResolvedValue(data);const w=await page()
+  expect(w.get('.carry-note').text()).toContain('此前内容未完成，今天继续接续')
+  expect(w.findAll('.book-content')).toHaveLength(1)
+  expect(w.get('.book-content').text()).toContain('昨天未完成的教材内容')
+  expect(w.get('.book-content').text()).toContain('已完成 40%')
+  expect(w.text()).not.toContain('本书当天内容已完成')
+  expect(w.text()).not.toContain('今天未安排本书，可按需要自选学习。')
+  expect(w.get('.today-summary').findAll('strong').map(m=>m.text())).toEqual(['0 项','1 项','0 项'])
+  expect(mocks.learning).not.toHaveBeenCalled()
+ })
+ it('轮换未安排的书籍只作为自选入口，展开不写记录或改变服务端任务数',async()=>{
+  const data=fixture();data.taskCounts={completed:0,inProgress:0,remaining:1}
+  data.sections![0].tasks=[{kind:'LEARNING',id:71,title:'线代当前内容',completionPercent:0,estimatedMinutes:60,remainingMinutes:60,revision:'rotation1',version:null,actionable:true,
+   continuation:{streamId:7,title:'线代教材',position:1,referenceDate:'2026-10-03',carried:false,optional:true,referenceDay:false},activity:{mode:'CONTINUED_STUDY',description:'教材知识点',flexibleMinutes:0}}]
+  mocks.fetch.mockResolvedValue(data);const w=await page()
+  expect(w.text()).toContain('今天未安排本书，可按需要自选学习。')
+  expect(w.text()).not.toContain('本书当天内容已完成')
+  expect(w.text()).not.toContain('教材知识点')
+  await button(w,'自选学习本书内容').trigger('click');await flushPromises()
+  expect(w.text()).toContain('教材知识点')
+  expect(mocks.learning).not.toHaveBeenCalled()
+  expect(w.get('.today-summary').findAll('strong').map(m=>m.text())).toEqual(['0 项','0 项','1 项'])
+ })
  function continuedFixture() {
   const data=fixture()
   const base=data.sections![0].tasks[0]

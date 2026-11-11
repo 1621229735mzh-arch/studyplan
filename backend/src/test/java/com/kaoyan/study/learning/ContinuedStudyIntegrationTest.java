@@ -32,6 +32,7 @@ class ContinuedStudyIntegrationTest {
     @Autowired SubjectService subjects;
     @Autowired StudyUnitService units;
     @Autowired com.kaoyan.study.progress.service.CatalogService catalog;
+    @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
     LocalDate start=LocalDate.of(2026,10,15);
     Long subjectId;
     String source;
@@ -67,6 +68,44 @@ class ContinuedStudyIntegrationTest {
     DayProgressRequest request(String title,LocalDate date,int percent,int minutes) {
         var task=snapshot(title,date);
         return new DayProgressRequest(date,task.id(),percent,minutes,task.revision(),UUID.randomUUID().toString());
+    }
+    @Test void rotationDaysKeepUnscheduledBooksOptionalAndActualRecordsAuthoritative() {
+        var baseline=today.today(start).taskCounts();
+        Long bookStream=jdbc.queryForObject("SELECT stream_id FROM task_continuation WHERE task_id=?",Long.class,ids.get("教材1"));
+        Long practiceStream=jdbc.queryForObject("SELECT stream_id FROM task_continuation WHERE task_id=?",Long.class,ids.get("练习1"));
+        jdbc.update("UPDATE study_continuation_stream SET reference_days_only=1,available_from=? WHERE id IN (?,?)",start,bookStream,practiceStream);
+        for (int i=1;i<=3;i++) {
+            jdbc.update("UPDATE daily_plan_item SET plan_date=? WHERE task_id=?",start.plusDays((i-1)*2),ids.get("教材"+i));
+            jdbc.update("UPDATE daily_plan_item SET plan_date=? WHERE task_id=?",start.plusDays(10+(i-1)*2),ids.get("练习"+i));
+        }
+        assertThat(snapshot("教材1",start).continuation().optional()).isFalse();
+        assertThat(snapshot("练习1",start).continuation().optional()).isTrue();
+        assertThat(snapshot("练习1",start).continuation().referenceDay()).isFalse();
+        assertThat(today.today(start).taskCounts().remaining()).isEqualTo(baseline.remaining()-1);
+        assertThat(snapshots(start.minusDays(1))).isEmpty();
+        assertThat(snapshot("教材1",start.plusDays(1)).continuation().optional()).isFalse();
+        assertThat(snapshot("教材1",start.plusDays(1)).continuation().carried()).isTrue();
+        assertThat(snapshot("练习1",start.plusDays(1)).continuation().optional()).isTrue();
+        var beforePartial=today.today(start.plusDays(1)).taskCounts();
+        var stale=request("教材1",start.plusDays(1),60,10);
+        var saved=records.recordDayProgress(request("教材1",start.plusDays(1),40,10));
+        assertThat(saved.amount()).isNull();
+        assertThat(saved.continuationDelta()).isEqualByComparingTo("40");
+        assertThat(today.today(start.plusDays(1)).taskCounts()).isEqualTo(new com.kaoyan.study.today.dto.TodayTaskCounts(
+                beforePartial.completed(),beforePartial.inProgress()+1,beforePartial.remaining()-1));
+        assertThat(snapshot("教材1",start.plusDays(1)).continuation().optional()).isFalse();
+        assertThat(snapshot("练习1",start.plusDays(1)).continuation().optional()).isTrue();
+        assertThat(snapshot("教材1",start.plusDays(2)).continuation().optional()).isFalse();
+        assertThat(snapshot("教材2",start.plusDays(2)).continuation().optional()).isFalse();
+        assertThatThrownBy(()->records.recordDayProgress(stale)).isInstanceOf(BusinessException.class);
+        records.delete(saved.id(),saved.version());
+        assertThat(snapshot("教材1",start.plusDays(1)).continuation().optional()).isFalse();
+        assertThat(snapshot("练习1",start.plusDays(1)).continuation().optional()).isTrue();
+        assertThat(snapshots(start.plusDays(2))).extracting(DayLearningTaskView::title).doesNotContain("教材2");
+        // Choosing an off-day book remains possible and does not require completing the textbook first.
+        records.recordDayProgress(request("练习1",start,100,10));
+        assertThat(snapshot("练习2",start).continuation().optional()).isTrue();
+        assertThat(snapshots(start.plusDays(10))).extracting(DayLearningTaskView::title).contains("练习2");
     }
     @Test void taskCountsUseConcreteContentsAndCarriedPartialProgress() {
         var baseline=today.today(start).taskCounts();

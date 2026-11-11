@@ -64,6 +64,36 @@ class PlanWorkspaceIntegrationTest {
                 .replace("math-foundation-example-2027-01",UUID.randomUUID().toString());
     }
     @Test
+    void dailyAndCalendarReadActualBookNamesForIdenticalMathTitles() {
+        var books=List.of("高等数学 · 基础30讲","线性代数 · 基础30讲","概率论 · 1000题基础篇");
+        var root=(ObjectNode)json.readTree(source);
+        root.put("schemaVersion",5);
+        var inputTasks=root.putArray("tasks");
+        var days=root.putArray("days");
+        var items=days.addObject().put("date",date.toString()).putArray("items");
+        root.put("endDate",date.toString());
+        root.putArray("goals");
+        for (int i=0;i<books.size();i++) {
+            var task=inputTasks.addObject();
+            task.put("key","book-"+i).put("subject",subjects.list(true).stream().filter(s->s.getId().equals(subjectId)).findFirst().orElseThrow().getName())
+                    .put("unit",units.list(true).stream().filter(u->u.getId().equals(unitId)).findFirst().orElseThrow().getName())
+                    .put("title","零基础 · 题4—8").putNull("plannedAmount");
+            task.putObject("activity").put("mode","CONTINUED_STUDY").put("flexibleMinutes",0);
+            task.putObject("continuation").put("streamKey","book-"+i).put("title",books.get(i)).put("position",1);
+            items.addObject().put("taskKey","book-"+i).putNull("amount");
+        }
+        String document=json.writeValueAsString(root);
+        imports.confirm(new PlanImportRequest(document,imports.preview(document).previewToken()));
+        workspace.quickAdd(date,quick("普通任务",UUID.randomUUID().toString()));
+        var entries=workspace.read(date,date,subjectId).entries();
+        assertThat(entries).hasSize(4);
+        assertThat(entries.stream().filter(e->e.bookTitle()!=null).map(ScheduleEntryView::bookTitle)).containsExactlyElementsOf(books);
+        assertThat(daily.list(date).stream().filter(e->subjectId.equals(e.subjectId()) && e.bookTitle()!=null).map(DailyPlanItemView::bookTitle))
+                .containsExactlyElementsOf(books);
+        assertThat(entries.stream().filter(e->e.taskTitle().equals("普通任务"))).allMatch(e->e.bookTitle()==null);
+        assertThat(entries.stream().filter(e->e.bookTitle()!=null)).allMatch(e->e.taskTitle().equals("零基础 · 题4—8") && e.completedAmount().signum()==0);
+    }
+    @Test
     void previewDoesNotWriteAndConfirmationAppendsToDailyFacts() {
         var existing=tasks.create(new TaskCreateRequest(subjectId,null,"已有安排",unitId,BigDecimal.TEN));
         daily.addItem(date,new DailyItemCreateRequest(existing.getId(),BigDecimal.ONE,null));
