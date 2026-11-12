@@ -15,7 +15,8 @@ export function fetchToday(date: string, signal?: AbortSignal): Promise<TodayRes
 export interface DayProgressPayload {
   problemNumber?: number | null
   date: string
-  completionPercent: number
+  completionPercent: number | null
+  completedPage?: number | null
   durationMinutes?: number | null
   clientToken: string
   actualAmount?: number | null

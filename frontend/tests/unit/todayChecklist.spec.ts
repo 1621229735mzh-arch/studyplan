@@ -25,6 +25,61 @@ async function page() {const wrapper=mount(TodayView,{global:{plugins:[ElementPl
 function button(wrapper: ReturnType<typeof mount>, text: string, index=0) {return wrapper.findAllComponents(ElButton).filter(b=>b.text()===text)[index]}
 beforeEach(()=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-10-01T12:00:00+08:00'));mocks.online=ref(true);mocks.snapshot=null;vi.clearAllMocks();mocks.fetch.mockResolvedValue(fixture());mocks.learning.mockResolvedValue({id:1});mocks.problems.mockResolvedValue([]);mocks.review.mockResolvedValue({id:2});mocks.cache.mockResolvedValue(undefined)})
 afterEach(()=>{wrappers.splice(0).forEach(w=>w.unmount());document.body.innerHTML='';vi.useRealTimers()})
+describe('教材按页码记录',()=>{
+ function pageFixture() {
+  const data=fixture();const task=data.sections![0].tasks[0]
+  task.continuation={streamId:1,title:'高数主教材',position:1,referenceDate:data.date,carried:false,pageRange:{startPage:25,endPage:28}}
+  task.activity={mode:'CONTINUED_STUDY',description:'阅读印刷25—28页',flexibleMinutes:0}
+  return data
+ }
+ it('剩余默认填印刷页码，页码和用时一起提交，失败重试保留输入，改变页码换令牌',async()=>{
+  mocks.fetch.mockResolvedValue(pageFixture());const w=await page()
+  await button(w,'剩余').trigger('click');await flushPromises()
+  const input=w.findAllComponents(ElInputNumber).find(c=>c.find('[aria-label="已学完到第几页"]').exists())!
+  expect(input.exists()).toBe(true);expect(input.props('modelValue')).toBeUndefined()
+  expect(w.text()).toContain('印刷第 25—28 页')
+  expect(w.find('[aria-label="累计已完成百分比"]').exists()).toBe(false)
+  await button(w,'保存').trigger('click');await flushPromises();expect(mocks.learning).not.toHaveBeenCalled()
+  input.vm.$emit('update:modelValue',27);w.findComponent(LearningDurationInput).vm.$emit('update:modelValue',45);await flushPromises()
+  mocks.learning.mockRejectedValueOnce(new Error('保存失败'));await button(w,'保存').trigger('click');await flushPromises()
+  const first=mocks.learning.mock.calls[0][2]
+  expect(first).toMatchObject({completedPage:27,completionPercent:null,durationMinutes:45,date:'2026-10-01'})
+  expect(input.props('modelValue')).toBe(27)
+  mocks.learning.mockRejectedValueOnce(new Error('保存失败'));await button(w,'保存').trigger('click');await flushPromises()
+  expect(mocks.learning.mock.calls[1][2].clientToken).toBe(first.clientToken)
+  input.vm.$emit('update:modelValue',28);await flushPromises();await button(w,'保存').trigger('click');await flushPromises()
+  expect(mocks.learning.mock.calls[2][2].clientToken).not.toBe(first.clientToken)
+  expect(mocks.learning.mock.calls[2][2].completedPage).toBe(28)
+ })
+ it('可切换百分比表达页内进度，完成按钮仍表示整段完成，不向复习发送页码',async()=>{
+  const data=pageFixture();data.sections![0].tasks[0].completionPercent=33.33
+  mocks.fetch.mockResolvedValue(data);const w=await page()
+  await button(w,'剩余').trigger('click');await flushPromises()
+  w.findComponent(ElRadioGroup).vm.$emit('update:modelValue','percent');await flushPromises()
+  const field=w.findAllComponents(ElInputNumber).find(c=>c.find('[aria-label="累计已完成百分比"]').exists())!
+  expect(field.props('modelValue')).toBe(33.33)
+  field.vm.$emit('update:modelValue',55);await flushPromises();await button(w,'保存').trigger('click');await flushPromises()
+  expect(mocks.learning.mock.calls[0][2]).toMatchObject({completionPercent:55})
+  expect(mocks.learning.mock.calls[0][2].completedPage).toBeUndefined()
+  await button(w,'完成').trigger('click');await flushPromises()
+  expect(w.find('[aria-label="已学完到第几页"]').exists()).toBe(false)
+  await button(w,'保存').trigger('click');await flushPromises()
+  expect(mocks.learning.mock.calls[1][2]).toMatchObject({completionPercent:100})
+  await button(w,'剩余',1).trigger('click');await flushPromises()
+  expect(w.find('[aria-label="已学完到第几页"]').exists()).toBe(false)
+ })
+ it('未填页码不能提交，旧快照或混合任务无页码范围时沿用百分比',async()=>{
+  mocks.fetch.mockResolvedValue(pageFixture());const w=await page()
+  await button(w,'剩余').trigger('click');await flushPromises()
+  await button(w,'保存').trigger('click');await flushPromises()
+  expect(mocks.learning).not.toHaveBeenCalled()
+  await button(w,'取消').trigger('click');await flushPromises()
+  mocks.fetch.mockResolvedValue(fixture());await button(w,'刷新').trigger('click');await flushPromises()
+  await button(w,'剩余').trigger('click');await flushPromises()
+  expect(w.find('[aria-label="累计已完成百分比"]').exists()).toBe(true)
+ })
+})
+
 describe('今日清单操作',()=>{
  it('页面保持打开时九点自动刷新，且不会在截止瞬间用旧清单提交',async()=>{
   vi.useRealTimers()

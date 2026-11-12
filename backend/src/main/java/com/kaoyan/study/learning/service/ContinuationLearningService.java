@@ -18,7 +18,11 @@ import java.util.stream.Collectors;
 @Service
 public class ContinuationLearningService {
     public record Context(Long streamId,String title,Integer position,LocalDate referenceDate,boolean carried,boolean optional,
-            boolean referenceDay) {}
+            boolean referenceDay,TextbookPageProgress.Range pageRange) {
+        public Context(Long streamId,String title,Integer position,LocalDate referenceDate,boolean carried,boolean optional,boolean referenceDay) {
+            this(streamId,title,position,referenceDate,carried,optional,referenceDay,null);
+        }
+    }
     private final TaskContinuationService plans;
     private final ContinuationProgressMapper records;
     public ContinuationLearningService(TaskContinuationService plans,ContinuationProgressMapper records) {
@@ -87,7 +91,8 @@ public class ContinuationLearningService {
             var activity=new TaskActivityService.Activity("CONTINUED_STUDY",definition.description(),0);
             result.add(new DayLearningTaskView(definition.taskId(),definition.subjectId(),definition.title(),null,null,completed,
                     definition.estimatedMinutes(),remaining,revision,null,activity,definition.unitName(),
-                    new Context(definition.streamId(),definition.streamTitle(),definition.position(),definition.referenceDate(),admitted.isBefore(date),optional,referenceDay)));
+                    new Context(definition.streamId(),definition.streamTitle(),definition.position(),definition.referenceDate(),admitted.isBefore(date),optional,referenceDay,
+                            TextbookPageProgress.range(definition.streamTitle(),definition.description()))));
         }
         return result;
     }

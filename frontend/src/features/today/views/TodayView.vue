@@ -138,6 +138,10 @@ const countedAction = computed(() => selected.value?.activity?.mode === 'COUNT_S
 const timedAction = computed(() => !!selected.value?.activity && !selected.value.continuation)
 const dialogVisible = ref(false)
 const isComplete = ref(false)
+const progressMode = ref<'page' | 'percent'>('percent')
+const completedPage = ref<number | undefined>()
+const pageRange = computed(() => selected.value?.kind === 'LEARNING' ? selected.value.continuation?.pageRange : null)
+const pageAction = computed(() => !isComplete.value && !!pageRange.value && progressMode.value === 'page')
 const percent = ref<number | undefined>(0)
 const actualAmount = ref<number | undefined>()
 const durationMinutes = ref<number | null>(null)
@@ -169,7 +173,9 @@ function openAction(task: TodayChecklistTask, complete: boolean): void {
   selectedSubjectName.value = today.value?.sections?.find(s => s.tasks.some(t => t.kind === task.kind && t.id === task.id))?.name ?? ''
   actionDate = date.value
   isComplete.value = complete
-  percent.value = complete ? 100 : Math.ceil(task.completionPercent)
+  progressMode.value = task.kind === 'LEARNING' && task.continuation?.pageRange ? 'page' : 'percent'
+  completedPage.value = undefined
+  percent.value = complete ? 100 : task.continuation ? task.completionPercent : Math.ceil(task.completionPercent)
   actualAmount.value = undefined
   durationMinutes.value = null
   problemNumbersText.value = ''
@@ -185,7 +191,10 @@ async function saveAction(): Promise<void> {
   if (readonly.value) { saveError.value = '请联网并刷新后再保存。'; return }
   const timeError = mathDurationAction.value ? durationError(durationMinutes.value) : null
   if (timeError) { saveError.value = timeError; return }
-  if (!numberedAction.value && (percent.value == null || percent.value < task.completionPercent || percent.value > 100)) {
+  if (pageAction.value && (!Number.isInteger(completedPage.value) || completedPage.value! < pageRange.value!.startPage || completedPage.value! > pageRange.value!.endPage)) {
+    saveError.value = '请填写本段印刷页码范围内已学完的最后一页。'; return
+  }
+  if (!pageAction.value && !numberedAction.value && (percent.value == null || percent.value < task.completionPercent || percent.value > 100)) {
     saveError.value = '请填写不低于当前进度、且不超过 100 的累计完成百分比。'; return
   }
   const parts = problemNumbersText.value.trim().split(/[\s,，、;；]+/)
@@ -198,9 +207,11 @@ async function saveAction(): Promise<void> {
   if (task.activity && actualAmount.value != null && actualAmount.value <= 0) { saveError.value = '新增完成量请填写正数，尚未完成可留空。'; return }
   if (task.kind === 'REVIEW' && percent.value === 100 && !mastery.value) { saveError.value = '请选择本次复习的掌握情况。'; return }
   const recordedMinutes = mathDurationAction.value ? durationMinutes.value : null
-  const signature = JSON.stringify([percent.value, mastery.value, actualAmount.value, activityNote.value, numberedAction.value ? problemNumbers : null, recordedMinutes])
+  const progressPercent = pageAction.value ? null : percent.value!
+  const page = pageAction.value ? completedPage.value : undefined
+  const signature = JSON.stringify([progressPercent, page, mastery.value, actualAmount.value, activityNote.value, numberedAction.value ? problemNumbers : null, recordedMinutes])
   if (attempt?.signature !== signature) attempt = { signature, token: crypto.randomUUID() }
-  const payload = { date: actionDate, completionPercent: percent.value!, durationMinutes: recordedMinutes, clientToken: attempt!.token,
+  const payload = { date: actionDate, completionPercent: progressPercent, ...(pageAction.value ? { completedPage: page } : {}), durationMinutes: recordedMinutes, clientToken: attempt!.token,
     ...(task.activity && !task.continuation ? {actualAmount: task.activity.mode === 'RECAP' ? null : actualAmount.value ?? null, note: activityNote.value || null} : {}) }
   saving.value = true
   saveError.value = null
@@ -209,7 +220,7 @@ async function saveAction(): Promise<void> {
     else if (task.kind === 'LEARNING') await saveLearningProgress(task.id, task.revision!, payload)
     else await saveReviewProgress(task.id, task.version!, mastery.value ?? null, payload)
     dialogVisible.value = false
-    ElMessage.success(numberedAction.value ? `已记录 ${problemNumbers.length} 题` : percent.value === 100 ? '已完成' : '进度已保存')
+    ElMessage.success(numberedAction.value ? `已记录 ${problemNumbers.length} 题` : pageAction.value ? `已记录学完至第 ${page} 页` : percent.value === 100 ? '已完成' : '进度已保存')
     await loadToday()
   } catch (caught) {
     const error = toApiError(caught)
@@ -332,9 +343,18 @@ onUnmounted(() => {
       <p v-if="timedAction && !countedAction && selected?.activity" class="section-note">结束本次安排只表示今天收工，不表示整讲或整章已经学完。{{ selected.activity.mode === 'RECAP' ? '复做与订正不增加首次完成量。' : '只填写本次首次完成的数量；已做过的题不重复计数。' }}</p>
       <template v-if="numberedAction"><label class="field-label">LeetCode 完成题号</label><ElInput v-model="problemNumbersText" type="textarea" :rows="3" maxlength="4000" :disabled="saving" aria-label="LeetCode完成题号" placeholder="例如：31、32、49" /><p class="section-note">只填本次新完成的题号，可填多题，用空格、逗号、顿号或换行分隔。同一天可继续追加，已完成的题不重复计数。</p></template>
       <p v-if="selected?.sequence?.dayItem && !numberedAction">{{ selected.sequence.dayItem.title }} · {{ isComplete ? '完成整题后推进' : '记录本次尝试，题目继续保留' }}</p>
-      <label v-if="!isComplete && !selected?.sequence && !timedAction" class="field-label">累计已完成 (%)</label>
-      <ElInputNumber v-if="!isComplete && !selected?.sequence && !timedAction" v-model="percent" :min="Math.ceil(selected?.completionPercent ?? 0)" :max="100" :precision="0" :disabled="saving" aria-label="累计已完成百分比" />
-      <p v-if="!isComplete && !selected?.sequence && !timedAction" class="section-note">填写 30 表示已完成 30%，剩余 70%。</p>
+      <template v-if="!isComplete && pageRange">
+        <ElRadioGroup v-model="progressMode" :disabled="saving" aria-label="进度填写方式"><ElRadioButton value="page">按页码</ElRadioButton><ElRadioButton value="percent">按百分比</ElRadioButton></ElRadioGroup>
+        <p class="section-note">本段：印刷第 {{ pageRange.startPage }}—{{ pageRange.endPage }} 页。当前记录 {{ selected?.completionPercent }}%。</p>
+      </template>
+      <template v-if="pageAction">
+        <label class="field-label">已学完到第几页</label>
+        <ElInputNumber v-model="completedPage" :min="pageRange!.startPage" :max="pageRange!.endPage" :precision="0" :controls="false" :disabled="saving" aria-label="已学完到第几页" placeholder="填写印刷页码" />
+        <p class="section-note">填写书上已学完的最后一页，不填 PDF 页码；包含该页属于本段的内容。系统自动换算进度，页内尚未学完可切换百分比。到达末页表示本段内容全部完成。</p>
+      </template>
+      <label v-if="!pageAction && !isComplete && !selected?.sequence && !timedAction" class="field-label">累计已完成 (%)</label>
+      <ElInputNumber v-if="!pageAction && !isComplete && !selected?.sequence && !timedAction" v-model="percent" :min="selected?.continuation ? selected.completionPercent : Math.ceil(selected?.completionPercent ?? 0)" :max="100" :precision="selected?.continuation ? 2 : 0" :disabled="saving" aria-label="累计已完成百分比" />
+      <p v-if="!pageAction && !isComplete && !selected?.sequence && !timedAction" class="section-note">填写 30 表示已完成 30%，剩余 70%。</p>
       <template v-if="mathDurationAction">
         <label class="field-label">本次用时（可选）</label>
         <LearningDurationInput v-model="durationMinutes" :disabled="saving || readonly" />

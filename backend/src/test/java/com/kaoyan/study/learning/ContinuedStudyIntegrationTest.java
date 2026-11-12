@@ -101,6 +101,59 @@ class ContinuedStudyIntegrationTest {
                 .map(e->List.of(e.date(),e.taskId(),e.estimatedMinutes())).toList())
                 .isEqualTo(schedule.stream().map(e->List.of(e.date(),e.taskId(),e.estimatedMinutes())).toList());
     }
+    void usePageRange(String description) {
+        jdbc.update("UPDATE study_continuation_stream SET title='高数主教材' WHERE id=(SELECT stream_id FROM task_continuation WHERE task_id=?)",ids.get("教材1"));
+        jdbc.update("UPDATE task_activity SET description=? WHERE task_id=?",description,ids.get("教材1"));
+    }
+    DayProgressRequest pageRequest(int page,Integer minutes,String token) {
+        var task=snapshot("教材1",start);
+        return new DayProgressRequest(start,task.id(),null,minutes,task.revision(),token,null,null,null,page);
+    }
+    @Test void pageInputUsesOriginalRecordProgressAndSupportsRetryTimeOnlyCompletionAndDeletion() {
+        usePageRange("阅读与例题。印刷25—27页（PDF31—33页）；教材基础习题另列为独立做题量。");
+        assertThat(snapshot("教材1",start).continuation().pageRange().startPage()).isEqualTo(25);
+        assertThat(today.today(start).sections().stream().flatMap(s->s.tasks().stream()).filter(t->t.id().equals(ids.get("教材1"))).findFirst().orElseThrow()
+                .continuation().pageRange().endPage()).isEqualTo(27);
+        var reference=workspace.read(start,start.plusDays(2),subjectId).entries();
+        var request=pageRequest(25,40,UUID.randomUUID().toString());
+        var first=records.recordDayProgress(request);
+        assertThat(first.continuationDelta()).isEqualByComparingTo("33.33");
+        assertThat(first.note()).contains("已学完至第25页","印刷25—27页");
+        assertThat(first.durationMinutes()).isEqualTo(40);
+        assertThat(records.recordDayProgress(request).id()).isEqualTo(first.id());
+        assertThatThrownBy(()->records.recordDayProgress(pageRequest(26,40,request.clientToken())))
+                .hasMessageContaining("不同页码");
+        assertThatThrownBy(()->records.recordDayProgress(pageRequest(24,null,UUID.randomUUID().toString())))
+                .hasMessageContaining("页码范围");
+        var timeOnly=records.recordDayProgress(pageRequest(25,10,UUID.randomUUID().toString()));
+        assertThat(timeOnly.continuationDelta()).isNull();
+        assertThat(snapshot("教材1",start).completionPercent()).isEqualByComparingTo("33.33");
+        var exact=snapshot("教材1",start);
+        var decimalTimeOnly=records.recordDayProgress(new DayProgressRequest(start,exact.id(),new BigDecimal("33.33"),5,exact.revision(),UUID.randomUUID().toString(),null,null,null,null));
+        assertThat(decimalTimeOnly.continuationDelta()).isNull();
+        assertThat(snapshot("教材1",start).completionPercent()).isEqualByComparingTo("33.33");
+        var second=records.recordDayProgress(pageRequest(26,null,UUID.randomUUID().toString()));
+        assertThat(second.continuationDelta()).isEqualByComparingTo("33.33");
+        assertThatThrownBy(()->records.recordDayProgress(pageRequest(25,10,UUID.randomUUID().toString())))
+                .hasMessageContaining("不能降低");
+        var last=records.recordDayProgress(pageRequest(27,null,UUID.randomUUID().toString()));
+        assertThat(last.continuationDelta()).isEqualByComparingTo("33.34");
+        assertThat(snapshot("教材1",start).completionPercent()).isEqualByComparingTo("100");
+        records.delete(last.id(),last.version());
+        assertThat(snapshot("教材1",start).completionPercent()).isEqualByComparingTo("66.66");
+        assertThat(workspace.read(start,start.plusDays(2),subjectId).entries().stream().map(e->List.of(e.date(),e.taskId(),e.estimatedMinutes())).toList())
+                .isEqualTo(reference.stream().map(e->List.of(e.date(),e.taskId(),e.estimatedMinutes())).toList());
+    }
+    @Test void pageInputDoesNotInventProgressForMixedTasksAndCannotReplaceLaterRecords() {
+        usePageRange("阅读印刷25—27页\n独立完成习题，印刷27—28页");
+        assertThat(snapshot("教材1",start).continuation().pageRange()).isNull();
+        assertThatThrownBy(()->records.recordDayProgress(pageRequest(26,null,UUID.randomUUID().toString())))
+                .hasMessageContaining("连续教材阅读范围");
+        usePageRange("阅读印刷25—27页");
+        records.recordDayProgress(request("教材1",start.plusDays(1),70,10));
+        assertThatThrownBy(()->records.recordDayProgress(pageRequest(26,null,UUID.randomUUID().toString())))
+                .hasMessageContaining("后续日期进度");
+    }
     @Test void rotationDaysKeepUnscheduledBooksOptionalAndActualRecordsAuthoritative() {
         var baseline=today.today(start).taskCounts();
         Long bookStream=jdbc.queryForObject("SELECT stream_id FROM task_continuation WHERE task_id=?",Long.class,ids.get("教材1"));

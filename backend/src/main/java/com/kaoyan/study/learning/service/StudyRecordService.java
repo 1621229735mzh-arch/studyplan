@@ -305,6 +305,10 @@ public class StudyRecordService {
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public StudyRecordView recordDayProgress(DayProgressRequest request) {
+        if (!request.isProgressSpecified())
+            throw new BusinessException("PROGRESS_INPUT","请填写完成比例或已学完页码，二选一");
+        if (request.completedPage()!=null && (request.actualAmount()!=null || request.problemNumber()!=null))
+            throw new BusinessException("PAGE_PROGRESS_INPUT","页码进度不能同时填写数量或题号");
         taskService.requireExistingForUpdate(request.taskId());
         var retry = studyRecordMapper.findByClientToken(request.clientToken());
         if (retry != null) {
@@ -312,8 +316,16 @@ public class StudyRecordService {
                 throw new ConflictException("TOKEN_REUSED", "提交令牌已被其他记录使用");
             if (!Objects.equals(request.durationMinutes(), retry.getDurationMinutes()))
                 throw new ConflictException("TOKEN_REUSED", "提交令牌已被不同用时的记录使用，请刷新后重试");
+            if (request.completedPage()!=null || TextbookPageProgress.hasPageNote(retry.getNote())) {
+                var definition=continuations.all().stream().filter(d->d.taskId().equals(request.taskId())).findFirst().orElse(null);
+                var range=definition==null ? null : TextbookPageProgress.range(definition.streamTitle(),definition.description());
+                if (request.completedPage()==null || range==null
+                        || !Objects.equals(range.note(request.completedPage(),request.note()),retry.getNote()))
+                    throw new ConflictException("TOKEN_REUSED","提交令牌已被不同页码的记录使用，请刷新后重试");
+                return get(retry.getId());
+            }
             verifyCountRetry(retry,request.taskId(),request.date(),request.actualAmount());
-            sequences.verifyNumberRetry(retry,request.taskId(),request.date(),request.completionPercent()==100 ? BigDecimal.ONE:null,request.problemNumber());
+            sequences.verifyNumberRetry(retry,request.taskId(),request.date(),request.completionPercent().compareTo(BigDecimal.valueOf(100))==0 ? BigDecimal.ONE:null,request.problemNumber());
             return get(retry.getId());
         }
         continuations.lockForTasks(request.taskId());
@@ -321,36 +333,41 @@ public class StudyRecordService {
                 .findFirst().orElseThrow(() -> new NotFoundException("当天学习安排不存在"));
         if (!snapshot.revision().equals(request.revision()))
             throw new ConflictException("DAY_PROGRESS_STALE", "当天计划或学习记录已变化，请刷新后重试");
+        if (request.completedPage()!=null && (snapshot.continuation()==null || snapshot.continuation().pageRange()==null))
+            throw new BusinessException("PAGE_PROGRESS_UNAVAILABLE","此任务没有可按页记录的连续教材阅读范围，请使用原进度入口");
         if (snapshot.continuation()!=null) {
             if (request.actualAmount()!=null)
                 throw new BusinessException("CONTINUATION_QUANTITY","学习接续只填写完成百分比，不虚构讲数或题数");
-            BigDecimal delta=BigDecimal.valueOf(request.completionPercent()).subtract(snapshot.completionPercent());
+            BigDecimal target=request.completedPage()==null ? request.completionPercent()
+                    : snapshot.continuation().pageRange().percent(request.completedPage());
+            String note=request.completedPage()==null ? request.note() : snapshot.continuation().pageRange().note(request.completedPage(),request.note());
+            BigDecimal delta=target.subtract(snapshot.completionPercent());
             if (delta.signum()<0) throw new BusinessException("PROGRESS_DECREASE","累计完成比例不能降低；请修改或删除原学习记录");
             if (continuedLearning.total(request.taskId()).add(delta).compareTo(BigDecimal.valueOf(100))>0)
                 throw new BusinessException("CONTINUATION_FUTURE_PROGRESS","该内容已有后续日期进度，请先修改或删除后续记录再补记");
             if (delta.signum()==0 && (request.durationMinutes()==null || request.durationMinutes()==0))
                 throw new BusinessException("EMPTY_PROGRESS","请增加完成比例");
             return createEntry(new StudyRecordCreateRequest(request.taskId(),null,null,request.date(),null,
-                    request.durationMinutes(),null,request.note(),request.clientToken()),false,delta.signum()>0 ? delta:null);
+                    request.durationMinutes(),null,note,request.clientToken()),false,delta.signum()>0 ? delta:null);
         }
         if (snapshot.activity()!=null) {
             if ("CHECK_ONLY".equals(snapshot.activity().mode()))
                 throw new BusinessException("CONFIRMATION_ENTRY","此安排只需勾选完成，不填写数量或用时");
-            if (request.completionPercent()!=0 && request.completionPercent()!=100)
+            if (request.completionPercent().signum()!=0 && request.completionPercent().compareTo(BigDecimal.valueOf(100))!=0)
                 throw new BusinessException("ACTIVITY_COMPLETION","时间型安排请选择继续记录或结束本次安排；不填写虚构百分比");
             if (!counted(snapshot.activity()) && snapshot.completionPercent().intValue()==100)
                 throw new ConflictException("ACTIVITY_ALREADY_COMPLETED","本次安排已结束，请在学习记录中补记或修改");
             return createEntry(new StudyRecordCreateRequest(request.taskId(),null,null,request.date(),request.actualAmount(),request.durationMinutes(),
-                    null,request.note(),request.clientToken()),request.completionPercent()==100);
+                    null,request.note(),request.clientToken()),request.completionPercent().compareTo(BigDecimal.valueOf(100))==0);
         }
         if (request.actualAmount()!=null) throw new BusinessException("QUANTITY_PROGRESS","数量型任务请使用原有完成比例或学习记录入口");
-        if (snapshot.sequence()!=null && request.completionPercent()!=0 && request.completionPercent()!=100)
+        if (snapshot.sequence()!=null && request.completionPercent().signum()!=0 && request.completionPercent().compareTo(BigDecimal.valueOf(100))!=0)
             throw new BusinessException("SEQUENCE_WHOLE_ITEM","接续任务只在整题完成后推进；尝试请选择未完成");
         if (snapshot.sequence()!=null && "SELECT_BY_NUMBER".equals(snapshot.sequence().mode()))
             return createEntry(new StudyRecordCreateRequest(request.taskId(),null,null,request.date(),
-                    request.completionPercent()==100 ? BigDecimal.ONE:null,request.durationMinutes(),null,null,
+                    request.completionPercent().compareTo(BigDecimal.valueOf(100))==0 ? BigDecimal.ONE:null,request.durationMinutes(),null,null,
                     request.clientToken(),null,request.problemNumber()),false);
-        var target = snapshot.plannedAmount().multiply(BigDecimal.valueOf(request.completionPercent()))
+        var target = snapshot.plannedAmount().multiply(request.completionPercent())
                 .movePointLeft(2).setScale(6, RoundingMode.HALF_UP);
         var delta = target.subtract(snapshot.completedAmount());
         if (delta.signum() < 0)
