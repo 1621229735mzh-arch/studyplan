@@ -70,7 +70,7 @@ public class PlanningContextExportService {
             var rows=study.stream().filter(r -> t.getId().equals(r.taskId())).toList();
             return new Task(t.getId(),t.getSubjectId(),t.getStageGoalId(),t.getTitle(),t.getUnitId(),t.getPlannedAmount(),
                     t.getStatus().name(),t.getVersion(),activity==null ? null:activity.mode(),activity==null ? null:activity.description(),
-                    sequence==null ? null:new Sequence(sequence.mode(),sequence.startDate(),sequence.endDate(),
+                    sequence==null ? null:new Sequence(sequence.mode(),sequence.startDate(),sequence.endDate(),sequence.dailyFrom(),
                             sequences.items(t.getId()).stream().map(i -> new SequenceItem(i.id(),i.position(),i.itemKey(),i.title(),i.url())).toList()),
                     new Actual(activity!=null && "COUNT_STUDY".equals(activity.mode()) ? knownSum(rows.stream().map(StudyRecordView::amount).toList()):sum(rows.stream().map(StudyRecordView::amount).toList()),
                             activity!=null && "COUNT_REVIEW".equals(activity.mode()) ? knownSum(rows.stream().map(StudyRecordView::reviewAmount).toList()):sum(rows.stream().map(StudyRecordView::reviewAmount).toList()),

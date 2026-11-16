@@ -141,6 +141,7 @@
                  LEFT JOIN task_continuation c ON c.task_id=t.id
                  LEFT JOIN study_continuation_stream s ON s.id=c.stream_id
         WHERE d.plan_date = #{planDate}
+          AND NOT EXISTS (SELECT 1 FROM task_sequence q WHERE q.task_id=d.task_id AND q.daily_from &lt;= d.plan_date)
         ORDER BY d.sort_order, d.id
     </select>
 

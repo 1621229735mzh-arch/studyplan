@@ -178,3 +178,5 @@ POST /api/learning/records/day-confirmation 接收 `{taskId,date,completed,revis
 ### 学习接续（v5）
 
 原计划导入 preview/confirm 支持 CONTINUED_STUDY + continuation（streamKey、title、position）。原 day-progress 接受每份内容的累计百分比，实际量 actualAmount 留空；今日 checklist 增加 continuation（streamId、title、position、referenceDate、carried），学习记录响应增加 continuationDelta。普通任务响应该字段为空。身份验证、CSRF、版本检查、防重及事务沿用原接口。日历日期为参考排期，实际继续内容由今日接口返回，允许超过参考截止日期。
+
+持续每日练习：`POST /api/plan/tasks/{id}/daily-practice`，请求`{version,from,title}`。仅显式转换已存在、启用且尚未转换的SELECT_BY_NUMBER任务，事务中取消截止和计划总量、解除原阶段目标关联，并保存每日展示起点。接口沿用登录、CSRF与任务版本；失败回滚。记录继续使用原problem-numbers／day-progress／学习记录接口，今日仍返回原SELECT_BY_NUMBER模式；规划上下文的sequence增加dailyFrom，endDate为空表示无截止。没有前端标记或缓存扩展，未自动转换生产数据。

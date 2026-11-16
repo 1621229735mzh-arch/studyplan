@@ -51,6 +51,7 @@ public class StudyRecordService {
 
     private final DailyPlanService dailyPlanService;
     private final SequenceLearningService sequences;
+    private final com.kaoyan.study.plan.service.TaskSequenceService sequencePlans;
     private final ContinuationLearningService continuedLearning;
     private final com.kaoyan.study.plan.service.TaskContinuationService continuations;
     private final com.kaoyan.study.plan.service.TaskActivityService activities;
@@ -66,7 +67,9 @@ public class StudyRecordService {
                               StudyUnitService studyUnitService,
                               DailyPlanService dailyPlanService, SequenceLearningService sequences, com.kaoyan.study.plan.service.TaskActivityService activities,
                               ContinuationLearningService continuedLearning,com.kaoyan.study.plan.service.TaskContinuationService continuations,
-                              org.springframework.context.ApplicationEventPublisher events) {
+                              org.springframework.context.ApplicationEventPublisher events,
+                              com.kaoyan.study.plan.service.TaskSequenceService sequencePlans) {
+        this.sequencePlans=sequencePlans;
         this.events = events;
         this.continuedLearning=continuedLearning; this.continuations=continuations;
         this.activities=activities;
@@ -273,7 +276,16 @@ public class StudyRecordService {
             return new DayLearningTaskView(entry.getKey(), first.subjectId(),
                     first.taskTitle(), planned, completed, fraction.movePointRight(2), estimate, remaining, revision, sequence,activity,first.unitName());
         }).toList();
-        return Stream.concat(ordinary.stream(),continuedLearning.dayTasks(date).stream()).toList();
+        var practice=sequencePlans.dailyPractice(date).stream().map(task -> {
+            var state=sequences.state(task.taskId(),date);
+            var completed=records.stream().filter(r->task.taskId().equals(r.taskId())).map(StudyRecordView::amount)
+                    .filter(Objects::nonNull).reduce(BigDecimal.ZERO,BigDecimal::add);
+            return new DayLearningTaskView(task.taskId(),task.subjectId(),task.title(),null,completed,
+                    completed.signum()>0 ? BigDecimal.valueOf(100):BigDecimal.ZERO,null,null,
+                    com.kaoyan.study.plan.service.PlanImportService.digest(task.version()+":"+date+":"+state.revision()),
+                    state,null,task.unitName());
+        });
+        return Stream.concat(Stream.concat(ordinary.stream(),continuedLearning.dayTasks(date).stream()),practice).toList();
     }
 
     /** Task lock serializes all confirmations and cancellations for this shared task. */

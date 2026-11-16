@@ -29,7 +29,7 @@ public record PlanningContextExport(Snapshot snapshot, String markdown) {
                        String description, Sequence sequence, Actual actual) {}
     public record Actual(BigDecimal firstStudyAmount, BigDecimal reviewAmount,
                          BigDecimal contentPercent, int recordCount, long learningDays, long unknownQuantityRecords) {}
-    public record Sequence(String mode, LocalDate startDate, LocalDate endDate, List<SequenceItem> items) {}
+    public record Sequence(String mode, LocalDate startDate, LocalDate endDate, LocalDate dailyFrom, List<SequenceItem> items) {}
     public record SequenceItem(Long id, Integer position, String key, String title, String url) {}
     public record Continuation(Long taskId, Long streamId, String bookTitle, Integer position,
                                LocalDate referenceDate, String description, boolean referenceDaysOnly, LocalDate availableFrom) {}

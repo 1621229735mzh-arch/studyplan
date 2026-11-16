@@ -117,7 +117,10 @@ public class TaskService {
                 && taskMapper.countRecords(id) > 0) {
             throw new ConflictException("TASK_MEASUREMENT_IN_USE", "该任务已有学习记录，不能修改科目或计量单位；请新建任务");
         }
-        if (sequences.definition(id)!=null && (!task.getUnitId().equals(request.unitId())
+        var sequence=sequences.definition(id);
+        if (sequence!=null && sequence.dailyFrom()!=null && (request.plannedAmount()!=null || !task.getUnitId().equals(request.unitId())))
+            throw new ConflictException("DAILY_PRACTICE_QUANTITY","日常练习不设置计划量，保留原计量单位");
+        if (sequence!=null && sequence.dailyFrom()==null && (!task.getUnitId().equals(request.unitId())
                 || request.plannedAmount()==null || task.getPlannedAmount().compareTo(request.plannedAmount())!=0))
             throw new ConflictException("SEQUENCE_TASK_QUANTITY","接续任务的单位与总名额固定；新的安排请另建计划");
         task.setSubjectId(request.subjectId());

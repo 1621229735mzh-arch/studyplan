@@ -50,6 +50,7 @@
                      NULL AS study_minutes
               FROM daily_plan_item d JOIN task t ON t.id = d.task_id
               WHERE d.source &lt;&gt; 'REVIEW'
+                AND NOT EXISTS (SELECT 1 FROM task_sequence q WHERE q.task_id=d.task_id AND q.daily_from &lt;= d.plan_date)
                 <if test="from != null">AND d.plan_date &gt;= #{from}</if>
                 <if test="to != null">AND d.plan_date &lt;= #{to}</if>
               UNION ALL

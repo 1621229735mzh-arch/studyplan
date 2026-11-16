@@ -57,7 +57,10 @@ final class PlanningContextMarkdown {
         f.continuations().forEach(c->row(b,c.taskId(),c.streamId(),c.bookTitle(),c.position(),c.referenceDate(),c.description())); b.append('\n');
         section(b,"题目清单与模式");
         for(var t:f.tasks()) if(t.sequence()!=null) {
-            b.append("任务ID ").append(t.id()).append(" · ").append(t.sequence().mode()).append(" · ").append(t.sequence().startDate()).append(" — ").append(t.sequence().endDate()).append("\n\n");
+            b.append("任务ID ").append(t.id()).append(" · ").append(t.sequence().mode()).append(" · ").append(t.sequence().startDate()).append(" — ")
+                    .append(t.sequence().endDate()==null ? "无截止日期":t.sequence().endDate());
+            if (t.sequence().dailyFrom()!=null) b.append(" · ").append(t.sequence().dailyFrom()).append("起每日展示，无计划题数，未做不积压");
+            b.append("\n\n");
             table(b,"题目ID","顺序","key","题名／题号","链接"); t.sequence().items().forEach(i->row(b,i.id(),i.position(),i.key(),i.title(),i.url())); b.append('\n');
         }
         section(b,"原参考安排"); b.append("工作区版本：").append(f.referencePlan().revision()).append("\n\n");

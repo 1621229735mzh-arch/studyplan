@@ -28,6 +28,10 @@ class SequenceLearningIntegrationTest {
     @Autowired SequenceLearningService sequences;
     @Autowired TaskService tasks;
     @Autowired ProblemNumberModeService numberMode;
+    @Autowired DailyPracticeService dailyPractice;
+    @Autowired PlanWorkspaceService workspace;
+    @Autowired com.kaoyan.study.progress.service.ProgressService progress;
+    @Autowired PlanningContextExportService contextExport;
     @Autowired DailyPlanService daily;
     @Autowired SubjectService subjects;
     @Autowired StudyUnitService units;
@@ -172,6 +176,90 @@ class SequenceLearningIntegrationTest {
     }
     StudyRecordCreateRequest numbered(int day,int number,BigDecimal amount,String token) {
         return new StudyRecordCreateRequest(taskId,null,null,date.plusDays(day),amount,null,null,null,token,null,number);
+    }
+    void enableDaily(LocalDate from) {
+        dailyPractice.enable(taskId,new DailyPracticeService.Request(tasks.get(taskId).getVersion(),from,"LeetCode练习"));
+    }
+    @Test void dailyPracticeContinuesWithoutDeadlineQuotaOrExtraDailyRows() {
+        convertNumbers(List.of());
+        enableDaily(date.plusDays(1));
+        var count=jdbc.queryForObject("SELECT COUNT(*) FROM daily_plan_item WHERE task_id=?",Long.class,taskId);
+        for (var on:List.of(date.plusDays(1),date.plusDays(3650))) {
+            var shown=records.dayTasks(on).stream().filter(t->t.id().equals(taskId)).toList();
+            assertThat(shown).hasSize(1);
+            assertThat(shown.getFirst().plannedAmount()).isNull();
+            assertThat(shown.getFirst().completionPercent()).isZero();
+            assertThat(shown.getFirst().sequence().mode()).isEqualTo("SELECT_BY_NUMBER");
+            assertThat(shown.getFirst().sequence().actionable()).isTrue();
+            assertThat(today.today(on).sections().stream().flatMap(s->s.tasks().stream()).filter(t->t.id().equals(taskId)).findFirst().orElseThrow().actionable()).isTrue();
+        }
+        assertThat(tasks.get(taskId).getPlannedAmount()).isNull();
+        assertThat(jdbc.queryForObject("SELECT end_date IS NULL FROM task_sequence WHERE task_id=?",Boolean.class,taskId)).isTrue();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM daily_plan_item WHERE task_id=?",Long.class,taskId)).isEqualTo(count);
+        assertThat(daily.list(date)).anyMatch(t->t.taskId().equals(taskId));
+        assertThat(workspace.read(date.plusDays(1),date.plusDays(2),subjectId).entries()).isEmpty();
+        assertThat(progress.overview(date.plusDays(1),date.plusDays(2)).items()).noneMatch(t->t.subjectId().equals(subjectId));
+        assertThatThrownBy(()->daily.addItem(date.plusDays(100),new DailyItemCreateRequest(taskId,BigDecimal.ONE,null))).isInstanceOf(BusinessException.class);
+    }
+    @Test void dailyPracticeUsesExistingMultiProblemRecordingAndReopensOnNextDay() {
+        convertNumbers(List.of());enableDaily(date);
+        var request=batch(100,List.of(7,10000),UUID.randomUUID().toString());
+        var saved=records.recordCompletedProblems(request);
+        assertThat(saved).hasSize(2);
+        assertThat(records.recordCompletedProblems(request).stream().map(StudyRecordView::id).toList()).isEqualTo(saved.stream().map(StudyRecordView::id).toList());
+        records.recordCompletedProblems(batch(100,List.of(42),UUID.randomUUID().toString()));
+        assertThat(tasks.progress(taskId).completedAmount()).isEqualByComparingTo("3");
+        var same=records.dayTasks(date.plusDays(100)).stream().filter(t->t.id().equals(taskId)).findFirst().orElseThrow();
+        assertThat(same.completedAmount()).isEqualByComparingTo("3");
+        assertThat(same.completionPercent()).isEqualByComparingTo("100");
+        assertThat(records.dayTasks(date.plusDays(101)).stream().filter(t->t.id().equals(taskId)).findFirst().orElseThrow().completionPercent()).isZero();
+        assertThatThrownBy(()->records.recordCompletedProblems(batch(101,List.of(42),UUID.randomUUID().toString()))).isInstanceOf(BusinessException.class);
+        assertThatThrownBy(()->records.create(numbered(-1,888,BigDecimal.ONE,null))).isInstanceOf(BusinessException.class);
+    }
+    @Test void dailyPracticePreservesHistoryAndKeepsEditDeleteAndStaleChecks() {
+        var old=complete(0,0);convertNumbers(List.of(31));
+        var stale=tasks.get(taskId);enableDaily(date.plusDays(1));
+        assertThat(records.get(old.id())).usingRecursiveComparison().ignoringFields("taskTitle").isEqualTo(old);
+        assertThatThrownBy(()->dailyPractice.enable(taskId,new DailyPracticeService.Request(stale.getVersion(),date,"覆盖"))).isInstanceOf(BusinessException.class);
+        var request=batch(100,List.of(1234),UUID.randomUUID().toString());
+        var created=records.recordCompletedProblems(request).getFirst();
+        var changed=records.update(created.id(),new StudyRecordUpdateRequest(taskId,null,null,date.plusDays(100),BigDecimal.ONE,null,
+                created.content(),created.note(),created.version(),created.sequenceItemId(),9999));
+        assertThat(changed.sequenceTitle()).isEqualTo("LeetCode 9999");
+        records.delete(changed.id(),changed.version());
+        assertThatThrownBy(()->records.recordCompletedProblems(request)).isInstanceOf(BusinessException.class);
+        assertThat(records.dayTasks(date.plusDays(100)).stream().filter(t->t.id().equals(taskId)).findFirst().orElseThrow().completionPercent()).isZero();
+        assertThat(tasks.progress(taskId).completedAmount()).isEqualByComparingTo("1");
+        var task=tasks.get(taskId);
+        tasks.update(taskId,new TaskUpdateRequest(task.getSubjectId(),null,task.getTitle(),task.getUnitId(),null,
+                com.kaoyan.study.plan.entity.TaskStatus.ARCHIVED,task.getVersion()));
+        assertThat(records.dayTasks(date.plusDays(101))).noneMatch(t->t.id().equals(taskId));
+    }
+    @Test void dailyPracticeRejectsWrongSourceOrStartAndExportsNoDeadline() {
+        var task=tasks.get(taskId);
+        assertThatThrownBy(()->dailyPractice.enable(taskId,new DailyPracticeService.Request(task.getVersion(),date,"练习"))).isInstanceOf(BusinessException.class);
+        convertNumbers(List.of());
+        assertThatThrownBy(()->enableDaily(date.minusDays(1))).isInstanceOf(BusinessException.class);
+        enableDaily(date);
+        var exported=contextExport.export().snapshot().facts().tasks().stream().filter(t->t.id().equals(taskId)).findFirst().orElseThrow();
+        assertThat(exported.sequence().endDate()).isNull();
+        assertThat(exported.sequence().dailyFrom()).isEqualTo(date);
+        assertThat(exported.plannedAmount()).isNull();
+    }
+    @Test void dailyPracticeConversionHttpRequiresLoginCsrfAndCurrentVersion() {
+        convertNumbers(List.of());
+        var client=new com.kaoyan.study.support.HttpTestClient("http://127.0.0.1:"+port);
+        String path="/api/plan/tasks/"+taskId+"/daily-practice";
+        var csrf=client.fetchCsrfToken();
+        assertThat(client.post(path,"{}",csrf).status()).isEqualTo(401);
+        assertThat(client.post("/api/auth/login","{\"username\":\"kaoyan\",\"password\":\"test-only-password\"}",csrf).status()).isEqualTo(200);
+        csrf=client.fetchCsrfToken();
+        String body="{\"version\":%d,\"from\":\"2026-10-14\",\"title\":\"LeetCode练习\"}".formatted(tasks.get(taskId).getVersion());
+        assertThat(client.post(path,body,null).status()).isEqualTo(403);
+        assertThat(client.post(path,body.replace("LeetCode练习"," "),csrf).status()).isEqualTo(400);
+        var saved=client.post(path,body,csrf);
+        assertThat(saved.status()).as(saved.body()).isEqualTo(204);
+        assertThat(client.post(path,body,csrf).status()).isEqualTo(409);
     }
     @Test void convertsExistingThreeRecordsTo31_32_49InPlace() {
         var first=complete(0,0);var second=complete(1,1);var third=complete(2,2);

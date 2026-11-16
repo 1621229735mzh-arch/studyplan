@@ -40,9 +40,9 @@ public class SequenceLearningService {
                 .sorted(Comparator.comparing((StudyRecordView r) -> r.amount()==null).thenComparing(StudyRecordView::id)).findFirst().orElse(null);
         boolean retainOwn=own!=null && (own.amount()!=null || date.isBefore(studyDay.today()));
         var dayItem=!retainOwn ? current : entries.stream().filter(i -> i.id().equals(own.sequenceItemId())).findFirst().orElse(null);
-        var revision=definition.mode()+":"+records.sequenceHistory(taskId)+":"+rows.stream().sorted(Comparator.comparing(StudyRecordView::id))
+        var revision=definition.toString()+":"+records.sequenceHistory(taskId)+":"+rows.stream().sorted(Comparator.comparing(StudyRecordView::id))
                 .map(r -> r.id()+":"+r.version()).collect(java.util.stream.Collectors.joining(","));
-        boolean inRange=!date.isBefore(definition.startDate()) && !date.isAfter(definition.endDate());
+        boolean inRange=definition.contains(date);
         if ("SELECT_BY_NUMBER".equals(definition.mode())) {
             var actual=own==null ? null:entries.stream().filter(i->i.id().equals(own.sequenceItemId())).findFirst().orElse(null);
             var used=rows.stream().map(StudyRecordView::sequenceItemId).collect(java.util.stream.Collectors.toSet());
@@ -75,7 +75,7 @@ public class SequenceLearningService {
         var items=sequences.items(record.getTaskId());
         var item=items.stream().filter(i -> i.id().equals(selected)).findFirst()
                 .orElseThrow(() -> new ConflictException("SEQUENCE_ITEM_REQUIRED","请选择当前题目后重试"));
-        if (record.getRecordDate().isBefore(definition.startDate()) || record.getRecordDate().isAfter(definition.endDate()))
+        if (!definition.contains(record.getRecordDate()))
             throw new BusinessException("SEQUENCE_DATE_RANGE","记录日期须在接续计划起止范围内，不会自动延长计划");
         var amount=record.getAmount();
         if (amount!=null && amount.compareTo(BigDecimal.ONE)!=0)
@@ -101,7 +101,7 @@ public class SequenceLearningService {
     }
 
     private void bindNumber(StudyRecord record,Integer number,com.kaoyan.study.plan.mapper.TaskSequenceMapper.Definition definition) {
-        if (record.getRecordDate().isBefore(definition.startDate()) || record.getRecordDate().isAfter(definition.endDate()))
+        if (!definition.contains(record.getRecordDate()))
             throw new BusinessException("SEQUENCE_DATE_RANGE","记录日期须在计划起止范围内");
         if (record.getAmount()!=null && record.getAmount().compareTo(BigDecimal.ONE)!=0)
             throw new BusinessException("SEQUENCE_WHOLE_ITEM","完成整题记 1；尝试未完成请留空完成量");

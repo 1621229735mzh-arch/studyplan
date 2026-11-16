@@ -44,7 +44,9 @@ public class DailyPlanService {
 
     private void validateSequence(Long taskId,LocalDate date,BigDecimal amount) {
         var definition=sequences.definition(taskId);
-        if (definition!=null && (date.isBefore(definition.startDate()) || date.isAfter(definition.endDate())
+        if (definition!=null && definition.dailyOn(date))
+            throw new ConflictException("DAILY_PRACTICE_SCHEDULE","日常练习每天直接展示，无需设置计划量");
+        if (definition!=null && (!definition.contains(date)
                 || amount==null || (amount.compareTo(BigDecimal.ZERO)!=0 && amount.compareTo(BigDecimal.ONE)!=0)))
             throw new ConflictException("SEQUENCE_DAILY_SLOT","接续任务只在原日期范围每天安排 1 个名额，取消可设为 0");
     }

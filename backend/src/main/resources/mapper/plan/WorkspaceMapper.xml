@@ -14,6 +14,7 @@
         LEFT JOIN task_continuation c ON c.task_id=t.id
         LEFT JOIN study_continuation_stream s ON s.id=c.stream_id
         WHERE d.source &lt;&gt; 'REVIEW'
+          AND NOT EXISTS (SELECT 1 FROM task_sequence q WHERE q.task_id=d.task_id AND q.daily_from &lt;= d.plan_date)
         <if test="start != null">AND d.plan_date &gt;= #{start}</if>
         <if test="end != null">AND d.plan_date &lt;= #{end}</if>
         <if test="subjectId != null">AND t.subject_id=#{subjectId}</if>

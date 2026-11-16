@@ -123,3 +123,7 @@ V17：`task_sequence` 保存本期日期，`task_sequence_item` 保存有序 key
 `study_continuation_stream` 按导入批次与 stream key 标识一本书，`task_continuation` 将独立内容任务映射到书籍与连续顺序。参考日期和预计用时仍由原 `daily_plan_item` 保存。`task_activity.mode=CONTINUED_STUDY` 不填写计划数量。
 
 `study_record.continuation_delta` 为本次增加的百分点（0 < delta <= 100），同记录的 amount 必须为 null。累计百分比、旧内容和下一份内容均实时派生，删除记录后重算；不增加一份独立完成量表或可失同步的游标。书籍行锁串行化同书各内容的写入。V1—V19 未修改。
+
+## V27：持续每日题号练习
+
+`task_sequence.end_date`允许为空；`daily_from DATE NULL`定义每日展示起点，约束仅SELECT_BY_NUMBER可启用，起点不早于原start_date且启用后end_date必须为空。迁移不修改个人任务、日安排或学习记录。正常业务服务经版本检查、工作区和任务锁设置字段，并清空task.planned_amount及stage_goal_id。从起点开始排除旧日安排的计划要求，今日任务改为只读派生；生效前参考安排、已有题目身份、每题原学习记录及课程关系保留。没有新的完成量表，其他V1—V26迁移不改写。

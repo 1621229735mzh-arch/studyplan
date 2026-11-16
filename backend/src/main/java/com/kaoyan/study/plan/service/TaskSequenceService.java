@@ -13,6 +13,12 @@ public class TaskSequenceService {
     public TaskSequenceService(TaskSequenceMapper mapper) { this.mapper=mapper; }
     public TaskSequenceMapper.Definition definition(Long taskId) { return taskId==null ? null : mapper.definition(taskId); }
     public List<TaskSequenceMapper.Item> items(Long taskId) { return mapper.items(taskId); }
+    public List<TaskSequenceMapper.DailyPractice> dailyPractice(LocalDate date) { return mapper.dailyPractice(date); }
+    @Transactional(propagation=Propagation.MANDATORY)
+    public void startDailyPractice(Long taskId,LocalDate from) {
+        if (mapper.startDailyPractice(taskId,from)!=1)
+            throw new com.kaoyan.study.common.exception.ConflictException("DAILY_PRACTICE_STALE","练习方式已变化，请刷新后重试");
+    }
     @Transactional(propagation=Propagation.MANDATORY)
     public void create(Long taskId, LocalDate start, LocalDate end, PlanImportDocument.Sequence sequence) {
         mapper.insert(taskId,start,end);

@@ -207,3 +207,5 @@ V20 新增学习接续规划表与原学习记录的 `continuation_delta`。`Tas
 前端 `review/components/AutoReviewBooks.vue` 按教材收纳小段及开关、暂停、改期入口；`review/api/automatic.ts` 管理认证API和专用类型。原日期工作区Entry附教材与轮次，今日仍读原复习安排。只读进度快照不增加算法状态或完整明细。规则见 [自动复习](business/automatic-review.md)。
 
 同日后续今日执行：`AutoReviewMapper.QueueRow`只读关联原复习项／当日记录，`AutoReviewService.dayQueue`按教材排序推荐当前项，`QueuedReviewTask`包装原日任务及`AutomaticReviewContext`；`ReviewService.todayTasks`组合手动项、当天痕迹和候选，`TodayService`只组合且排除未开始的自选候选计数。`today/components/ReviewBook.vue`收纳教材及“继续复习下一项”，复用原百分比反馈接口，无新表或迁移。进度使用`ReviewWorkspaceService.progressSources`的内部只读DTO，`CatalogService`依原目录归属生成branchReviews，分科页面展示；原subject统计保留兼容。只读快照增加分科汇总，不含复习明细或独立完成事实。
+
+2026-11-16持续日常练习：V27允许`task_sequence.end_date`为空并增加`daily_from`，只由显式转换设置，不自动更新个人计划。`DailyPracticeService`在原plan模块持有工作区／任务锁、校验版本并移除截止和计划量；`DailyPracticeController`提供认证转换接口。`TaskSequenceService.dailyPractice`只读返回每天应展示的任务，`StudyRecordService.dayTasks`使用原记录派生完成情况；题号输入、批量记录、课程统计和前端保持原样。`PlanningContextExport.Sequence`增加dailyFrom，Markdown明确无截止，未新增缓存或完成事实表。
