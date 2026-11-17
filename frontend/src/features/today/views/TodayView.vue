@@ -21,6 +21,7 @@ import ChecklistTask from '../components/ChecklistTask.vue'
 import ContinuationBook from '../components/ContinuationBook.vue'
 import ReviewBook from '../components/ReviewBook.vue'
 import type { TodayChecklistTask, TodayResponse } from '../types'
+import { questBoard } from '../quests'
 const session = useSessionStore()
 const catalog = useCatalogStore()
 const offline = useOfflineSnapshotStore()
@@ -38,6 +39,8 @@ function syncStudyDay(): boolean {
   return true
 }
 const today = ref<TodayResponse | null>(null)
+const quests = computed(() => questBoard(today.value?.sections ?? []))
+const activeQuest = ref('daily')
 const loading = ref(false)
 const errorMessage = ref<string | null>(null)
 const readFailure = ref<ReturnType<typeof todayReadFailure> | null>(null)
@@ -283,7 +286,7 @@ onUnmounted(() => {
   <div class="page today-page">
     <header class="today-hero">
       <ArchiveArtwork variant="hero" class="today-hero__art" />
-      <div class="today-hero__copy"><span class="today-eyebrow">STUDY ROOM</span><h1>今日学习</h1><p>学习日 {{ date }} · 次日早上 9 点截止（北京时间）。</p>
+      <div class="today-hero__copy"><span class="today-eyebrow">YOUR LIFE, YOUR QUEST</span><h1>今日任务</h1><p class="today-hero__intro">把想成为的自己，落在今天的行动里。</p><p>学习日 {{ date }} · 次日早上 9 点截止（北京时间）。</p>
       </div>
       <div class="today-hero__tools">
         <ElButton class="today-extra-button" :disabled="readonly || saving || !today?.sections" @click="openExtraRecord"><AppIcon name="edit" :size="20" />补记学习</ElButton>
@@ -308,12 +311,28 @@ onUnmounted(() => {
         <div class="summary-metric summary-metric--pending"><span class="metric-icon"><AppIcon name="pending" :size="30" /></span><div><span>还剩</span><strong>{{ today.taskCounts.remaining }} <small>项</small></strong></div></div>
       </section>
       <ElAlert v-else type="info" :closable="false" title="当前数据尚无任务项数统计，请联网刷新今日清单。" />
-      <section v-for="section in today.sections" :key="section.name" class="section-card subject-section">
+      <div class="quest-board">
+        <nav class="quest-navigation" aria-label="任务分类">
+          <span class="quest-navigation__label">任务日志</span>
+          <button v-for="quest in quests" :key="quest.id" type="button" :aria-pressed="activeQuest === quest.id" :aria-controls="`quest-${quest.id}`" :class="[`quest-link quest-link--${quest.id}`, { 'is-active': activeQuest === quest.id }]" @click="activeQuest = quest.id">
+            <AppIcon :name="quest.icon" :size="23" /><span><strong>{{ quest.title }}</strong><small>{{ quest.english }}</small></span><span class="quest-link__indicator" aria-hidden="true">{{ activeQuest === quest.id ? '●' : '' }}</span>
+          </button>
+          <p>每一次真实行动，<br />都让成长有迹可循。</p>
+        </nav>
+        <div class="quest-board__content">
+          <section v-for="quest in quests" v-show="activeQuest === quest.id" :id="`quest-${quest.id}`" :key="quest.id" :class="`quest-chapter quest-chapter--${quest.id}`" :aria-labelledby="`quest-title-${quest.id}`">
+            <header class="quest-heading">
+              <span class="quest-emblem"><AppIcon :name="quest.icon" :size="27" /></span>
+              <div><span class="quest-heading__eyebrow">{{ quest.english }}</span><h2 :id="`quest-title-${quest.id}`">{{ quest.title }}</h2><p>{{ quest.description }}</p></div>
+              <span class="quest-context">{{ quest.context }}</span>
+            </header>
+            <div v-if="!quest.sections.length" class="quest-empty"><AppIcon :name="quest.icon" :size="25" /><p>{{ quest.empty }}</p></div>
+      <section v-for="section in quest.sections" :key="section.name" class="section-card subject-section">
         <div class="subject-heading">
-          <h2><AppIcon :name="subjectIcon(section.name)" :size="30" />{{ section.name }}</h2>
+          <h3><AppIcon :name="subjectIcon(section.name)" :size="20" />{{ section.name }}</h3>
         </div>
         <ul class="checklist">
-          <ChecklistTask v-for="task in section.tasks.filter(t => t.kind !== 'REVIEW' && !t.continuation && (t.completionPercent < 100 || t.sequence?.mode === 'SELECT_BY_NUMBER'))" :key="`${task.kind}-${task.id}`"
+          <ChecklistTask v-for="task in section.tasks.filter(t => t.kind !== 'REVIEW' && !t.continuation && (t.completionPercent < 100 || t.sequence?.mode === 'SELECT_BY_NUMBER' || t.activity?.mode === 'COUNT_STUDY' || t.activity?.mode === 'COUNT_REVIEW'))" :key="`${task.kind}-${task.id}`"
             :task="task" :readonly="readonly || saving" :show-estimate="section.name === '数学一'" @action="openAction" />
           <ContinuationBook v-for="book in bookGroups(section.tasks)" :key="`book-${book.id}`" :title="book.title" :tasks="book.tasks" :readonly="readonly || saving" :show-estimate="section.name === '数学一'" @action="openAction" />
           <li v-if="section.tasks.some(t => t.kind === 'REVIEW')" class="today-review-section">
@@ -324,14 +343,17 @@ onUnmounted(() => {
             </ul>
           </li>
         </ul>
-        <p v-if="!section.tasks.some(t => t.completionPercent < 100 || t.sequence?.mode === 'SELECT_BY_NUMBER')" class="empty-subject">
+        <p v-if="!section.tasks.some(t => t.completionPercent < 100 || t.sequence?.mode === 'SELECT_BY_NUMBER' || t.activity?.mode === 'COUNT_STUDY' || t.activity?.mode === 'COUNT_REVIEW')" class="empty-subject">
           {{ section.tasks.length ? '今日任务已完成' : '今天暂无任务' }}
         </p>
-        <details v-if="section.tasks.some(t => !t.continuation && !t.automaticReview && t.completionPercent >= 100 && t.sequence?.mode !== 'SELECT_BY_NUMBER')" class="completed">
-          <summary>已完成 · {{ section.tasks.filter(t => !t.continuation && !t.automaticReview && t.completionPercent >= 100 && t.sequence?.mode !== 'SELECT_BY_NUMBER').length }}</summary>
-          <ul class="checklist"><ChecklistTask v-for="task in section.tasks.filter(t => !t.continuation && !t.automaticReview && t.completionPercent >= 100 && t.sequence?.mode !== 'SELECT_BY_NUMBER')" :key="`${task.kind}-${task.id}`" :task="task" :readonly="readonly || saving" @action="openAction" /></ul>
+        <details v-if="section.tasks.some(t => !t.continuation && !t.automaticReview && t.completionPercent >= 100 && t.sequence?.mode !== 'SELECT_BY_NUMBER' && t.activity?.mode !== 'COUNT_STUDY' && t.activity?.mode !== 'COUNT_REVIEW')" class="completed">
+          <summary>已完成 · {{ section.tasks.filter(t => !t.continuation && !t.automaticReview && t.completionPercent >= 100 && t.sequence?.mode !== 'SELECT_BY_NUMBER' && t.activity?.mode !== 'COUNT_STUDY' && t.activity?.mode !== 'COUNT_REVIEW').length }}</summary>
+          <ul class="checklist"><ChecklistTask v-for="task in section.tasks.filter(t => !t.continuation && !t.automaticReview && t.completionPercent >= 100 && t.sequence?.mode !== 'SELECT_BY_NUMBER' && t.activity?.mode !== 'COUNT_STUDY' && t.activity?.mode !== 'COUNT_REVIEW')" :key="`${task.kind}-${task.id}`" :task="task" :readonly="readonly || saving" @action="openAction" /></ul>
         </details>
       </section>
+          </section>
+        </div>
+      </div>
       <details ref="extraRecordRef" class="section-card extra-record"><summary>补记学习 / 计划外记录</summary>
         <fieldset :disabled="readonly" class="extra-record-fields"><RecordForm ref="recordFormRef" :tasks="taskOptions" :submitting="recording" @submit="saveExtraRecord" /></fieldset>
       </details>

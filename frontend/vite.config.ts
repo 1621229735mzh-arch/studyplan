@@ -12,9 +12,9 @@ export default defineConfig({
       // 由 src/pwa/registerServiceWorker.ts 自行注册，便于展示“有新版本”提示。
       injectRegister: false,
       manifest: {
-        name: '考研学习工作台',
-        short_name: '考研工作台',
-        description: '个人考研学习计划、记录、进度与复习工作台',
+        name: '人生任务系统',
+        short_name: '人生任务系统',
+        description: '记录每日行动，推进长期目标，回看个人成长',
         lang: 'zh-CN',
         start_url: '/',
         scope: '/',

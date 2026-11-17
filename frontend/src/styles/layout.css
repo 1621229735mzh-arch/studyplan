@@ -1,11 +1,11 @@
 .app-layout { display:grid; grid-template-columns:clamp(210px,14.6vw,390px) minmax(0,1fr); min-height:100vh; min-height:100dvh; }
-.app-layout--today { grid-template-columns:clamp(210px,14.6vw,390px) minmax(0,1fr) clamp(360px,31.3vw,840px); }
+.app-layout--today { grid-template-columns:clamp(210px,14.6vw,280px) minmax(0,1fr); }
 .app-layout__aside { position:sticky; top:0; height:100vh; height:100dvh; display:flex; flex-direction:column; padding:32px 18px 20px; border-right:1px solid #584457; background:linear-gradient(180deg,rgba(15,13,21,.18),rgba(15,13,21,.46)),url('../assets/theme/archive-patina.webp') left top / auto 115% no-repeat; }
 .app-layout__brand { display:flex; align-items:center; gap:10px; padding:0 8px 36px; color:var(--kaoyan-text); text-decoration:none; }
 .app-layout__brand:hover { text-decoration:none; }
 .app-layout__logo { display:none; width:30px; height:30px; flex-shrink:0; }
-.app-layout__brand-text strong { display:block; white-space:nowrap; font-family:var(--kaoyan-display-font); font-size:clamp(25px,2vw,40px); font-weight:700; letter-spacing:2px; text-shadow:0 2px 6px #000; }
-.app-layout__brand-text span { display:block; margin-top:6px; color:#e6dce8; font-family:Georgia,serif; font-size:11px; letter-spacing:5px; }
+.app-layout__brand-text strong { display:block; white-space:nowrap; font-family:var(--kaoyan-display-font); font-size:clamp(23px,1.6vw,32px); font-weight:700; letter-spacing:1px; text-shadow:0 2px 6px #000; }
+.app-layout__brand-text span { display:block; margin-top:8px; color:#c8b8d3; font-family:Georgia,serif; font-size:9px; letter-spacing:2px; }
 .app-layout__menu { display:flex; flex-direction:column; gap:9px; }
 .app-layout__nav-link { display:flex; align-items:center; gap:20px; min-height:clamp(58px,3.8vw,76px); padding:13px 20px; font-size:clamp(21px,1.45vw,28px); letter-spacing:2px; border:1px solid transparent; border-radius:12px; color:#e7dfed; text-shadow:0 1px 5px #000; transition:color .15s,background .15s,border-color .15s; text-decoration:none; }
 .app-layout__nav-link .app-icon { width:28px; height:28px; }
@@ -26,8 +26,7 @@
 .app-layout--today .desktop-page-title { display:none; }
 .app-layout--today .app-layout__status { margin-left:auto; font-size:10px; opacity:.8; }
 .app-layout--today .desktop-logout { min-height:26px; padding:5px 8px; font-size:10px; }
-.app-layout--today .app-layout__main { padding:0 14px 44px; }
-.app-layout__art { position:sticky; top:0; height:100vh; height:100dvh; border-left:1px solid var(--kaoyan-border); background:var(--kaoyan-bg); }
+.app-layout--today .app-layout__main { padding:20px clamp(18px,2.3vw,40px) 44px; }
 .mobile-navigation,.mobile-brand { display:none; }
 .more-menu { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; padding-bottom:22px; }
 .more-menu a { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:9px; min-height:80px; border:1px solid var(--kaoyan-border); border-radius:10px; color:var(--kaoyan-text-secondary); text-decoration:none; }

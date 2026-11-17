@@ -25,6 +25,53 @@ async function page() {const wrapper=mount(TodayView,{global:{plugins:[ElementPl
 function button(wrapper: ReturnType<typeof mount>, text: string, index=0) {return wrapper.findAllComponents(ElButton).filter(b=>b.text()===text)[index]}
 beforeEach(()=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-10-01T12:00:00+08:00'));mocks.online=ref(true);mocks.snapshot=null;vi.clearAllMocks();mocks.fetch.mockResolvedValue(fixture());mocks.learning.mockResolvedValue({id:1});mocks.problems.mockResolvedValue([]);mocks.review.mockResolvedValue({id:2});mocks.cache.mockResolvedValue(undefined)})
 afterEach(()=>{wrappers.splice(0).forEach(w=>w.unmount());document.body.innerHTML='';vi.useRealTimers()})
+describe('人生任务面板', () => {
+ it('每日练习与主线分栏，教材自选与复习仍留在主线，任务不重复', async () => {
+  const data = fixture()
+  const base = data.sections![0].tasks[0]
+  data.sections![0].tasks.push({ ...base, id: 12, title: '自选下一段', completionPercent: 0,
+   continuation: { streamId: 8, title: '高数教材', position: 2, referenceDate: data.date, carried: false, optional: true } })
+  data.sections!.push({ ...data.sections![0], name: '英语一', tasks: [
+   { ...base, id: 13, title: '背单词', completionPercent: 100, recordedAmount: 25, unitName: '词', activity: { mode: 'COUNT_STUDY', description: null, flexibleMinutes: 0 } },
+   { ...base, id: 14, title: '单词复习', activity: { mode: 'COUNT_REVIEW', description: null, flexibleMinutes: 0 } }
+  ] })
+  data.sections![1].tasks.push({ ...base, id: 15, title: 'LeetCode', sequence: { mode: 'SELECT_BY_NUMBER', items: [], current: null, dayItem: null, revision: 'r', actionable: true } })
+  mocks.fetch.mockResolvedValue(data)
+  const w = await page()
+  const main = w.get('#quest-main'), daily = w.get('#quest-daily'), side = w.get('#quest-side')
+  expect(daily.isVisible()).toBe(true); expect(main.isVisible()).toBe(false); expect(side.isVisible()).toBe(false)
+  const categories = w.get('[aria-label="任务分类"]')
+  expect(categories.findAll('a')).toHaveLength(0)
+  expect(categories.findAll('button').map(b => b.attributes('aria-controls'))).toEqual(['quest-main', 'quest-daily', 'quest-side'])
+  expect(categories.get('[aria-controls="quest-daily"]').attributes('aria-pressed')).toBe('true')
+  expect(main.text()).toContain('高数第三讲'); expect(main.text()).toContain('复习进程调度')
+  expect(main.text()).toContain('高数教材'); expect(main.text()).not.toContain('背单词')
+  expect(daily.text()).toContain('背单词'); expect(daily.text()).toContain('单词复习'); expect(daily.text()).toContain('LeetCode')
+  expect(daily.find('.completed').exists()).toBe(false)
+  expect(daily.findAll('.task-row')).toHaveLength(3)
+  expect(side.find('.task-row').exists()).toBe(false); expect(side.text()).toContain('还没有支线任务')
+  await categories.get('[aria-controls="quest-main"]').trigger('click')
+  expect(main.isVisible()).toBe(true); expect(daily.isVisible()).toBe(false); expect(side.isVisible()).toBe(false)
+  expect(categories.get('[aria-controls="quest-main"]').attributes('aria-pressed')).toBe('true')
+  await button(w, '继续学习下一段').trigger('click'); await flushPromises()
+  expect(main.text()).toContain('自选下一段'); expect(side.text()).not.toContain('自选下一段')
+  await categories.get('[aria-controls="quest-side"]').trigger('click')
+  expect(side.isVisible()).toBe(true); expect(main.isVisible()).toBe(false); expect(daily.isVisible()).toBe(false)
+  await categories.get('[aria-controls="quest-main"]').trigger('click')
+  expect(main.text()).toContain('自选下一段'); expect(main.isVisible()).toBe(true)
+  expect(mocks.fetch).toHaveBeenCalledTimes(1)
+  expect(mocks.learning).not.toHaveBeenCalled(); expect(mocks.review).not.toHaveBeenCalled()
+ })
+ it('未知科目和已完成任务保留，空清单不伪造支线或进度', async () => {
+  const data = fixture(); data.sections![0].name = '其他方向'; data.sections![0].tasks[0].completionPercent = 100
+  mocks.fetch.mockResolvedValue(data)
+  const w = await page()
+  expect(w.get('#quest-main').text()).toContain('其他方向'); expect(w.get('#quest-main .completed').text()).toContain('高数第三讲')
+  expect(w.get('#quest-daily').text()).toContain('今天暂无每日任务')
+  expect(w.get('#quest-side').findAll('.task-row')).toHaveLength(0)
+ })
+})
+
 describe('教材按页码记录',()=>{
  function pageFixture() {
   const data=fixture();const task=data.sections![0].tasks[0]

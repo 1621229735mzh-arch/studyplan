@@ -119,7 +119,7 @@ router.beforeEach(async (to) => {
 
 router.afterEach((to) => {
   const title = typeof to.meta.title === 'string' ? to.meta.title : ''
-  document.title = title ? `${title} · 考研学习工作台` : '考研学习工作台'
+  document.title = title ? `${title} · 人生任务系统` : '人生任务系统'
 })
 
 export default router

@@ -52,9 +52,9 @@ async function handleSubmit(): Promise<void> {
   <div class="login-page">
     <div class="login-page__art" aria-hidden="true"><ArchiveArtwork /></div>
     <div class="login-page__panel">
-      <span class="login-page__eyebrow">STUDY ROOM</span>
-      <h1 class="login-page__title">学习工作台</h1>
-      <p class="login-page__subtitle">预设账号登录，不开放注册。登录后学习数据在电脑与手机之间同步。</p>
+      <span class="login-page__eyebrow">LIFE QUEST SYSTEM</span>
+      <h1 class="login-page__title">人生任务系统</h1>
+      <p class="login-page__subtitle">从今天的行动开始，持续推进自己的目标。使用个人账号登录，记录在电脑与手机之间同步。</p>
 
       <ElAlert v-if="route.query.reason === 'expired'" class="login-page__error" type="warning" show-icon :closable="false" title="登录已失效，请重新登录。登录成功后将返回原页面并读取最新数据。" />
       <ElAlert

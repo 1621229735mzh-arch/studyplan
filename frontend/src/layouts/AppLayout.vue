@@ -3,7 +3,6 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { ElButton, ElDrawer, ElMessage, ElTag } from 'element-plus'
 import AppIcon from '@/components/AppIcon.vue'
-import ArchiveArtwork from '@/components/ArchiveArtwork.vue'
 import OfflineNotice from '@/components/OfflineNotice.vue'
 import { formatDateTime } from '@/composables/useFormat'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
@@ -55,9 +54,9 @@ async function handleLogout(): Promise<void> {
   <div class="app-layout" :class="{ 'app-layout--today': isToday }">
     <a class="skip-link" href="#study-main">跳到主要内容</a>
     <aside class="app-layout__aside">
-      <RouterLink to="/" class="app-layout__brand" aria-label="学习工作台首页">
+      <RouterLink to="/" class="app-layout__brand" aria-label="人生任务系统首页">
         <img src="@/assets/logo.svg" alt="" class="app-layout__logo" />
-        <div class="app-layout__brand-text"><strong>学习工作台</strong><span>STUDY ROOM</span></div>
+        <div class="app-layout__brand-text"><strong>人生任务系统</strong><span>LIFE QUEST SYSTEM</span></div>
       </RouterLink>
       <nav class="app-layout__menu" aria-label="主导航">
         <RouterLink v-for="item in menuItems" :key="item.path" :to="item.path" class="app-layout__nav-link" :class="{ 'is-active': isActive(item.path) }" :aria-current="isActive(item.path) ? 'page' : undefined" :aria-label="item.label"><AppIcon :name="item.icon" /><span>{{ item.label }}</span></RouterLink>
@@ -67,7 +66,7 @@ async function handleLogout(): Promise<void> {
     </aside>
     <div class="app-layout__body">
       <header class="app-layout__header">
-        <div class="app-layout__title"><span class="desktop-page-title">{{ pageTitle }}</span><span class="mobile-brand">学习工作台</span></div>
+        <div class="app-layout__title"><span class="desktop-page-title">{{ pageTitle }}</span><span class="mobile-brand">人生任务系统</span></div>
         <div class="app-layout__status">
           <ElTag :type="online ? 'success' : 'warning'" size="small" effect="plain">{{ online ? '在线' : '离线' }}</ElTag>
           <span class="app-layout__sync">最后同步：{{ lastSyncText }}</span>
@@ -77,7 +76,6 @@ async function handleLogout(): Promise<void> {
       </header>
       <main id="study-main" class="app-layout__main"><OfflineNotice /><RouterView /></main>
     </div>
-    <aside v-if="isToday" class="app-layout__art" aria-hidden="true"><ArchiveArtwork /></aside>
     <nav class="mobile-navigation" aria-label="手机主导航">
       <RouterLink v-for="item in primaryItems" :key="item.path" :to="item.path" :class="{ 'is-active': isActive(item.path) }" :aria-current="isActive(item.path) ? 'page' : undefined"><AppIcon :name="item.icon" :size="22" /><span>{{ item.label }}</span></RouterLink>
       <button type="button" :class="{ 'is-active': moreActive || moreOpen }" :aria-expanded="moreOpen" :aria-controls="moreOpen ? 'mobile-more-menu' : undefined" @click="moreOpen = !moreOpen"><AppIcon name="more" :size="22" /><span>更多</span></button>
