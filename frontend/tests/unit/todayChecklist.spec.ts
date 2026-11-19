@@ -5,8 +5,10 @@ import ElementPlus, { ElButton, ElDatePicker, ElInputNumber, ElRadioGroup } from
 import { HttpApiError } from '@/api/http'
 import TodayView from '@/features/today/views/TodayView.vue'
 import LearningDurationInput from '@/features/learning/components/LearningDurationInput.vue'
+import { readTimeDraft, saveTimeDraft } from '@/features/learning/api/timeDraft'
 import type { TodayResponse } from '@/features/today/types'
 const mocks = vi.hoisted(() => ({ fetch: vi.fn(), learning: vi.fn(), review: vi.fn(), problems: vi.fn(), confirmation: vi.fn(), cache: vi.fn(), online: { value: true }, snapshot: null as TodayResponse | null }))
+vi.mock('@/features/learning/api/timeDraft', () => ({ readTimeDraft: vi.fn().mockResolvedValue(null), saveTimeDraft: vi.fn(), discardTimeDraft: vi.fn() }))
 vi.mock('@/features/today/api', () => ({ fetchToday: mocks.fetch, saveLearningProgress: mocks.learning, saveCompletedProblemNumbers: mocks.problems, saveReviewProgress: mocks.review, saveDayConfirmation: mocks.confirmation }))
 vi.mock('@/composables/useOnlineStatus', () => ({ useOnlineStatus: () => ({ online: mocks.online }) }))
 vi.mock('@/stores/catalog', () => ({ useCatalogStore: () => ({ load: vi.fn(), subjectNameOf: () => '数学一' }) }))
@@ -87,7 +89,7 @@ describe('教材按页码记录',()=>{
   expect(w.text()).toContain('印刷第 25—28 页')
   expect(w.find('[aria-label="累计已完成百分比"]').exists()).toBe(false)
   await button(w,'保存').trigger('click');await flushPromises();expect(mocks.learning).not.toHaveBeenCalled()
-  input.vm.$emit('update:modelValue',27);w.findComponent(LearningDurationInput).vm.$emit('update:modelValue',45);await flushPromises()
+  await button(w, '手填分钟').trigger('click');input.vm.$emit('update:modelValue',27);w.findComponent(LearningDurationInput).vm.$emit('update:modelValue',45);await flushPromises()
   mocks.learning.mockRejectedValueOnce(new Error('保存失败'));await button(w,'保存').trigger('click');await flushPromises()
   const first=mocks.learning.mock.calls[0][2]
   expect(first).toMatchObject({completedPage:27,completionPercent:null,durationMinutes:45,date:'2026-10-01'})
@@ -203,7 +205,7 @@ describe('今日清单操作',()=>{
   const first=mocks.learning.mock.calls[0];expect(first.slice(0,2)).toEqual([11,'rev1']);expect(first[2]).toMatchObject({date:'2026-10-01',completionPercent:50,durationMinutes:null});
   await button(w,'保存').trigger('click');await flushPromises();expect(mocks.learning.mock.calls[1][2].clientToken).toEqual(first[2].clientToken);expect(mocks.fetch).toHaveBeenCalledTimes(2);
  })
- it('数学完成按钮可留空用时保存',async()=>{const w=await page();await button(w,'完成').trigger('click');await flushPromises();expect(w.findAllComponents(ElInputNumber)).toHaveLength(1);await button(w,'保存').trigger('click');await flushPromises();expect(mocks.learning.mock.calls[0][2]).toMatchObject({completionPercent:100,durationMinutes:null})})
+ it('数学完成按钮可留空用时保存',async()=>{const w=await page();await button(w,'完成').trigger('click');await flushPromises();expect(w.findAll('input[type="datetime-local"]')).toHaveLength(2);await button(w,'保存').trigger('click');await flushPromises();expect(mocks.learning.mock.calls[0][2]).toMatchObject({completionPercent:100,durationMinutes:null})})
  it('复习完成必须反馈掌握情况',async()=>{const w=await page();await button(w,'完成',1).trigger('click');await flushPromises();await flushPromises();await button(w,'保存').trigger('click');await flushPromises();expect(mocks.review).not.toHaveBeenCalled();expect(w.text()).toContain('请选择本次复习的掌握情况')})
  it('离线快照可查看任务项数但不能提交任务',async()=>{mocks.online.value=false;mocks.snapshot=fixture();const w=await page();expect(w.text()).toContain('只读快照');expect(w.get('.today-summary').findAll('strong').map(m=>m.text())).toEqual(['0 项','1 项','1 项']);expect(button(w,'完成').attributes('disabled')).toBeDefined();expect(button(w,'剩余').attributes('disabled')).toBeDefined();expect(mocks.fetch).not.toHaveBeenCalled();expect(mocks.learning).not.toHaveBeenCalled()})
  it('部分复习无需用时提交进度，不要求掌握反馈',async()=>{const w=await page();await button(w,'剩余',1).trigger('click');await flushPromises();const fields=w.findAllComponents(ElInputNumber);fields[0].vm.$emit('update:modelValue',30);await flushPromises();await button(w,'保存').trigger('click');await flushPromises();expect(mocks.review.mock.calls[0].slice(0,3)).toEqual([21,3,null]);expect(mocks.review.mock.calls[0][3]).toMatchObject({completionPercent:30,durationMinutes:null})})
@@ -289,8 +291,8 @@ describe('时间型学习与复盘', () => {
   const data=fixture(); Object.assign(data.sections![0].tasks[0],{completionPercent:0,unitName:'题',activity:{mode:'TIMED_STUDY',description:'基础练习',flexibleMinutes:30}})
   mocks.fetch.mockResolvedValue(data); const w=await page(); await button(w,'结束本次').trigger('click'); await flushPromises()
   expect(w.text()).toContain('不表示整讲或整章已经学完'); expect(w.text()).not.toContain('累计已完成 (%)')
-  const fields=w.findAllComponents(ElInputNumber); expect(fields).toHaveLength(2)
-  fields[1].vm.$emit('update:modelValue',4);  await flushPromises()
+  const fields=w.findAllComponents(ElInputNumber); expect(fields).toHaveLength(1)
+  fields[0].vm.$emit('update:modelValue',4);  await flushPromises()
   await button(w,'保存').trigger('click'); await flushPromises()
   expect(mocks.learning.mock.calls[0][2]).toMatchObject({completionPercent:100,durationMinutes:null,actualAmount:4})
  })
@@ -326,10 +328,39 @@ describe('每日完成确认',()=>{
 })
 
 describe('按书接续学习',()=>{
+ it('开始时间单独保存，重进任务后跨午夜计算用时并随记录提交', async () => {
+  const w = await page()
+  const startedAt = '2026-10-01T23:45'
+  const draft = { startedAt, revision: 'saved-start' }
+  vi.mocked(saveTimeDraft).mockRejectedValueOnce(new Error('暂时断线')).mockResolvedValueOnce(draft)
+  await button(w, '剩余').trigger('click'); await flushPromises()
+  await w.findAll('input[type="datetime-local"]')[0].setValue(startedAt)
+  await flushPromises()
+  expect(w.text()).not.toContain('开始时间已保存')
+  await button(w, '重试保存').trigger('click'); await flushPromises()
+  expect(saveTimeDraft).toHaveBeenCalledWith('task-11', startedAt, null)
+  expect(w.text()).toContain('开始时间已保存，可以退出')
+  await button(w, '保存').trigger('click')
+  expect(mocks.learning).not.toHaveBeenCalled()
+  await button(w, '取消').trigger('click')
+  vi.mocked(readTimeDraft).mockResolvedValueOnce(draft)
+  await button(w, '完成').trigger('click'); await flushPromises()
+  const [start, end] = w.findAll<HTMLInputElement>('input[type="datetime-local"]')
+  expect(start.element.value).toBe(startedAt)
+  await end.setValue('2026-10-01T00:20')
+  await button(w, '保存').trigger('click')
+  expect(mocks.learning).not.toHaveBeenCalled()
+  await end.setValue('2026-10-02T00:20')
+  expect(w.text()).toContain('本次用时 35 分钟')
+  await button(w, '保存').trigger('click'); await flushPromises()
+  expect(mocks.learning.mock.calls[0][2]).toMatchObject({ durationMinutes: 35,
+    timeRange: { revision: draft.revision, endedAt: '2026-10-02T00:20' } })
+ })
  it('数学本次用时随进度保存，失败保留，改用时换令牌，下一次不沿用',async()=>{
   mocks.fetch.mockResolvedValue(continuedFixture());const w=await page()
   await button(w,'剩余',0).trigger('click');await flushPromises()
   w.findAllComponents(ElInputNumber)[0].vm.$emit('update:modelValue',70)
+  await button(w, '手填分钟').trigger('click')
   w.findComponent(LearningDurationInput).vm.$emit('update:modelValue',45);await flushPromises()
   mocks.learning.mockRejectedValueOnce(new Error('保存失败'))
   await button(w,'保存').trigger('click');await flushPromises()
@@ -349,6 +380,7 @@ describe('按书接续学习',()=>{
  it('用时为零不保存，清空后仍可提交；只记用时可保持原进度',async()=>{
   mocks.fetch.mockResolvedValue(continuedFixture());const w=await page()
   await button(w,'剩余',0).trigger('click');await flushPromises()
+  await button(w, '手填分钟').trigger('click')
   w.findComponent(LearningDurationInput).vm.$emit('update:modelValue',0);await flushPromises()
   await button(w,'保存').trigger('click');await flushPromises()
   expect(mocks.learning).not.toHaveBeenCalled();expect(w.text()).toContain('正整数分钟')
@@ -356,6 +388,7 @@ describe('按书接续学习',()=>{
   await button(w,'保存').trigger('click');await flushPromises()
   expect(mocks.learning.mock.calls[0][2]).toMatchObject({completionPercent:40,durationMinutes:25})
   await button(w,'完成',1).trigger('click');await flushPromises()
+  await button(w, '手填分钟').trigger('click')
   w.findComponent(LearningDurationInput).vm.$emit('update:modelValue',20);await flushPromises()
   w.findComponent(LearningDurationInput).vm.$emit('update:modelValue',null);await flushPromises()
   await button(w,'保存').trigger('click');await flushPromises()
@@ -462,7 +495,7 @@ describe('按书接续学习',()=>{
   expect(w.findAll('.task-estimate').map(item=>item.text())).toEqual(['预计剩余 1 小时 30 分钟'])
   expect(w.text()).not.toContain('预计用时待补充')
   await button(w,'剩余',0).trigger('click');await flushPromises()
-  expect(w.findAllComponents(ElInputNumber)).toHaveLength(2)
+  expect(w.findAllComponents(ElInputNumber)).toHaveLength(1)
   expect(w.text()).toContain('本次用时（可选）')
   w.findComponent(ElInputNumber).vm.$emit('update:modelValue',70);await flushPromises()
   await button(w,'保存').trigger('click');await flushPromises()
@@ -472,7 +505,7 @@ describe('按书接续学习',()=>{
   mocks.fetch.mockResolvedValue(continuedFixture());const w=await page()
   await button(w,'剩余',0).trigger('click');await flushPromises()
   expect(w.text()).not.toContain('进度位置与卡点');expect(w.text()).not.toContain('不表示整讲')
-  const fields=w.findAllComponents(ElInputNumber);expect(fields).toHaveLength(2)
+  const fields=w.findAllComponents(ElInputNumber);expect(fields).toHaveLength(1)
   fields[0].vm.$emit('update:modelValue',70);await flushPromises()
   await button(w,'保存').trigger('click');await flushPromises()
   expect(mocks.learning.mock.calls[0].slice(0,2)).toEqual([11,'rev-11'])

@@ -37,7 +37,11 @@ public record StudyRecordUpdateRequest(
 
         @NotNull(message = "缺少数据版本，无法安全修改")
         Long version,
-        Long sequenceItemId, @Min(1) Integer problemNumber) {
+        Long sequenceItemId, @Min(1) Integer problemNumber, @jakarta.validation.Valid StudyTimeRange timeRange) {
+    public StudyRecordUpdateRequest(Long taskId, Long subjectId, Long unitId, LocalDate recordDate,
+            BigDecimal amount, Integer durationMinutes, String content, String note, Long version, Long sequenceItemId, Integer problemNumber) {
+        this(taskId, subjectId, unitId, recordDate, amount, durationMinutes, content, note, version, sequenceItemId, problemNumber, null);
+    }
     public StudyRecordUpdateRequest(Long taskId, Long subjectId, Long unitId, LocalDate recordDate,
             BigDecimal amount, Integer durationMinutes, String content, String note, Long version, Long sequenceItemId) {
         this(taskId,subjectId,unitId,recordDate,amount,durationMinutes,content,note,version,sequenceItemId,null);

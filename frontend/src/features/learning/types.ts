@@ -36,6 +36,7 @@ export interface LearningRecord {
 
 /** 提交学习记录（后端 StudyRecordCreateRequest）。 */
 export interface LearningRecordCreateRequest {
+  timeRange?: import('./api/timeDraft').StudyTimeRange
   problemNumber?: number | null
   sequenceItemId?: number | null
   sequenceTitle?: string | null
@@ -58,6 +59,7 @@ export interface LearningRecordCreateRequest {
 
 /** 修改学习记录（后端 StudyRecordUpdateRequest）；version 必填。 */
 export interface LearningRecordUpdateRequest {
+  timeRange?: import('./api/timeDraft').StudyTimeRange
   problemNumber?: number | null
   sequenceItemId?: number | null
   sequenceTitle?: string | null
@@ -83,6 +85,7 @@ export interface LearningRecordQuery {
 
 /** 记录表单的本地校验字段（表单字段名与请求字段保持一致）。 */
 export interface LearningRecordFormModel {
+  timeRange?: import('./api/timeDraft').StudyTimeRange
   problemNumber?: number | null
   sequenceItemId?: number | null
   sequenceTitle?: string | null

@@ -13,6 +13,7 @@ export function fetchToday(date: string, signal?: AbortSignal): Promise<TodayRes
 }
 
 export interface DayProgressPayload {
+  timeRange?: import('@/features/learning/api/timeDraft').StudyTimeRange
   problemNumber?: number | null
   date: string
   completionPercent: number | null

@@ -123,11 +123,11 @@ onBeforeUnmount(() => { request++ })
     <RecordClassificationDialog :record="classifying" @close="classifying = null" @saved="loadRecords" />
     <ElDialog v-model="createVisible" title="补记学习" width="min(700px, calc(100vw - 24px))" :close-on-click-modal="false" :close-on-press-escape="!submitting" :show-close="!submitting">
       <p class="workspace-note">选择学习日期，记下实际完成的内容。</p>
-      <RecordEditorForm ref="createForm" :tasks="taskOptions" :subjects="catalog.subjects" :units="catalog.units" :submitting="submitting" @submit="save($event)" />
+      <RecordEditorForm ref="createForm" :visible="createVisible" :tasks="taskOptions" :subjects="catalog.subjects" :units="catalog.units" :submitting="submitting" @submit="save($event)" />
     </ElDialog>
     <ElDialog v-model="editVisible" title="修改学习记录" width="min(700px, calc(100vw - 24px))" :close-on-click-modal="false" :close-on-press-escape="!submitting" :show-close="!submitting" destroy-on-close>
       <p class="workspace-note">修改会同步反映到今日和进度中。</p>
-      <RecordEditorForm ref="editForm" mode="edit" :continued="editing?.activityMode === 'CONTINUED_STUDY'" :progress-delta="editing?.continuationDelta" :tasks="taskOptions" :subjects="catalog.subjects" :units="catalog.units" :submitting="submitting" @submit="save($event, true)" @cancel="editVisible = false" />
+      <RecordEditorForm ref="editForm" :visible="editVisible" :record-id="editing?.id" mode="edit" :continued="editing?.activityMode === 'CONTINUED_STUDY'" :progress-delta="editing?.continuationDelta" :tasks="taskOptions" :subjects="catalog.subjects" :units="catalog.units" :submitting="submitting" @submit="save($event, true)" @cancel="editVisible = false" />
     </ElDialog>
   </div>
 </template>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kaoyan.study.learning.mapper.TimeDraftMapper">
+    <select id="find" resultType="com.kaoyan.study.learning.dto.TimeDraft">
+        SELECT started_at, revision FROM learning_time_draft
+        WHERE username = #{username} AND context_key = #{context}
+    </select>
+    <insert id="insert">
+        INSERT INTO learning_time_draft (username, context_key, started_at, revision)
+        VALUES (#{username}, #{context}, #{draft.startedAt}, #{draft.revision})
+    </insert>
+    <update id="replace">
+        UPDATE learning_time_draft SET started_at = #{draft.startedAt}, revision = #{draft.revision}
+        WHERE username = #{username} AND context_key = #{context} AND revision = #{expected}
+    </update>
+    <delete id="remove">
+        DELETE FROM learning_time_draft WHERE username = #{username} AND context_key = #{context} AND revision = #{expected}
+    </delete>
+</mapper>

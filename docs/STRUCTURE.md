@@ -1,5 +1,7 @@
 # 目录与模块落点
 
+2026-11-18：学习模块的 `TimeDraftService` 通过 V28 的 `learning_time_draft` 保存账号下的开始时间。今日和记录表单共用 `LearningDurationInput.vue`；草稿仅在线读取，提交学习记录时在同一事务内校验分钟数并清除草稿。
+
 2026-11-17：`features/today/quests.ts` 仅按已有任务模式划分主线与每日展示，支线无归属时为空；不保存任务状态或统计，不拆散教材接续与自动复习队列。`TodayView.vue` 与 `styles/today.css` 组织响应式任务面板。
 
 2026-11-02流程补强：`review/service/ReviewFeedbackService`在原复习模块实现带版本和审计的最近反馈更正，复用原记录和FSRS纯计算；`ReviewFeedbackMapper`只写本模块数据，V25增加日期来源与审计表。`ReviewFeedbackCorrectionDialog.vue`由教材列表及内容库共用，接口归原`review/api`。`today/readFailure.ts`组织今日读取失败说明，日期来源文案归`review/dateExplanation.ts`，不新增缓存层或模块。合同见[business/review-feedback-correction.md](business/review-feedback-correction.md)。

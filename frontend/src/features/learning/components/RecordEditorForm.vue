@@ -46,6 +46,8 @@ const props = withDefaults(
   defineProps<{
     /** 任务候选项（今日计划任务或全部任务） */
     tasks?: LearningRecordTaskOption[]
+    recordId?: number
+    visible?: boolean
     subjects?: Subject[]
     units?: StudyUnit[]
     /** 修改模式：按钮文案与提示不同 */
@@ -59,6 +61,7 @@ const props = withDefaults(
     tasks: () => [],
     subjects: () => [],
     units: () => [],
+    visible: true,
     mode: 'create',
     submitting: false
   }
@@ -113,6 +116,8 @@ const subjectName = computed(() => selectedTask.value?.subjectName ?? props.subj
 const allowDuration = computed(() => canRecordMathDuration(subjectName.value, selectedTask.value?.activityMode))
 watch(allowDuration, allowed => { if (!allowed && props.mode === 'create') form.durationMinutes = null })
 
+const durationInput = ref<InstanceType<typeof LearningDurationInput> | null>(null)
+const durationContext = computed(() => props.recordId ? `record-${props.recordId}` : form.taskId ? `task-${form.taskId}` : `subject-${form.subjectId}`)
 const submitLabel = computed(() => (props.mode === 'edit' ? '保存修改' : '记一笔'))
 
 
@@ -150,7 +155,10 @@ function onAmountChange(value: unknown): void {
 /** 提交：先本地校验（同步、可测），再判断离线，最后把载荷交给父组件。 */
 function submit(): void {
   if (props.submitting || !sequenceReady.value) return
-  const result = validateLearningRecordForm(form, props.mode)
+  const timing = durationInput.value?.submission(form.durationMinutes)
+  if (timing?.error) { formError.value = timing.error; return }
+  const model = { ...form, ...(timing && { durationMinutes: timing.durationMinutes, timeRange: timing.timeRange }) }
+  const result = validateLearningRecordForm(model, props.mode)
   fieldErrors.value = result.errors
   formError.value = result.summary
   if (!result.valid) {
@@ -161,10 +169,10 @@ function submit(): void {
     formError.value = '当前处于离线状态，第一版不支持离线提交。已填写的内容会保留，联网后可直接重试。'
     return
   }
-  const signature = JSON.stringify(form)
+  const signature = JSON.stringify(model)
   if (submittedSignature !== null && signature !== submittedSignature) clientToken.value = newClientToken()
   submittedSignature = signature
-  emit('submit', { model: { ...form }, clientToken: clientToken.value })
+  emit('submit', { model, clientToken: clientToken.value })
 }
 
 /** 后端返回的字段错误（例如任务不存在）绑定回表单。 */
@@ -267,7 +275,7 @@ defineExpose({ form, submit, reset, fillFrom, setServerError })
       <p v-if="continued" class="record-form__wide">本次增加进度：{{ progressDelta ?? 0 }}%。需要更正进度时删除此记录，再填写正确百分比。</p>
 
       <ElFormItem v-if="allowDuration" class="record-form__wide" label="本次用时" :error="fieldErrors.durationMinutes">
-        <LearningDurationInput v-model="form.durationMinutes" :disabled="submitting || !online" />
+        <LearningDurationInput v-if="visible !== false" :key="durationContext" ref="durationInput" :context="durationContext" v-model="form.durationMinutes" :disabled="submitting || !online" />
       </ElFormItem>
       <ElFormItem class="record-form__wide" label="复盘" :error="fieldErrors.note">
         <ElInput

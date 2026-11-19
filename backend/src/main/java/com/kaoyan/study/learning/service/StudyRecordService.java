@@ -49,6 +49,7 @@ import java.util.stream.Stream;
 @Service
 public class StudyRecordService {
 
+    private final TimeDraftService timeDrafts;
     private final DailyPlanService dailyPlanService;
     private final SequenceLearningService sequences;
     private final com.kaoyan.study.plan.service.TaskSequenceService sequencePlans;
@@ -68,7 +69,8 @@ public class StudyRecordService {
                               DailyPlanService dailyPlanService, SequenceLearningService sequences, com.kaoyan.study.plan.service.TaskActivityService activities,
                               ContinuationLearningService continuedLearning,com.kaoyan.study.plan.service.TaskContinuationService continuations,
                               org.springframework.context.ApplicationEventPublisher events,
-                              com.kaoyan.study.plan.service.TaskSequenceService sequencePlans) {
+                              com.kaoyan.study.plan.service.TaskSequenceService sequencePlans, TimeDraftService timeDrafts) {
+        this.timeDrafts = timeDrafts;
         this.sequencePlans=sequencePlans;
         this.events = events;
         this.continuedLearning=continuedLearning; this.continuations=continuations;
@@ -160,6 +162,8 @@ public class StudyRecordService {
                 throw new ConflictException("TOKEN_REUSED","该提交令牌已使用或已撤销，请刷新后重新提交");
             throw ex;
         }
+        String context = request.taskId() != null ? "task-" + request.taskId() : "subject-" + request.subjectId();
+        timeDrafts.consume(context, request.timeRange(), request.durationMinutes());
         events.publishEvent(new com.kaoyan.study.learning.dto.StudyTaskChanged(record.getTaskId()));
         return get(record.getId());
     }
@@ -206,6 +210,7 @@ public class StudyRecordService {
         if (studyRecordMapper.update(existing) == 0) {
             throw new ConflictException("STUDY_RECORD_STALE", "该记录已在其他设备上修改，请刷新后重试");
         }
+        timeDrafts.consume("record-" + id, request.timeRange(), request.durationMinutes());
         events.publishEvent(new com.kaoyan.study.learning.dto.StudyTaskChanged(original.getTaskId()));
         if (!Objects.equals(original.getTaskId(),existing.getTaskId()))
             events.publishEvent(new com.kaoyan.study.learning.dto.StudyTaskChanged(existing.getTaskId()));
@@ -340,6 +345,7 @@ public class StudyRecordService {
             sequences.verifyNumberRetry(retry,request.taskId(),request.date(),request.completionPercent().compareTo(BigDecimal.valueOf(100))==0 ? BigDecimal.ONE:null,request.problemNumber());
             return get(retry.getId());
         }
+        timeDrafts.consume("task-" + request.taskId(), request.timeRange(), request.durationMinutes());
         continuations.lockForTasks(request.taskId());
         var snapshot = dayTasks(request.date()).stream().filter(x -> x.id().equals(request.taskId()))
                 .findFirst().orElseThrow(() -> new NotFoundException("当天学习安排不存在"));

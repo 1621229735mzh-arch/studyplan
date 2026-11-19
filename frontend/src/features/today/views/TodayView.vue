@@ -147,6 +147,7 @@ const pageRange = computed(() => selected.value?.kind === 'LEARNING' ? selected.
 const pageAction = computed(() => !isComplete.value && !!pageRange.value && progressMode.value === 'page')
 const percent = ref<number | undefined>(0)
 const actualAmount = ref<number | undefined>()
+const durationInput = ref<InstanceType<typeof LearningDurationInput> | null>(null)
 const durationMinutes = ref<number | null>(null)
 const activityNote = ref('')
 const mastery = ref<MasteryLevel | undefined>()
@@ -192,7 +193,9 @@ async function saveAction(): Promise<void> {
   const task = selected.value
   if (!task || saving.value) return
   if (readonly.value) { saveError.value = '请联网并刷新后再保存。'; return }
-  const timeError = mathDurationAction.value ? durationError(durationMinutes.value) : null
+  const timing = mathDurationAction.value ? durationInput.value?.submission(durationMinutes.value) : undefined
+  const recordedMinutes = mathDurationAction.value ? (timing ? timing.durationMinutes : durationMinutes.value) : null
+  const timeError = timing?.error || durationError(recordedMinutes)
   if (timeError) { saveError.value = timeError; return }
   if (pageAction.value && (!Number.isInteger(completedPage.value) || completedPage.value! < pageRange.value!.startPage || completedPage.value! > pageRange.value!.endPage)) {
     saveError.value = '请填写本段印刷页码范围内已学完的最后一页。'; return
@@ -209,12 +212,11 @@ async function saveAction(): Promise<void> {
   if (countedAction.value && (!Number.isInteger(actualAmount.value) || actualAmount.value! <= 0 || actualAmount.value! > 99999999)) { saveError.value = '请填写本次实际词数（正整数），未学习无需提交。'; return }
   if (task.activity && actualAmount.value != null && actualAmount.value <= 0) { saveError.value = '新增完成量请填写正数，尚未完成可留空。'; return }
   if (task.kind === 'REVIEW' && percent.value === 100 && !mastery.value) { saveError.value = '请选择本次复习的掌握情况。'; return }
-  const recordedMinutes = mathDurationAction.value ? durationMinutes.value : null
   const progressPercent = pageAction.value ? null : percent.value!
   const page = pageAction.value ? completedPage.value : undefined
-  const signature = JSON.stringify([progressPercent, page, mastery.value, actualAmount.value, activityNote.value, numberedAction.value ? problemNumbers : null, recordedMinutes])
+  const signature = JSON.stringify([progressPercent, page, mastery.value, actualAmount.value, activityNote.value, numberedAction.value ? problemNumbers : null, recordedMinutes, timing?.timeRange])
   if (attempt?.signature !== signature) attempt = { signature, token: crypto.randomUUID() }
-  const payload = { date: actionDate, completionPercent: progressPercent, ...(pageAction.value ? { completedPage: page } : {}), durationMinutes: recordedMinutes, clientToken: attempt!.token,
+  const payload = { date: actionDate, completionPercent: progressPercent, ...(pageAction.value ? { completedPage: page } : {}), durationMinutes: recordedMinutes, ...(timing?.timeRange && { timeRange: timing.timeRange }), clientToken: attempt!.token,
     ...(task.activity && !task.continuation ? {actualAmount: task.activity.mode === 'RECAP' ? null : actualAmount.value ?? null, note: activityNote.value || null} : {}) }
   saving.value = true
   saveError.value = null
@@ -379,7 +381,7 @@ onUnmounted(() => {
       <p v-if="!pageAction && !isComplete && !selected?.sequence && !timedAction" class="section-note">填写 30 表示已完成 30%，剩余 70%。</p>
       <template v-if="mathDurationAction">
         <label class="field-label">本次用时（可选）</label>
-        <LearningDurationInput v-model="durationMinutes" :disabled="saving || readonly" />
+        <LearningDurationInput v-if="dialogVisible && selected" :key="selected.id" ref="durationInput" :context="`task-${selected.id}`" v-model="durationMinutes" :disabled="saving || readonly" />
       </template>
       <template v-if="selected?.activity?.mode === 'TIMED_STUDY' && !countedAction"><label class="field-label">本次新增完成量（{{ selected.unitName }}，可留空）</label><ElInputNumber v-model="actualAmount" :min="0.000001" :precision="6" :controls="false" :disabled="saving" aria-label="本次新增完成量" /></template>
       <template v-if="countedAction">

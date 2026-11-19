@@ -1,10 +1,12 @@
-import { afterEach, describe, expect, it } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
 import ElementPlus from 'element-plus'
 import RecordForm from '@/features/learning/components/RecordForm.vue'
 import RecordEditorForm from '@/features/learning/components/RecordEditorForm.vue'
 import LearningDurationInput from '@/features/learning/components/LearningDurationInput.vue'
 import type { LearningRecordFormModel } from '@/features/learning/types'
+
+vi.mock('@/features/learning/api/timeDraft', () => ({ readTimeDraft: vi.fn().mockResolvedValue(null) }))
 
 const wrappers: ReturnType<typeof mount>[] = []
 afterEach(() => wrappers.splice(0).forEach(w => w.unmount()))
@@ -21,9 +23,10 @@ describe.each([['今日补记', RecordForm], ['记录页', RecordEditorForm]] as
   }
   it('可留空，填写后随记录发送；切换非数学任务不携带新用时', async () => {
     const { wrapper, form } = page()
-    form.fillFrom(model); await wrapper.vm.$nextTick()
+    form.fillFrom(model); await flushPromises()
     expect(wrapper.findComponent(LearningDurationInput).props('modelValue')).toBeNull()
     form.submit()
+    await wrapper.findAll('button').find(b => b.text() === '手填分钟')!.trigger('click')
     wrapper.findComponent(LearningDurationInput).vm.$emit('update:modelValue',45)
     await wrapper.vm.$nextTick(); form.submit()
     const submissions = wrapper.emitted('submit')!.map(e => e[0] as { model: LearningRecordFormModel; clientToken: string })

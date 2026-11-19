@@ -10,7 +10,11 @@ public record DayProgressRequest(
     @NotBlank @Size(max=64) String clientToken,
     @DecimalMin("0.000001") @Digits(integer=12,fraction=6) BigDecimal actualAmount,
     @Size(max=500) String note, @Min(1) Integer problemNumber,
-    @Min(1) Integer completedPage) {
+    @Min(1) Integer completedPage, @jakarta.validation.Valid StudyTimeRange timeRange) {
+    public DayProgressRequest(LocalDate date, Long taskId, BigDecimal completionPercent, Integer durationMinutes, String revision,
+            String clientToken, BigDecimal actualAmount, String note, Integer problemNumber, Integer completedPage) {
+        this(date, taskId, completionPercent, durationMinutes, revision, clientToken, actualAmount, note, problemNumber, completedPage, null);
+    }
     @com.fasterxml.jackson.annotation.JsonIgnore
     @AssertTrue(message="请填写完成比例或已学完页码，二选一")
     public boolean isProgressSpecified() { return (completionPercent==null)!=(completedPage==null); }
